@@ -1,0 +1,14 @@
+.progress-canvas {
+  width: 176px;
+  height: 24px;
+  cursor: pointer;
+  transition: transform 0.1s ease;
+}
+
+.progress-canvas:hover {
+  transform: scale(1.02);
+}
+
+.progress-canvas:active {
+  transform: scale(0.98);
+}

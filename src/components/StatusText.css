@@ -1,0 +1,30 @@
+.status-container {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.status {
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.3px;
+  color: var(--text-secondary);
+  transition: color 0.2s ease;
+}
+
+.status-idle {
+  color: var(--text-secondary);
+}
+
+.status-running {
+  color: var(--primary-color);
+}
+
+.status-completed {
+  color: var(--success-color);
+}
+
+.status-error {
+  color: var(--error-color);
+}
