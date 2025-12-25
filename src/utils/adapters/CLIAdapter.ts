@@ -1,4 +1,4 @@
-import { BaseAdapter, TaskInfo } from './adapters';
+import { BaseAdapter, TaskInfo } from '../adapters';
 
 export class CLIAdapter extends BaseAdapter {
   constructor() {

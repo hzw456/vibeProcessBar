@@ -52,6 +52,6 @@ export function useProgressEvents<T extends ProgressEventType>(
   const { on } = useProgressEvent();
   
   useEffect(() => {
-    return on(event, handler);
+    return on(event, handler as (data: unknown) => void);
   }, [event, handler, on]);
 }

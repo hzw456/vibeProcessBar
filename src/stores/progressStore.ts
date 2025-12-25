@@ -39,7 +39,7 @@ interface ProgressState {
 
 export const useProgressStore = create<ProgressState>()(
   persist(
-    (set, get) => ({
+    (set) => ({
       tasks: [],
       currentTaskId: null,
       settings: {

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { ProgressBar } from './components/ProgressBar';
 import { StatusText } from './components/StatusText';
-import { getCurrentWindow, invoke } from '@tauri-apps/api/window';
+import { getCurrentWindow, LogicalPosition } from '@tauri-apps/api/window';
 import './App.css';
 
 interface Task {
@@ -14,7 +14,7 @@ interface Task {
 
 function App() {
   const [tasks, setTasks] = useState<Task[]>([]);
-  const [currentTaskId, setCurrentTaskId] = useState<string | null>(null);
+  const [currentTaskId] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const containerRef = useRef<HTMLDivElement>(null);
@@ -26,7 +26,7 @@ function App() {
       if (isDragging && containerRef.current) {
         const newX = e.clientX - dragOffset.x;
         const newY = e.clientY - dragOffset.y;
-        getCurrentWindow().setPosition({ x: newX, y: newY });
+        getCurrentWindow().setPosition(new LogicalPosition(newX, newY));
       }
     };
 
@@ -64,19 +64,6 @@ function App() {
         t.id === currentTaskId ? { ...t, progress: value, status: value >= 100 ? 'completed' : 'running' } : t
       ));
     }
-  };
-
-  const startNewTask = (name: string = 'New Task') => {
-    const id = Date.now().toString();
-    const newTask: Task = {
-      id,
-      name,
-      progress: 0,
-      status: 'running',
-      startTime: Date.now()
-    };
-    setTasks(prev => [...prev, newTask]);
-    setCurrentTaskId(id);
   };
 
   const resetTask = () => {

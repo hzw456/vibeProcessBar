@@ -24,7 +24,7 @@ fn set_window_always_on_top(window: tauri::Window, on_top: bool) {
 
 #[tauri::command]
 fn set_window_transparency(window: tauri::Window, transparent: bool) {
-    window.set_effects(tauri::window::EffectsConfig::default()).ok();
+    // Transparency is handled by the window configuration in tauri.conf.json
 }
 
 #[tauri::command]

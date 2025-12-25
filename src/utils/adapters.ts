@@ -74,3 +74,8 @@ export function createAdapter(name: string): ProgressAdapter | null {
   const factory = adapters[name.toLowerCase()];
   return factory ? factory() : null;
 }
+
+import { CopilotAdapter } from './adapters/CopilotAdapter';
+import { ClaudeCodeAdapter } from './adapters/ClaudeCodeAdapter';
+import { CursorAdapter } from './adapters/CursorAdapter';
+import { CLIAdapter } from './adapters/CLIAdapter';
