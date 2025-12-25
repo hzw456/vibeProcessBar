@@ -1,8 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { ProgressBar } from './components/ProgressBar';
 import { StatusText } from './components/StatusText';
-import { appWindow } from '@tauri-apps/api/window';
-import { invoke } from '@tauri-apps/api/tauri';
+import { getCurrentWindow, invoke } from '@tauri-apps/api/window';
 import './App.css';
 
 interface Task {
@@ -27,7 +26,7 @@ function App() {
       if (isDragging && containerRef.current) {
         const newX = e.clientX - dragOffset.x;
         const newY = e.clientY - dragOffset.y;
-        invoke('set_window_position', { x: newX, y: newY });
+        getCurrentWindow().setPosition({ x: newX, y: newY });
       }
     };
 
