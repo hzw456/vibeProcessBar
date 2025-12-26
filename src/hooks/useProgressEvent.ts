@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useRef } from 'react';
+import { useProgressStore } from '../stores/progressStore';
+import { showNotification, playCompletionSound, isInDoNotDisturb } from '../utils/notifications';
 
 export function useProgressEvent() {
   const eventHandlers = useRef<Map<string, Set<(data: unknown) => void>>>(new Map());
@@ -54,4 +56,98 @@ export function useProgressEvents<T extends ProgressEventType>(
   useEffect(() => {
     return on(event, handler as (data: unknown) => void);
   }, [event, handler, on]);
+}
+
+export function useProgressNotifications() {
+  const { settings, addToHistory } = useProgressStore();
+  const lastNotifiedProgress = useRef<Map<string, number>>(new Map());
+
+  useEffect(() => {
+    const { on } = useProgressEvent();
+
+    const handleTaskCompleted = (data: unknown) => {
+      const eventData = data as { taskId: string; duration: number };
+      const { taskId, duration } = eventData;
+
+      if (settings.doNotDisturb && isInDoNotDisturb(settings.doNotDisturbStart, settings.doNotDisturbEnd)) {
+        return;
+      }
+
+      if (settings.notifications) {
+        showNotification({
+          title: 'Task Completed',
+          body: `Completed in ${(duration / 1000).toFixed(1)}s`,
+        });
+      }
+
+      if (settings.sound) {
+        playCompletionSound(settings.soundVolume);
+      }
+
+      addToHistory({
+        id: taskId,
+        name: 'Task',
+        progress: 100,
+        status: 'completed',
+        startTime: Date.now() - duration,
+        endTime: Date.now(),
+      });
+    };
+
+    const handleTaskProgress = (data: unknown) => {
+      const eventData = data as { taskId: string; progress: number };
+      const { taskId, progress } = eventData;
+      
+      const lastProgress = lastNotifiedProgress.current.get(taskId) || 0;
+      
+      if (progress >= settings.reminderThreshold && lastProgress < settings.reminderThreshold) {
+        if (settings.doNotDisturb && isInDoNotDisturb(settings.doNotDisturbStart, settings.doNotDisturbEnd)) {
+          return;
+        }
+
+        if (settings.notifications) {
+          showNotification({
+            title: 'Almost Done!',
+            body: `${progress}% complete`,
+          });
+        }
+
+        if (settings.sound) {
+          playCompletionSound(settings.soundVolume * 0.5);
+        }
+      }
+
+      lastNotifiedProgress.current.set(taskId, progress);
+    };
+
+    const handleTaskError = (data: unknown) => {
+      const eventData = data as { error: string };
+      const { error } = eventData;
+
+      if (settings.doNotDisturb && isInDoNotDisturb(settings.doNotDisturbStart, settings.doNotDisturbEnd)) {
+        return;
+      }
+
+      if (settings.notifications) {
+        showNotification({
+          title: 'Task Error',
+          body: error,
+        });
+      }
+
+      if (settings.sound) {
+        playCompletionSound(settings.soundVolume * 0.3);
+      }
+    };
+
+    const unsubCompleted = on('task:completed', handleTaskCompleted);
+    const unsubProgress = on('task:progress', handleTaskProgress);
+    const unsubError = on('task:error', handleTaskError);
+
+    return () => {
+      unsubCompleted();
+      unsubProgress();
+      unsubError();
+    };
+  }, [settings, addToHistory]);
 }

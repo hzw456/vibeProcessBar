@@ -15,13 +15,27 @@ interface ProgressState {
   tasks: ProgressTask[];
   currentTaskId: string | null;
   settings: {
-    theme: 'dark' | 'light';
+    theme: 'dark' | 'light' | 'purple' | 'ocean' | 'forest' | 'midnight';
     opacity: number;
     alwaysOnTop: boolean;
     autoStart: boolean;
     notifications: boolean;
     sound: boolean;
+    soundVolume: number;
+    vscodeEnabled: boolean;
+    vscodePort: number;
+    vscodeHost: string;
+    customColors: {
+      primaryColor: string;
+      backgroundColor: string;
+      textColor: string;
+    };
+    reminderThreshold: number;
+    doNotDisturb: boolean;
+    doNotDisturbStart: string;
+    doNotDisturbEnd: string;
   };
+  history: ProgressTask[];
   addTask: (name: string, adapter?: string) => string;
   removeTask: (id: string) => void;
   setCurrentTask: (id: string | null) => void;
@@ -29,12 +43,23 @@ interface ProgressState {
   updateStatus: (id: string, status: ProgressTask['status']) => void;
   completeTask: (id: string) => void;
   resetTask: (id: string) => void;
-  setTheme: (theme: 'dark' | 'light') => void;
+  setTheme: (theme: 'dark' | 'light' | 'purple' | 'ocean' | 'forest' | 'midnight') => void;
   setOpacity: (opacity: number) => void;
   setAlwaysOnTop: (value: boolean) => void;
   setAutoStart: (value: boolean) => void;
   setNotifications: (value: boolean) => void;
   setSound: (value: boolean) => void;
+  setSoundVolume: (value: number) => void;
+  setVSCodeEnabled: (value: boolean) => void;
+  setVSCodePort: (value: number) => void;
+  setVSCodeHost: (value: string) => void;
+  setCustomColors: (colors: { primaryColor?: string; backgroundColor?: string; textColor?: string }) => void;
+  setReminderThreshold: (value: number) => void;
+  setDoNotDisturb: (value: boolean) => void;
+  setDoNotDisturbStart: (value: string) => void;
+  setDoNotDisturbEnd: (value: string) => void;
+  addToHistory: (task: ProgressTask) => void;
+  clearHistory: () => void;
 }
 
 export const useProgressStore = create<ProgressState>()(
@@ -42,6 +67,7 @@ export const useProgressStore = create<ProgressState>()(
     (set) => ({
       tasks: [],
       currentTaskId: null,
+      history: [],
       settings: {
         theme: 'dark',
         opacity: 0.85,
@@ -49,6 +75,19 @@ export const useProgressStore = create<ProgressState>()(
         autoStart: false,
         notifications: true,
         sound: true,
+        soundVolume: 0.7,
+        vscodeEnabled: false,
+        vscodePort: 31415,
+        vscodeHost: 'localhost',
+        customColors: {
+          primaryColor: '',
+          backgroundColor: '',
+          textColor: '',
+        },
+        reminderThreshold: 100,
+        doNotDisturb: false,
+        doNotDisturbStart: '22:00',
+        doNotDisturbEnd: '08:00',
       },
 
       addTask: (name, adapter) => {
@@ -154,12 +193,83 @@ export const useProgressStore = create<ProgressState>()(
           settings: { ...state.settings, sound: value },
         }));
       },
+
+      setVSCodeEnabled: (value) => {
+        set((state) => ({
+          settings: { ...state.settings, vscodeEnabled: value },
+        }));
+      },
+
+      setVSCodePort: (value) => {
+        set((state) => ({
+          settings: { ...state.settings, vscodePort: Math.max(1024, Math.min(65535, value)) },
+        }));
+      },
+
+      setVSCodeHost: (value) => {
+        set((state) => ({
+          settings: { ...state.settings, vscodeHost: value },
+        }));
+      },
+
+      setSoundVolume: (value) => {
+        set((state) => ({
+          settings: { ...state.settings, soundVolume: Math.min(1, Math.max(0, value)) },
+        }));
+      },
+
+      setCustomColors: (colors) => {
+        set((state) => ({
+          settings: {
+            ...state.settings,
+            customColors: {
+              ...state.settings.customColors,
+              ...colors,
+            },
+          },
+        }));
+      },
+
+      setReminderThreshold: (value) => {
+        set((state) => ({
+          settings: { ...state.settings, reminderThreshold: Math.min(100, Math.max(0, value)) },
+        }));
+      },
+
+      setDoNotDisturb: (value) => {
+        set((state) => ({
+          settings: { ...state.settings, doNotDisturb: value },
+        }));
+      },
+
+      setDoNotDisturbStart: (value) => {
+        set((state) => ({
+          settings: { ...state.settings, doNotDisturbStart: value },
+        }));
+      },
+
+      setDoNotDisturbEnd: (value) => {
+        set((state) => ({
+          settings: { ...state.settings, doNotDisturbEnd: value },
+        }));
+      },
+
+      addToHistory: (task) => {
+        set((state) => ({
+          history: [task, ...state.history].slice(0, 50),
+        }));
+      },
+
+      clearHistory: () => {
+        set({ history: [] });
+      },
     }),
     {
       name: 'vibe-progress-storage',
       partialize: (state) => ({
         tasks: state.tasks,
         currentTaskId: state.currentTaskId,
+        history: state.history,
         settings: state.settings,
       }),
     }

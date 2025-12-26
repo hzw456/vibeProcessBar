@@ -15,17 +15,22 @@
         "title": "Vibe Progress Bar",
         "width": 200,
         "height": 60,
-        "resizable": false,
+        "resizable": true,
         "decorations": false,
         "transparent": true,
         "alwaysOnTop": true,
         "skipTaskbar": true,
-        "center": true
+        "center": true,
+        "minWidth": 150,
+        "minHeight": 50,
+        "maxWidth": 400,
+        "maxHeight": 150
       }
     ],
     "trayIcon": {
       "iconPath": "icons/tray.png",
-      "iconAsTemplate": true
+      "iconAsTemplate": true,
+      "tooltip": "Vibe Progress Bar"
     },
     "security": {
       "csp": null
@@ -41,5 +46,10 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ]
+  },
+  "plugins": {
+    "shell": {
+      "open": true
+    }
   }
 }
