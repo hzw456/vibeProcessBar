@@ -2,17 +2,22 @@ import './StatusText.css';
 
 interface StatusTextProps {
   taskName: string;
-  status: 'idle' | 'running' | 'completed' | 'error';
+  status: 'idle' | 'running' | 'completed' | 'error' | 'armed' | 'active';
   tokens?: number;
   ide?: string;
   onActivate?: () => void;
+  elapsedTime?: string;
 }
 
-export function StatusText({ taskName, status, tokens = 0, ide, onActivate }: StatusTextProps) {
+export function StatusText({ taskName, status, tokens = 0, ide, onActivate, elapsedTime }: StatusTextProps) {
   const getStatusIcon = () => {
     switch (status) {
       case 'idle':
         return '○';
+      case 'armed':
+        return '◎';
+      case 'active':
+        return '◈';
       case 'running':
         return '◉';
       case 'completed':
@@ -28,10 +33,14 @@ export function StatusText({ taskName, status, tokens = 0, ide, onActivate }: St
     switch (status) {
       case 'idle':
         return 'Ready';
+      case 'armed':
+        return taskName || 'Armed...';
+      case 'active':
+        return taskName || 'Active';
       case 'running':
         return taskName || 'Running...';
       case 'completed':
-        return 'Complete';
+        return elapsedTime ? `${taskName} - ${elapsedTime}` : taskName || 'Done';
       case 'error':
         return 'Error';
       default:

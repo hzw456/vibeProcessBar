@@ -13,16 +13,17 @@
     "macOSPrivateApi": true,
     "windows": [
       {
-        "title": "Vibe Progress Bar",
+        "title": "Vibe Process Bar",
         "label": "main",
-        "width": 220,
-        "height": 70,
+        "width": 280,
+        "height": 80,
+        "x": 1100,
+        "y": 50,
         "resizable": false,
         "decorations": false,
         "transparent": true,
         "alwaysOnTop": true,
         "skipTaskbar": true,
-        "center": true,
         "shadow": false,
         "visible": true
       }

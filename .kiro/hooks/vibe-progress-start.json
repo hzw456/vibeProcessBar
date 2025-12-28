@@ -1,0 +1,11 @@
+{
+  "name": "Vibe Progress - Start Task",
+  "description": "Report task start to Vibe Process Bar when agent execution begins",
+  "trigger": {
+    "type": "onAgentStart"
+  },
+  "action": {
+    "type": "shell",
+    "command": ".kiro/hooks/scripts/vibe-report.sh start"
+  }
+}

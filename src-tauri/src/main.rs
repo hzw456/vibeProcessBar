@@ -51,23 +51,26 @@ fn activate_ide(ide: &str, window_title: Option<&str>) -> Result<(), String> {
             }
             "kiro" => {
                 if let Some(title) = window_title {
-                    // Try to activate the specific Kiro window by title
+                    // For Kiro, search for window containing the title and raise it
                     format!(
                         r#"
                         tell application "System Events"
-                            tell process "Kiro"
-                                set frontmost to true
-                                set targetWindow to missing value
-                                repeat with w in windows
-                                    if name of w contains "{}" then
-                                        set targetWindow to w
+                            set kiroProcess to application process "Kiro"
+                            set frontmost of kiroProcess to true
+                            
+                            set winCount to count of windows of kiroProcess
+                            set searchTitle to "{}"
+                            
+                            repeat with i from 1 to winCount
+                                try
+                                    set w to window i of kiroProcess
+                                    set winTitle to title of w
+                                    if winTitle contains searchTitle then
+                                        perform action "AXRaise" of w
                                         exit repeat
                                     end if
-                                end repeat
-                                if targetWindow is not missing value then
-                                    perform action "AXRaise" of targetWindow
-                                end if
-                            end tell
+                                end try
+                            end repeat
                         end tell
                         tell application "Kiro" to activate
                     "#,
@@ -75,10 +78,7 @@ fn activate_ide(ide: &str, window_title: Option<&str>) -> Result<(), String> {
                     )
                 } else {
                     r#"
-                    tell application "Kiro"
-                        activate
-                        delay 0.3
-                    end tell
+                    tell application "Kiro" to activate
                     "#.to_string()
                 }
             }

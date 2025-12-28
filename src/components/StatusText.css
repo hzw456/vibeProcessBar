@@ -9,7 +9,7 @@
 }
 
 .status-icon {
-  font-size: 10px;
+  font-size: 12px;
   line-height: 1;
 }
 
@@ -30,16 +30,33 @@
   color: var(--error-color);
 }
 
+.status-icon.status-armed {
+  color: #fbbf24;
+  animation: armed-icon-pulse 1.5s ease-in-out infinite;
+  text-shadow: 0 0 8px rgba(251, 191, 36, 0.6);
+}
+
+@keyframes armed-icon-pulse {
+  0%, 100% { 
+    opacity: 0.7;
+    transform: scale(1);
+  }
+  50% { 
+    opacity: 1;
+    transform: scale(1.15);
+  }
+}
+
 @keyframes pulse {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.5; }
 }
 
 .status-text {
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 500;
   letter-spacing: 0.3px;
-  max-width: 100px;
+  max-width: 120px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -61,20 +78,39 @@
   color: var(--error-color);
 }
 
+.status-text.status-armed {
+  color: #fcd34d;
+  font-style: italic;
+}
+
+.status-icon.status-active {
+  color: #60a5fa;
+  animation: active-icon-pulse 2s ease-in-out infinite;
+}
+
+@keyframes active-icon-pulse {
+  0%, 100% { opacity: 0.8; }
+  50% { opacity: 1; }
+}
+
+.status-text.status-active {
+  color: #93c5fd;
+}
+
 .token-count {
-  font-size: 9px;
+  font-size: 10px;
   color: var(--text-muted);
   background: var(--bg-secondary);
-  padding: 2px 5px;
+  padding: 2px 6px;
   border-radius: 3px;
   font-weight: 500;
 }
 
 .ide-badge {
-  font-size: 8px;
+  font-size: 9px;
   color: var(--primary-color);
   background: var(--primary-color-10);
-  padding: 2px 5px;
+  padding: 2px 6px;
   border-radius: 3px;
   text-transform: uppercase;
   letter-spacing: 0.5px;

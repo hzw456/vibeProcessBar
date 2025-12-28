@@ -13,6 +13,7 @@ pub struct Task {
     pub ide: String,
     pub window_title: String,
     pub start_time: u64,
+    pub end_time: Option<u64>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -97,7 +98,8 @@ async fn handle_connection(
             "taskCount": tasks.len()
         });
         format_response(200, &resp.to_string())
-    } else if request.starts_with("POST /api/task/start") {
+    } else if request.starts_with("POST /api/task/armed") {
+        // ARMED state - task is waiting for AI activity, no timer yet
         match serde_json::from_str::<StartTaskRequest>(&body) {
             Ok(req) => {
                 let task = Task {
@@ -105,14 +107,46 @@ async fn handle_connection(
                     name: req.name,
                     progress: 0,
                     tokens: 0,
-                    status: "running".to_string(),
+                    status: "armed".to_string(),  // Special armed status
                     ide: req.ide,
                     window_title: req.window_title,
-                    start_time: chrono::Utc::now().timestamp_millis() as u64,
+                    start_time: 0,  // No start time yet - will be set when running
+                    end_time: None,
                 };
                 let mut tasks = state.tasks.lock().unwrap();
                 tasks.retain(|t| t.id != req.task_id);
                 tasks.push(task);
+                *state.current_task_id.lock().unwrap() = Some(req.task_id);
+                format_response(200, r#"{"status":"ok"}"#)
+            }
+            Err(e) => format_response(400, &format!(r#"{{"error":"Invalid request: {}"}}"#, e))
+        }
+    } else if request.starts_with("POST /api/task/start") {
+        match serde_json::from_str::<StartTaskRequest>(&body) {
+            Ok(req) => {
+                let mut tasks = state.tasks.lock().unwrap();
+                // Check if task exists and is in armed state
+                let existing = tasks.iter_mut().find(|t| t.id == req.task_id);
+                if let Some(task) = existing {
+                    // Update existing armed task to running
+                    task.status = "running".to_string();
+                    task.start_time = chrono::Utc::now().timestamp_millis() as u64;
+                    task.name = req.name;
+                } else {
+                    // Create new running task
+                    let task = Task {
+                        id: req.task_id.clone(),
+                        name: req.name,
+                        progress: 0,
+                        tokens: 0,
+                        status: "running".to_string(),
+                        ide: req.ide,
+                        window_title: req.window_title,
+                        start_time: chrono::Utc::now().timestamp_millis() as u64,
+                        end_time: None,
+                    };
+                    tasks.push(task);
+                }
                 *state.current_task_id.lock().unwrap() = Some(req.task_id);
                 format_response(200, r#"{"status":"ok"}"#)
             }
@@ -159,6 +193,7 @@ async fn handle_connection(
                 if let Some(task) = found {
                     task.status = "completed".to_string();
                     task.progress = 100;
+                    task.end_time = Some(chrono::Utc::now().timestamp_millis() as u64);
                     if let Some(tokens) = req.total_tokens {
                         task.tokens = tokens;
                     }
@@ -193,6 +228,21 @@ async fn handle_connection(
                     *current_id = None;
                 }
                 format_response(200, r#"{"status":"ok"}"#)
+            }
+            Err(e) => format_response(400, &format!(r#"{{"error":"Invalid request: {}"}}"#, e))
+        }
+    } else if request.starts_with("POST /api/task/active") {
+        // ACTIVE state - window has focus, task is visible but not running
+        match serde_json::from_str::<CancelRequest>(&body) {
+            Ok(req) => {
+                let mut tasks = state.tasks.lock().unwrap();
+                let found = tasks.iter_mut().find(|t| t.id == req.task_id);
+                if let Some(task) = found {
+                    task.status = "active".to_string();
+                    format_response(200, r#"{"status":"ok"}"#)
+                } else {
+                    format_response(404, r#"{"error":"Task not found"}"#)
+                }
             }
             Err(e) => format_response(400, &format!(r#"{{"error":"Invalid request: {}"}}"#, e))
         }

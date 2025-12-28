@@ -6,7 +6,7 @@ export interface ProgressTask {
   name: string;
   progress: number;
   tokens: number;
-  status: 'idle' | 'running' | 'completed' | 'error';
+  status: 'idle' | 'running' | 'completed' | 'error' | 'armed' | 'active';
   startTime: number;
   endTime?: number;
   adapter?: string;
@@ -267,39 +267,55 @@ export const useProgressStore = create<ProgressState>()(
       syncFromHttpApi: async () => {
         try {
           const port = get().settings.httpPort;
-          const response = await fetch(`http://localhost:${port}/api/status`);
+          // Use 127.0.0.1 instead of localhost to avoid IPv6 issues
+          const response = await fetch(`http://127.0.0.1:${port}/api/status`);
           if (response.ok) {
             const data = await response.json();
-            if (data.currentTask) {
-              const apiTask = data.currentTask;
-              // Convert snake_case to camelCase
-              const currentTask: ProgressTask = {
+            console.log('Synced from API:', data.taskCount, 'tasks');
+            if (data.tasks && Array.isArray(data.tasks)) {
+              // Sync all tasks from API
+              const apiTasks: ProgressTask[] = data.tasks.map((apiTask: any) => ({
                 id: apiTask.id,
                 name: apiTask.name,
                 progress: apiTask.progress,
                 tokens: apiTask.tokens,
                 status: apiTask.status as ProgressTask['status'],
                 startTime: apiTask.start_time,
+                // Use API end_time if available
+                endTime: apiTask.end_time,
                 ide: apiTask.ide,
                 windowTitle: apiTask.window_title,
-              };
-              const existingTask = get().tasks.find(t => t.id === currentTask.id);
-              if (!existingTask) {
-                set((state) => ({
-                  tasks: [...state.tasks, currentTask],
-                  currentTaskId: currentTask.id,
-                }));
-              } else {
-                set((state) => ({
-                  tasks: state.tasks.map(t =>
-                    t.id === currentTask.id ? { ...t, ...currentTask } : t
-                  ),
-                  currentTaskId: currentTask.id,
-                }));
-              }
+              }));
+              
+              set((state) => {
+                // Merge API tasks with existing tasks
+                const mergedTasks = apiTasks.map(apiTask => {
+                  const existing = state.tasks.find(t => t.id === apiTask.id);
+                  if (existing) {
+                    // Preserve existing endTime if API doesn't have one
+                    let endTime = apiTask.endTime || existing.endTime;
+                    // If task just completed and no endTime, set it now
+                    if (apiTask.status === 'completed' && !endTime) {
+                      endTime = Date.now();
+                    }
+                    return { ...existing, ...apiTask, endTime };
+                  }
+                  // New task from API - set endTime if completed
+                  if (apiTask.status === 'completed' && !apiTask.endTime) {
+                    return { ...apiTask, endTime: Date.now() };
+                  }
+                  return apiTask;
+                });
+                
+                return {
+                  tasks: mergedTasks,
+                  currentTaskId: data.currentTask?.id || state.currentTaskId,
+                };
+              });
             }
           }
         } catch (error) {
+          console.error('Failed to sync from API:', error);
           // Silently ignore errors - API might not be ready yet
         }
       },
