@@ -7,18 +7,16 @@ interface SettingsPanelProps {
 }
 
 export function SettingsPanel({ onClose }: SettingsPanelProps) {
-  const { 
-    settings, 
-    setTheme, 
-    setOpacity, 
-    setAlwaysOnTop, 
-    setAutoStart, 
-    setNotifications, 
+  const {
+    settings,
+    setTheme,
+    setOpacity,
+    setAlwaysOnTop,
+    setAutoStart,
+    setNotifications,
     setSound,
     setSoundVolume,
-    setVSCodeEnabled, 
-    setVSCodePort, 
-    setVSCodeHost,
+    setHttpPort,
     setCustomColors,
     setReminderThreshold,
     setDoNotDisturb,
@@ -39,9 +37,7 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
         notifications: settings.notifications,
         sound: settings.sound,
         soundVolume: settings.soundVolume,
-        vscodeEnabled: settings.vscodeEnabled,
-        vscodePort: settings.vscodePort,
-        vscodeHost: settings.vscodeHost,
+        httpPort: settings.httpPort,
         customColors: settings.customColors,
         reminderThreshold: settings.reminderThreshold,
         doNotDisturb: settings.doNotDisturb,
@@ -51,7 +47,7 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
       history: history.slice(0, 20),
       exportedAt: new Date().toISOString(),
     };
-    
+
     const blob = new Blob([JSON.stringify(config, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -77,9 +73,7 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
           if (config.settings.notifications !== undefined) setNotifications(config.settings.notifications);
           if (config.settings.sound !== undefined) setSound(config.settings.sound);
           if (config.settings.soundVolume) setSoundVolume(config.settings.soundVolume);
-          if (config.settings.vscodeEnabled !== undefined) setVSCodeEnabled(config.settings.vscodeEnabled);
-          if (config.settings.vscodePort) setVSCodePort(config.settings.vscodePort);
-          if (config.settings.vscodeHost) setVSCodeHost(config.settings.vscodeHost);
+          if (config.settings.httpPort) setHttpPort(config.settings.httpPort);
           if (config.settings.customColors) setCustomColors(config.settings.customColors);
           if (config.settings.reminderThreshold) setReminderThreshold(config.settings.reminderThreshold);
           if (config.settings.doNotDisturb !== undefined) setDoNotDisturb(config.settings.doNotDisturb);
@@ -104,31 +98,31 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
         </div>
 
         <div className="settings-tabs">
-          <button 
+          <button
             className={`tab ${activeTab === 'general' ? 'active' : ''}`}
             onClick={() => setActiveTab('general')}
           >
             General
           </button>
-          <button 
+          <button
             className={`tab ${activeTab === 'appearance' ? 'active' : ''}`}
             onClick={() => setActiveTab('appearance')}
           >
             Appearance
           </button>
-          <button 
+          <button
             className={`tab ${activeTab === 'notifications' ? 'active' : ''}`}
             onClick={() => setActiveTab('notifications')}
           >
             Notifications
           </button>
-          <button 
+          <button
             className={`tab ${activeTab === 'tasks' ? 'active' : ''}`}
             onClick={() => setActiveTab('tasks')}
           >
             Tasks
           </button>
-          <button 
+          <button
             className={`tab ${activeTab === 'shortcuts' ? 'active' : ''}`}
             onClick={() => setActiveTab('shortcuts')}
           >
@@ -156,38 +150,16 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
                 />
               </div>
               <div className="setting-item">
-                <label>VSCode Integration</label>
+                <label>HTTP API Port</label>
                 <input
-                  type="checkbox"
-                  checked={settings.vscodeEnabled}
-                  onChange={e => setVSCodeEnabled(e.target.checked)}
+                  type="number"
+                  className="http-input"
+                  value={settings.httpPort}
+                  onChange={e => setHttpPort(parseInt(e.target.value) || 31415)}
+                  min="1024"
+                  max="65535"
                 />
               </div>
-              {settings.vscodeEnabled && (
-                <>
-                  <div className="setting-item indent">
-                    <label>Host</label>
-                    <input
-                      type="text"
-                      className="vscode-input"
-                      value={settings.vscodeHost}
-                      onChange={e => setVSCodeHost(e.target.value)}
-                      placeholder="localhost"
-                    />
-                  </div>
-                  <div className="setting-item indent">
-                    <label>Port</label>
-                    <input
-                      type="number"
-                      className="vscode-input"
-                      value={settings.vscodePort}
-                      onChange={e => setVSCodePort(parseInt(e.target.value) || 31415)}
-                      min="1024"
-                      max="65535"
-                    />
-                  </div>
-                </>
-              )}
               <div className="setting-item">
                 <label>Export/Import Config</label>
                 <button className="action-btn" onClick={() => setShowImportExport(true)}>
@@ -201,7 +173,7 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
             <div className="settings-section">
               <div className="setting-item">
                 <label>Theme</label>
-                <select 
+                <select
                   value={settings.theme}
                   onChange={e => setTheme(e.target.value as 'dark' | 'light' | 'purple' | 'ocean' | 'forest' | 'midnight')}
                 >
@@ -262,7 +234,7 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
               </div>
               <div className="setting-item">
                 <label>Reset Custom Colors</label>
-                <button 
+                <button
                   className="action-btn small"
                   onClick={() => setCustomColors({ primaryColor: '', backgroundColor: '', textColor: '' })}
                 >
@@ -355,7 +327,7 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
               </div>
               <div className="setting-item">
                 <label>Clear History</label>
-                <button 
+                <button
                   className="action-btn danger small"
                   onClick={clearHistory}
                 >
@@ -382,6 +354,10 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
                   <div className="shortcut-item">
                     <span className="shortcut-key">Scroll</span>
                     <span className="shortcut-desc">Adjust progress</span>
+                  </div>
+                  <div className="shortcut-item">
+                    <span className="shortcut-key">Click status</span>
+                    <span className="shortcut-desc">Activate IDE window</span>
                   </div>
                 </div>
               </div>
@@ -424,9 +400,7 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
             setNotifications(true);
             setSound(true);
             setSoundVolume(0.7);
-            setVSCodeEnabled(false);
-            setVSCodePort(31415);
-            setVSCodeHost('localhost');
+            setHttpPort(31415);
             setCustomColors({ primaryColor: '', backgroundColor: '', textColor: '' });
             setReminderThreshold(100);
             setDoNotDisturb(false);

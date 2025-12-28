@@ -88,6 +88,7 @@ export function useProgressNotifications() {
         id: taskId,
         name: 'Task',
         progress: 100,
+        tokens: 0,
         status: 'completed',
         startTime: Date.now() - duration,
         endTime: Date.now(),

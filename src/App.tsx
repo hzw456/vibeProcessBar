@@ -2,13 +2,14 @@ import { useEffect, useRef, useState } from 'react';
 import { ProgressBar } from './components/ProgressBar';
 import { StatusText } from './components/StatusText';
 import { getCurrentWindow } from '@tauri-apps/api/window';
+import { invoke } from '@tauri-apps/api/core';
 import { useProgressStore } from './stores/progressStore';
 import { useProgressNotifications } from './hooks/useProgressEvent';
 import { SHORTCUTS, registerGlobalShortcut, moveToCorner } from './utils/windowManager';
 import './App.css';
 
 function App() {
-  const { tasks, currentTaskId, settings, setCurrentTask, updateProgress, resetTask, removeTask } = useProgressStore();
+  const { tasks, currentTaskId, settings, setCurrentTask, updateProgress, resetTask, removeTask, syncFromHttpApi } = useProgressStore();
   const containerRef = useRef<HTMLDivElement>(null);
   const [showMenu, setShowMenu] = useState(false);
   const [isResizing, setIsResizing] = useState(false);
@@ -34,9 +35,16 @@ function App() {
   }, [settings.customColors]);
 
   useEffect(() => {
+    const syncInterval = setInterval(() => {
+      syncFromHttpApi();
+    }, 1000);
+
+    return () => clearInterval(syncInterval);
+  }, [syncFromHttpApi]);
+
+  useEffect(() => {
     const unregisterShortcuts = [
       registerGlobalShortcut(SHORTCUTS.TOGGLE_ALWAYS_ON_TOP, async () => {
-        const { invoke } = await import('@tauri-apps/api/core');
         await invoke('toggle_window_always_on_top');
       }),
       registerGlobalShortcut(SHORTCUTS.RESET_PROGRESS, () => {
@@ -152,6 +160,19 @@ function App() {
     }
   };
 
+  const handleActivateWindow = async () => {
+    if (currentTask?.ide) {
+      try {
+        await invoke('activate_ide_window', {
+          ide: currentTask.ide,
+          windowTitle: currentTask.windowTitle || null
+        });
+      } catch (error) {
+        console.error('Failed to activate IDE window:', error);
+      }
+    }
+  };
+
   return (
     <div 
       ref={containerRef}
@@ -164,6 +185,9 @@ function App() {
       <StatusText 
         taskName={currentTask?.name || 'Ready'}
         status={currentTask?.status || 'idle'}
+        tokens={currentTask?.tokens || 0}
+        ide={currentTask?.ide}
+        onActivate={handleActivateWindow}
       />
       <ProgressBar 
         progress={currentTask?.progress || 0}

@@ -28,54 +28,6 @@ export interface ProgressAdapter {
   completeTask: (taskId: string) => Promise<void>;
 }
 
-export abstract class BaseAdapter implements ProgressAdapter {
-  name: string;
-  version: string;
-  protected callbacks: Set<(task: TaskInfo) => void> = new Set();
-  protected isRunning = false;
-
-  constructor(name: string, version: string) {
-    this.name = name;
-    this.version = version;
-  }
-
-  abstract initialize(): Promise<void>;
-  abstract destroy(): Promise<void>;
-  abstract isAvailable(): Promise<boolean>;
-  abstract getTasks(): Promise<TaskInfo[]>;
-  abstract startTask(name: string): Promise<string>;
-  abstract updateProgress(taskId: string, progress: number): Promise<void>;
-  abstract completeTask(taskId: string): Promise<void>;
-
-  onProgress(callback: (task: TaskInfo) => void): () => void {
-    this.callbacks.add(callback);
-    return () => {
-      this.callbacks.delete(callback);
-    };
-  }
-
-  protected notifyProgress(task: TaskInfo): void {
-    this.callbacks.forEach(cb => cb(task));
-  }
-
-  protected setRunning(running: boolean): void {
-    this.isRunning = running;
-  }
+export function createAdapter(_name: string): null {
+  return null;
 }
-
-export function createAdapter(name: string): ProgressAdapter | null {
-  const adapters: Record<string, () => ProgressAdapter> = {
-    'copilot': () => new CopilotAdapter(),
-    'claude-code': () => new ClaudeCodeAdapter(),
-    'cursor': () => new CursorAdapter(),
-    'cli': () => new CLIAdapter(),
-  };
-
-  const factory = adapters[name.toLowerCase()];
-  return factory ? factory() : null;
-}
-
-import { CopilotAdapter } from './adapters/CopilotAdapter';
-import { ClaudeCodeAdapter } from './adapters/ClaudeCodeAdapter';
-import { CursorAdapter } from './adapters/CursorAdapter';
-import { CLIAdapter } from './adapters/CLIAdapter';

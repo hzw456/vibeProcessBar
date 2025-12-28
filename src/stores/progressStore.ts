@@ -5,10 +5,13 @@ export interface ProgressTask {
   id: string;
   name: string;
   progress: number;
+  tokens: number;
   status: 'idle' | 'running' | 'completed' | 'error';
   startTime: number;
   endTime?: number;
   adapter?: string;
+  ide?: string;
+  windowTitle?: string;
 }
 
 interface ProgressState {
@@ -22,9 +25,7 @@ interface ProgressState {
     notifications: boolean;
     sound: boolean;
     soundVolume: number;
-    vscodeEnabled: boolean;
-    vscodePort: number;
-    vscodeHost: string;
+    httpPort: number;
     customColors: {
       primaryColor: string;
       backgroundColor: string;
@@ -36,12 +37,13 @@ interface ProgressState {
     doNotDisturbEnd: string;
   };
   history: ProgressTask[];
-  addTask: (name: string, adapter?: string) => string;
+  addTask: (name: string, adapter?: string, ide?: string, windowTitle?: string) => string;
   removeTask: (id: string) => void;
   setCurrentTask: (id: string | null) => void;
   updateProgress: (id: string, progress: number) => void;
+  updateTokens: (id: string, tokens: number, increment?: boolean) => void;
   updateStatus: (id: string, status: ProgressTask['status']) => void;
-  completeTask: (id: string) => void;
+  completeTask: (id: string, totalTokens?: number) => void;
   resetTask: (id: string) => void;
   setTheme: (theme: 'dark' | 'light' | 'purple' | 'ocean' | 'forest' | 'midnight') => void;
   setOpacity: (opacity: number) => void;
@@ -50,9 +52,7 @@ interface ProgressState {
   setNotifications: (value: boolean) => void;
   setSound: (value: boolean) => void;
   setSoundVolume: (value: number) => void;
-  setVSCodeEnabled: (value: boolean) => void;
-  setVSCodePort: (value: number) => void;
-  setVSCodeHost: (value: string) => void;
+  setHttpPort: (value: number) => void;
   setCustomColors: (colors: { primaryColor?: string; backgroundColor?: string; textColor?: string }) => void;
   setReminderThreshold: (value: number) => void;
   setDoNotDisturb: (value: boolean) => void;
@@ -60,11 +60,12 @@ interface ProgressState {
   setDoNotDisturbEnd: (value: string) => void;
   addToHistory: (task: ProgressTask) => void;
   clearHistory: () => void;
+  syncFromHttpApi: () => Promise<void>;
 }
 
 export const useProgressStore = create<ProgressState>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       tasks: [],
       currentTaskId: null,
       history: [],
@@ -76,9 +77,7 @@ export const useProgressStore = create<ProgressState>()(
         notifications: true,
         sound: true,
         soundVolume: 0.7,
-        vscodeEnabled: false,
-        vscodePort: 31415,
-        vscodeHost: 'localhost',
+        httpPort: 31415,
         customColors: {
           primaryColor: '',
           backgroundColor: '',
@@ -90,15 +89,18 @@ export const useProgressStore = create<ProgressState>()(
         doNotDisturbEnd: '08:00',
       },
 
-      addTask: (name, adapter) => {
+      addTask: (name, adapter, ide, windowTitle) => {
         const id = Date.now().toString();
         const newTask: ProgressTask = {
           id,
           name,
           progress: 0,
+          tokens: 0,
           status: 'idle',
           startTime: Date.now(),
           adapter,
+          ide,
+          windowTitle,
         };
         set((state) => ({
           tasks: [...state.tasks, newTask],
@@ -128,6 +130,16 @@ export const useProgressStore = create<ProgressState>()(
         }));
       },
 
+      updateTokens: (id, tokens, increment) => {
+        set((state) => ({
+          tasks: state.tasks.map((t) =>
+            t.id === id
+              ? { ...t, tokens: increment ? t.tokens + tokens : tokens }
+              : t
+          ),
+        }));
+      },
+
       updateStatus: (id, status) => {
         set((state) => ({
           tasks: state.tasks.map((t) =>
@@ -138,11 +150,11 @@ export const useProgressStore = create<ProgressState>()(
         }));
       },
 
-      completeTask: (id) => {
+      completeTask: (id, totalTokens) => {
         set((state) => ({
           tasks: state.tasks.map((t) =>
             t.id === id
-              ? { ...t, progress: 100, status: 'completed', endTime: Date.now() }
+              ? { ...t, progress: 100, status: 'completed', endTime: Date.now(), tokens: totalTokens ?? t.tokens }
               : t
           ),
         }));
@@ -152,7 +164,7 @@ export const useProgressStore = create<ProgressState>()(
         set((state) => ({
           tasks: state.tasks.map((t) =>
             t.id === id
-              ? { ...t, progress: 0, status: 'idle', startTime: Date.now(), endTime: undefined }
+              ? { ...t, progress: 0, tokens: 0, status: 'idle', startTime: Date.now(), endTime: undefined }
               : t
           ),
         }));
@@ -194,27 +206,15 @@ export const useProgressStore = create<ProgressState>()(
         }));
       },
 
-      setVSCodeEnabled: (value) => {
-        set((state) => ({
-          settings: { ...state.settings, vscodeEnabled: value },
-        }));
-      },
-
-      setVSCodePort: (value) => {
-        set((state) => ({
-          settings: { ...state.settings, vscodePort: Math.max(1024, Math.min(65535, value)) },
-        }));
-      },
-
-      setVSCodeHost: (value) => {
-        set((state) => ({
-          settings: { ...state.settings, vscodeHost: value },
-        }));
-      },
-
       setSoundVolume: (value) => {
         set((state) => ({
           settings: { ...state.settings, soundVolume: Math.min(1, Math.max(0, value)) },
+        }));
+      },
+
+      setHttpPort: (value) => {
+        set((state) => ({
+          settings: { ...state.settings, httpPort: Math.max(1024, Math.min(65535, value)) },
         }));
       },
 
@@ -262,6 +262,35 @@ export const useProgressStore = create<ProgressState>()(
 
       clearHistory: () => {
         set({ history: [] });
+      },
+
+      syncFromHttpApi: async () => {
+        try {
+          const port = get().settings.httpPort;
+          const response = await fetch(`http://localhost:${port}/api/status`);
+          if (response.ok) {
+            const data = await response.json();
+            if (data.currentTask) {
+              const { currentTask } = data;
+              const existingTask = get().tasks.find(t => t.id === currentTask.id);
+              if (!existingTask) {
+                set((state) => ({
+                  tasks: [...state.tasks, currentTask],
+                  currentTaskId: currentTask.id,
+                }));
+              } else {
+                set((state) => ({
+                  tasks: state.tasks.map(t =>
+                    t.id === currentTask.id ? currentTask : t
+                  ),
+                  currentTaskId: currentTask.id,
+                }));
+              }
+            }
+          }
+        } catch (error) {
+          console.error('Failed to sync from HTTP API:', error);
+        }
       },
     }),
     {

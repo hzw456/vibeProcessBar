@@ -3,6 +3,7 @@
   display: flex;
   justify-content: center;
   align-items: center;
+  gap: 8px;
 }
 
 .status {
@@ -27,4 +28,22 @@
 
 .status-error {
   color: var(--error-color);
+}
+
+.token-count {
+  font-size: 10px;
+  color: var(--text-muted);
+  background: var(--bg-secondary);
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.ide-indicator {
+  font-size: 9px;
+  color: var(--primary-color);
+  background: var(--primary-color-10);
+  padding: 2px 6px;
+  border-radius: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
