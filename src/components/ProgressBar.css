@@ -1,14 +1,62 @@
-.progress-canvas {
-  width: 176px;
-  height: 24px;
+.progress-bar-container {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
   cursor: pointer;
-  transition: transform 0.1s ease;
+  -webkit-app-region: no-drag;
 }
 
-.progress-canvas:hover {
-  transform: scale(1.02);
+.progress-bar-track {
+  flex: 1;
+  height: 6px;
+  background: rgba(148, 163, 184, 0.2);
+  border-radius: 3px;
+  overflow: hidden;
+  position: relative;
 }
 
-.progress-canvas:active {
-  transform: scale(0.98);
+.progress-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--primary-color), #a855f7);
+  border-radius: 3px;
+  transition: width 0.3s ease;
+  position: relative;
+}
+
+.progress-bar-fill::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.2),
+    transparent
+  );
+  animation: shimmer 2s infinite;
+}
+
+@keyframes shimmer {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+.progress-text {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-color);
+  min-width: 32px;
+  text-align: right;
+}
+
+.progress-bar-container:hover .progress-bar-track {
+  height: 8px;
+}
+
+.progress-bar-container:active .progress-bar-fill {
+  opacity: 0.8;
 }

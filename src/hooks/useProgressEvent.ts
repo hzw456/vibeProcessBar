@@ -61,10 +61,9 @@ export function useProgressEvents<T extends ProgressEventType>(
 export function useProgressNotifications() {
   const { settings, addToHistory } = useProgressStore();
   const lastNotifiedProgress = useRef<Map<string, number>>(new Map());
+  const { on } = useProgressEvent();
 
   useEffect(() => {
-    const { on } = useProgressEvent();
-
     const handleTaskCompleted = (data: unknown) => {
       const eventData = data as { taskId: string; duration: number };
       const { taskId, duration } = eventData;
@@ -150,5 +149,5 @@ export function useProgressNotifications() {
       unsubProgress();
       unsubError();
     };
-  }, [settings, addToHistory]);
+  }, [settings, addToHistory, on]);
 }

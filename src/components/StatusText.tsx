@@ -9,12 +9,27 @@ interface StatusTextProps {
 }
 
 export function StatusText({ taskName, status, tokens = 0, ide, onActivate }: StatusTextProps) {
+  const getStatusIcon = () => {
+    switch (status) {
+      case 'idle':
+        return '○';
+      case 'running':
+        return '◉';
+      case 'completed':
+        return '✓';
+      case 'error':
+        return '✕';
+      default:
+        return '○';
+    }
+  };
+
   const getStatusText = () => {
     switch (status) {
       case 'idle':
         return 'Ready';
       case 'running':
-        return taskName || 'Running';
+        return taskName || 'Running...';
       case 'completed':
         return 'Complete';
       case 'error':
@@ -22,10 +37,6 @@ export function StatusText({ taskName, status, tokens = 0, ide, onActivate }: St
       default:
         return 'Ready';
     }
-  };
-
-  const getStatusClass = () => {
-    return `status status-${status}`;
   };
 
   const formatTokens = (num: number) => {
@@ -39,21 +50,22 @@ export function StatusText({ taskName, status, tokens = 0, ide, onActivate }: St
   };
 
   const handleClick = () => {
-    if (ide && status === 'running' && onActivate) {
+    if (ide && onActivate) {
       onActivate();
     }
   };
 
   return (
-    <div className="status-container">
-      <span className={getStatusClass()} onClick={handleClick} style={{ cursor: ide && status === 'running' ? 'pointer' : 'default' }}>
+    <div className="status-container" onClick={handleClick} style={{ cursor: ide ? 'pointer' : 'default' }}>
+      <span className={`status-icon status-${status}`}>{getStatusIcon()}</span>
+      <span className={`status-text status-${status}`}>
         {getStatusText()}
       </span>
       {tokens > 0 && (
-        <span className="token-count">{formatTokens(tokens)} tokens</span>
+        <span className="token-count">{formatTokens(tokens)}</span>
       )}
-      {ide && status === 'running' && (
-        <span className="ide-indicator" onClick={handleClick} title={`Click to activate ${ide}`}>
+      {ide && (
+        <span className="ide-badge" title={`Click to activate ${ide}`}>
           {ide}
         </span>
       )}

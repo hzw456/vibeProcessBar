@@ -271,7 +271,18 @@ export const useProgressStore = create<ProgressState>()(
           if (response.ok) {
             const data = await response.json();
             if (data.currentTask) {
-              const { currentTask } = data;
+              const apiTask = data.currentTask;
+              // Convert snake_case to camelCase
+              const currentTask: ProgressTask = {
+                id: apiTask.id,
+                name: apiTask.name,
+                progress: apiTask.progress,
+                tokens: apiTask.tokens,
+                status: apiTask.status as ProgressTask['status'],
+                startTime: apiTask.start_time,
+                ide: apiTask.ide,
+                windowTitle: apiTask.window_title,
+              };
               const existingTask = get().tasks.find(t => t.id === currentTask.id);
               if (!existingTask) {
                 set((state) => ({
@@ -281,7 +292,7 @@ export const useProgressStore = create<ProgressState>()(
               } else {
                 set((state) => ({
                   tasks: state.tasks.map(t =>
-                    t.id === currentTask.id ? currentTask : t
+                    t.id === currentTask.id ? { ...t, ...currentTask } : t
                   ),
                   currentTaskId: currentTask.id,
                 }));
@@ -289,7 +300,7 @@ export const useProgressStore = create<ProgressState>()(
             }
           }
         } catch (error) {
-          console.error('Failed to sync from HTTP API:', error);
+          // Silently ignore errors - API might not be ready yet
         }
       },
     }),

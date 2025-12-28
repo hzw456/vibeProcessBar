@@ -1,23 +1,27 @@
 .app-container {
+  position: relative;
   width: 200px;
   height: 60px;
   background: var(--bg-color);
-  border-radius: 8px;
+  border-radius: 12px;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   padding: 8px 12px;
   gap: 4px;
-  box-shadow: 0 4px 12px var(--shadow-color);
-  backdrop-filter: blur(10px);
+  box-shadow: 0 4px 20px var(--shadow-color);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   border: 1px solid var(--border-color);
   cursor: move;
   transition: all 0.2s ease;
+  -webkit-app-region: drag;
 }
 
 .app-container:hover {
-  background: rgba(15, 23, 42, 0.92);
+  background: var(--bg-color);
+  box-shadow: 0 6px 24px var(--shadow-color);
 }
 
 .app-container:active {
@@ -33,6 +37,7 @@
   cursor: se-resize;
   opacity: 0;
   transition: opacity 0.2s;
+  -webkit-app-region: no-drag;
 }
 
 .app-container:hover .resize-handle {
@@ -63,12 +68,14 @@
   border-radius: 8px;
   border: 1px solid var(--border-color);
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
-  backdrop-filter: blur(10px);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   z-index: 1000;
   padding: 8px 0;
   min-width: 180px;
   max-height: 300px;
   overflow-y: auto;
+  -webkit-app-region: no-drag;
 }
 
 .menu-header {

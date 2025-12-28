@@ -10,28 +10,23 @@
     "frontendDist": "../dist"
   },
   "app": {
+    "macOSPrivateApi": true,
     "windows": [
       {
         "title": "Vibe Progress Bar",
-        "width": 200,
-        "height": 60,
-        "resizable": true,
+        "label": "main",
+        "width": 220,
+        "height": 70,
+        "resizable": false,
         "decorations": false,
         "transparent": true,
         "alwaysOnTop": true,
         "skipTaskbar": true,
         "center": true,
-        "minWidth": 150,
-        "minHeight": 50,
-        "maxWidth": 400,
-        "maxHeight": 150
+        "shadow": false,
+        "visible": true
       }
     ],
-    "trayIcon": {
-      "iconPath": "icons/tray.png",
-      "iconAsTemplate": true,
-      "tooltip": "Vibe Progress Bar"
-    },
     "security": {
       "csp": null
     }

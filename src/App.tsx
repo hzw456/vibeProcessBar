@@ -8,6 +8,8 @@ import { useProgressNotifications } from './hooks/useProgressEvent';
 import { SHORTCUTS, registerGlobalShortcut, moveToCorner } from './utils/windowManager';
 import './App.css';
 
+console.log('App.tsx loaded');
+
 function App() {
   const { tasks, currentTaskId, settings, setCurrentTask, updateProgress, resetTask, removeTask, syncFromHttpApi } = useProgressStore();
   const containerRef = useRef<HTMLDivElement>(null);
@@ -17,6 +19,10 @@ function App() {
   useProgressNotifications();
 
   const currentTask = tasks.find(t => t.id === currentTaskId) || tasks[0] || null;
+
+  useEffect(() => {
+    console.log('App mounted, tasks:', tasks.length, 'currentTask:', currentTask?.name);
+  }, [tasks, currentTask]);
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', settings.theme);

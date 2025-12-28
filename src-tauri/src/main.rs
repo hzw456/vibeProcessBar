@@ -24,7 +24,7 @@ async fn activate_ide_window<R: Runtime>(
 fn activate_ide(ide: &str, window_title: Option<&str>) -> Result<(), String> {
     #[cfg(target_os = "macos")]
     {
-        let script = match ide {
+        let script = match ide.to_lowercase().as_str() {
             "cursor" => {
                 if let Some(title) = window_title {
                     format!(
@@ -43,6 +43,39 @@ fn activate_ide(ide: &str, window_title: Option<&str>) -> Result<(), String> {
                 } else {
                     r#"
                     tell application "Cursor"
+                        activate
+                        delay 0.3
+                    end tell
+                    "#.to_string()
+                }
+            }
+            "kiro" => {
+                if let Some(title) = window_title {
+                    // Try to activate the specific Kiro window by title
+                    format!(
+                        r#"
+                        tell application "System Events"
+                            tell process "Kiro"
+                                set frontmost to true
+                                set targetWindow to missing value
+                                repeat with w in windows
+                                    if name of w contains "{}" then
+                                        set targetWindow to w
+                                        exit repeat
+                                    end if
+                                end repeat
+                                if targetWindow is not missing value then
+                                    perform action "AXRaise" of targetWindow
+                                end if
+                            end tell
+                        end tell
+                        tell application "Kiro" to activate
+                    "#,
+                        title
+                    )
+                } else {
+                    r#"
+                    tell application "Kiro"
                         activate
                         delay 0.3
                     end tell
@@ -249,11 +282,12 @@ async fn start_http_server<R: Runtime>(
 
 #[tauri::command]
 async fn trigger_notification<R: Runtime>(
-    window: tauri::Window<R>,
-    title: String,
-    body: String
+    _window: tauri::Window<R>,
+    _title: String,
+    _body: String
 ) -> Result<(), String> {
-    window.notify(&title, &body).map_err(|e| e.to_string())
+    // Notification functionality - can be implemented with tauri-plugin-notification if needed
+    Ok(())
 }
 
 fn main() {
@@ -280,6 +314,21 @@ fn main() {
         ])
         .setup(|app| {
             let window = app.get_webview_window("main").unwrap();
+
+            // Set webview background to transparent
+            #[cfg(target_os = "macos")]
+            {
+                use window_vibrancy::{apply_vibrancy, NSVisualEffectMaterial, NSVisualEffectState};
+                // Apply vibrancy effect for macOS - this makes the window background translucent
+                let _ = apply_vibrancy(&window, NSVisualEffectMaterial::HudWindow, Some(NSVisualEffectState::Active), Some(12.0));
+            }
+
+            // Apply blur effect for Windows
+            #[cfg(target_os = "windows")]
+            {
+                use window_vibrancy::apply_blur;
+                let _ = apply_blur(&window, Some((18, 18, 18, 200)));
+            }
 
             http_server::start_server_background(31415);
 
