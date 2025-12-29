@@ -14,6 +14,7 @@ export interface ProgressTask {
   adapter?: string;
   ide?: string;
   windowTitle?: string;
+  projectPath?: string;
 }
 
 interface ProgressState {
@@ -322,6 +323,7 @@ export const useProgressStore = create<ProgressState>()(
                 endTime: apiTask.end_time,
                 ide: apiTask.ide,
                 windowTitle: apiTask.window_title,
+                projectPath: apiTask.project_path,
               }));
 
               set((state) => {

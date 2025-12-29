@@ -9,6 +9,7 @@ describe('ProgressStore', () => {
       history: [],
       settings: {
         theme: 'dark',
+        fontSize: 14,
         opacity: 0.85,
         alwaysOnTop: true,
         autoStart: false,

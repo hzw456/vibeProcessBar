@@ -227,26 +227,52 @@ function App() {
   };
 
   const handleActivateWindow = async () => {
-    if (currentTask?.ide) {
-      try {
-        await invoke('activate_ide_window', {
-          ide: currentTask.ide,
-          windowTitle: currentTask.windowTitle || null
-        });
-        debug('IDE window activated', { ide: currentTask.ide, windowTitle: currentTask.windowTitle });
-      } catch (err) {
-        error('Failed to activate IDE window', { error: String(err), ide: currentTask.ide });
+    if (currentTask) {
+      // Check for project path first (priority for VS Code)
+      if (currentTask.projectPath && (currentTask.ide?.toLowerCase().includes('code') || currentTask.ide?.toLowerCase() === 'vscode')) {
+        try {
+          debug('Opening VS Code project', { path: currentTask.projectPath });
+          await invoke('open_url', { url: `vscode://file/${currentTask.projectPath}` });
+          return;
+        } catch (err) {
+          error('Failed to open VS Code project', { error: String(err) });
+          // Fallback to activate_ide_window
+        }
+      }
+
+      if (currentTask.ide) {
+        try {
+          await invoke('activate_ide_window', {
+            ide: currentTask.ide,
+            windowTitle: currentTask.windowTitle || null
+          });
+          debug('IDE window activated', { ide: currentTask.ide, windowTitle: currentTask.windowTitle });
+        } catch (err) {
+          error('Failed to activate IDE window', { error: String(err), ide: currentTask.ide });
+        }
       }
     }
   };
 
   const handleTaskClick = async (task: typeof currentTask) => {
     if (!task) return;
-    debug('Task clicked', { taskId: task.id, ide: task.ide, windowTitle: task.windowTitle });
+    debug('Task clicked', { taskId: task.id, ide: task.ide, windowTitle: task.windowTitle, projectPath: task.projectPath });
     setCurrentTask(task.id);
 
     if (task.status === 'completed') {
       setClickedCompletedTasks(prev => new Set([...prev, task.id]));
+    }
+
+    // Check for project path first (priority for VS Code)
+    if (task.projectPath && (task.ide?.toLowerCase().includes('code') || task.ide?.toLowerCase() === 'vscode')) {
+      try {
+        debug('Opening VS Code project', { path: task.projectPath });
+        await invoke('open_url', { url: `vscode://file/${task.projectPath}` });
+        return;
+      } catch (err) {
+        error('Failed to open VS Code project', { error: String(err) });
+        // Fallback to activate_ide_window
+      }
     }
 
     if (task.ide) {

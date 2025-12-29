@@ -116,6 +116,14 @@
   box-sizing: border-box;
 }
 
+input,
+textarea,
+[contenteditable] {
+  user-select: text;
+  -webkit-user-select: text;
+  cursor: text;
+}
+
 html {
   background: transparent !important;
 }
@@ -126,6 +134,8 @@ body {
   -moz-osx-font-smoothing: grayscale;
   overflow: hidden;
   user-select: none;
+  -webkit-user-select: none;
+  cursor: default;
   background: transparent !important;
   width: 100%;
   height: 100%;
