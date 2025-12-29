@@ -1,16 +1,45 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-use tauri::{Manager, Runtime, WindowEvent};
+use tauri::{Manager, Runtime, WindowEvent, Emitter};
+use tauri::menu::{Menu, MenuItem};
+use tauri::tray::{TrayIconBuilder, TrayIconEvent, MouseButton, MouseButtonState};
 use serde_json::json;
 use std::process::Command;
-use tracing::{info, error};
+use tracing::info;
 
 mod window_manager;
 mod http_server;
+mod settings;
 
 #[tauri::command]
 async fn activate_window<R: Runtime>(window: tauri::Window<R>, window_id: String) -> Result<(), String> {
     window_manager::activate_window(window, window_id).await
+}
+
+#[tauri::command]
+fn open_settings_window<R: Runtime>(app: tauri::AppHandle<R>) -> Result<(), String> {
+    if let Some(window) = app.get_webview_window("settings") {
+        let _ = window.show();
+        let _ = window.set_focus();
+    } else {
+        // Calculate position: center of screen effectively
+        // We'll let the OS decide or center it
+        let _ = tauri::WebviewWindowBuilder::new(
+            &app,
+            "settings",
+            tauri::WebviewUrl::App("index.html".into()),
+        )
+        .title("设置")
+        .inner_size(800.0, 600.0)
+        .resizable(false)
+        .minimizable(false)
+        .maximizable(false)
+        .decorations(true) // Use system title bar
+        .transparent(false) // Standard opaque window
+        .build()
+        .map_err(|e| e.to_string())?;
+    }
+    Ok(())
 }
 
 #[tauri::command]
@@ -291,6 +320,31 @@ async fn trigger_notification<R: Runtime>(
     Ok(())
 }
 
+#[tauri::command]
+async fn get_app_settings(state: tauri::State<'_, settings::SettingsState>) -> Result<settings::AppSettings, String> {
+    let settings = state.settings.lock().map_err(|_| "Failed to lock settings mutex")?;
+    Ok(settings.clone())
+}
+
+#[tauri::command]
+async fn update_app_settings<R: Runtime>(
+    app: tauri::AppHandle<R>,
+    state: tauri::State<'_, settings::SettingsState>,
+    new_settings: settings::AppSettings
+) -> Result<(), String> {
+    {
+        let mut settings = state.settings.lock().map_err(|_| "Failed to lock settings mutex")?;
+        *settings = new_settings.clone();
+    } // Drop lock before saving/emitting
+
+    state.save()?; // Save to disk
+
+    // Emit event to all windows
+    app.emit("settings-changed", new_settings).map_err(|e| e.to_string())?;
+    
+    Ok(())
+}
+
 fn main() {
     tracing_subscriber::fmt::init();
 
@@ -313,9 +367,16 @@ fn main() {
             open_url,
             start_http_server,
             trigger_notification,
-            activate_ide_window
+            activate_ide_window,
+            open_settings_window,
+            get_app_settings,
+            update_app_settings
         ])
         .setup(|app| {
+            // Initialize settings state
+            let settings_state = settings::SettingsState::new(app.app_handle());
+            app.manage(settings_state);
+
             let window = app.get_webview_window("main").unwrap();
 
             // Set webview background to transparent
@@ -335,6 +396,47 @@ fn main() {
 
             http_server::start_server_background(31415);
             info!(port = 31415, "HTTP server started on port 31415");
+
+            // Setup system tray
+            let settings_item = MenuItem::with_id(app, "settings", "设置", true, None::<&str>)?;
+            let quit_item = MenuItem::with_id(app, "quit", "退出", true, None::<&str>)?;
+            let menu = Menu::with_items(app, &[&settings_item, &quit_item])?;
+
+            // Load tray icon from PNG file
+            let icon_bytes = include_bytes!("../icons/32x32.png");
+            let img = image::load_from_memory(icon_bytes).expect("Failed to load icon");
+            let rgba = img.to_rgba8();
+            let (width, height) = rgba.dimensions();
+            let icon = tauri::image::Image::new_owned(rgba.into_raw(), width, height);
+
+            info!("Creating system tray with icon {}x{}", width, height);
+
+            let tray = TrayIconBuilder::with_id("main-tray")
+                .icon(icon)
+                .icon_as_template(false)
+                .tooltip("Vibe Process Bar")
+                .menu(&menu)
+                .show_menu_on_left_click(true)
+                .on_menu_event(move |app, event| {
+                    match event.id.as_ref() {
+                        "settings" => {
+                            // Show settings window
+                            let _ = open_settings_window(app.app_handle().clone());
+                        }
+                        "quit" => {
+                            // Exit the application
+                            app.exit(0);
+                        }
+                        _ => {}
+                    }
+                })
+                .build(app)?;
+
+            info!("System tray created successfully with id: {:?}", tray.id());
+            
+            // Leak the tray to prevent it from being dropped
+            // This is safe because we want the tray to live for the entire application lifetime
+            Box::leak(Box::new(tray));
 
             let window_clone = window.clone();
             window.on_window_event(move |event| {

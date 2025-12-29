@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { debug, error } from '../utils/logger';
+import { invoke } from '@tauri-apps/api/core';
 
 export interface ProgressTask {
   id: string;
@@ -20,6 +21,7 @@ interface ProgressState {
   currentTaskId: string | null;
   settings: {
     theme: 'dark' | 'light' | 'purple' | 'ocean' | 'forest' | 'midnight';
+    fontSize: number;
     opacity: number;
     alwaysOnTop: boolean;
     autoStart: boolean;
@@ -47,6 +49,7 @@ interface ProgressState {
   completeTask: (id: string, totalTokens?: number) => void;
   resetTask: (id: string) => void;
   setTheme: (theme: 'dark' | 'light' | 'purple' | 'ocean' | 'forest' | 'midnight') => void;
+  setFontSize: (size: number) => void;
   setOpacity: (opacity: number) => void;
   setAlwaysOnTop: (value: boolean) => void;
   setAutoStart: (value: boolean) => void;
@@ -62,6 +65,8 @@ interface ProgressState {
   addToHistory: (task: ProgressTask) => void;
   clearHistory: () => void;
   syncFromHttpApi: () => Promise<void>;
+  loadSettings: () => Promise<void>;
+  setSettings: (settings: ProgressState['settings']) => void;
 }
 
 export const useProgressStore = create<ProgressState>()(
@@ -72,6 +77,7 @@ export const useProgressStore = create<ProgressState>()(
       history: [],
       settings: {
         theme: 'dark',
+        fontSize: 14,
         opacity: 0.85,
         alwaysOnTop: true,
         autoStart: false,
@@ -88,6 +94,19 @@ export const useProgressStore = create<ProgressState>()(
         doNotDisturb: false,
         doNotDisturbStart: '22:00',
         doNotDisturbEnd: '08:00',
+      },
+
+      loadSettings: async () => {
+        try {
+          const settings = await invoke<ProgressState['settings']>('get_app_settings');
+          set({ settings });
+        } catch (err) {
+          error('Failed to load settings', { error: String(err) });
+        }
+      },
+
+      setSettings: (settings) => {
+        set({ settings });
       },
 
       addTask: (name, adapter, ide, windowTitle) => {
@@ -172,87 +191,107 @@ export const useProgressStore = create<ProgressState>()(
       },
 
       setTheme: (theme) => {
-        set((state) => ({
-          settings: { ...state.settings, theme },
-        }));
+        const settings = get().settings;
+        const newSettings = { ...settings, theme };
+        set({ settings: newSettings }); // Optimistic update
+        invoke('update_app_settings', { newSettings }).catch(err => error('Failed to update settings', { error: String(err) }));
+      },
+
+      setFontSize: (fontSize) => {
+        const settings = get().settings;
+        const newSettings = { ...settings, fontSize: Math.max(10, Math.min(24, fontSize)) };
+        set({ settings: newSettings });
+        invoke('update_app_settings', { newSettings }).catch(err => error('Failed to update settings', { error: String(err) }));
       },
 
       setOpacity: (opacity) => {
-        set((state) => ({
-          settings: { ...state.settings, opacity: Math.min(1, Math.max(0.1, opacity)) },
-        }));
+        const settings = get().settings;
+        const newSettings = { ...settings, opacity: Math.min(1, Math.max(0.1, opacity)) };
+        set({ settings: newSettings });
+        invoke('update_app_settings', { newSettings }).catch(err => error('Failed to update settings', { error: String(err) }));
       },
 
       setAlwaysOnTop: (value) => {
-        set((state) => ({
-          settings: { ...state.settings, alwaysOnTop: value },
-        }));
+        const settings = get().settings;
+        const newSettings = { ...settings, alwaysOnTop: value };
+        set({ settings: newSettings });
+        invoke('update_app_settings', { newSettings }).catch(err => error('Failed to update settings', { error: String(err) }));
       },
 
       setAutoStart: (value) => {
-        set((state) => ({
-          settings: { ...state.settings, autoStart: value },
-        }));
+        const settings = get().settings;
+        const newSettings = { ...settings, autoStart: value };
+        set({ settings: newSettings });
+        invoke('update_app_settings', { newSettings }).catch(err => error('Failed to update settings', { error: String(err) }));
       },
 
       setNotifications: (value) => {
-        set((state) => ({
-          settings: { ...state.settings, notifications: value },
-        }));
+        const settings = get().settings;
+        const newSettings = { ...settings, notifications: value };
+        set({ settings: newSettings });
+        invoke('update_app_settings', { newSettings }).catch(err => error('Failed to update settings', { error: String(err) }));
       },
 
       setSound: (value) => {
-        set((state) => ({
-          settings: { ...state.settings, sound: value },
-        }));
+        const settings = get().settings;
+        const newSettings = { ...settings, sound: value };
+        set({ settings: newSettings });
+        invoke('update_app_settings', { newSettings }).catch(err => error('Failed to update settings', { error: String(err) }));
       },
 
       setSoundVolume: (value) => {
-        set((state) => ({
-          settings: { ...state.settings, soundVolume: Math.min(1, Math.max(0, value)) },
-        }));
+        const settings = get().settings;
+        const newSettings = { ...settings, soundVolume: Math.min(1, Math.max(0, value)) };
+        set({ settings: newSettings });
+        invoke('update_app_settings', { newSettings }).catch(err => error('Failed to update settings', { error: String(err) }));
       },
 
       setHttpPort: (value) => {
-        set((state) => ({
-          settings: { ...state.settings, httpPort: Math.max(1024, Math.min(65535, value)) },
-        }));
+        const settings = get().settings;
+        const newSettings = { ...settings, httpPort: Math.max(1024, Math.min(65535, value)) };
+        set({ settings: newSettings });
+        invoke('update_app_settings', { newSettings }).catch(err => error('Failed to update settings', { error: String(err) }));
       },
 
       setCustomColors: (colors) => {
-        set((state) => ({
-          settings: {
-            ...state.settings,
-            customColors: {
-              ...state.settings.customColors,
-              ...colors,
-            },
+        const settings = get().settings;
+        const newSettings = {
+          ...settings,
+          customColors: {
+            ...settings.customColors,
+            ...colors,
           },
-        }));
+        };
+        set({ settings: newSettings });
+        invoke('update_app_settings', { newSettings }).catch(err => error('Failed to update settings', { error: String(err) }));
       },
 
       setReminderThreshold: (value) => {
-        set((state) => ({
-          settings: { ...state.settings, reminderThreshold: Math.min(100, Math.max(0, value)) },
-        }));
+        const settings = get().settings;
+        const newSettings = { ...settings, reminderThreshold: Math.min(100, Math.max(0, value)) };
+        set({ settings: newSettings });
+        invoke('update_app_settings', { newSettings }).catch(err => error('Failed to update settings', { error: String(err) }));
       },
 
       setDoNotDisturb: (value) => {
-        set((state) => ({
-          settings: { ...state.settings, doNotDisturb: value },
-        }));
+        const settings = get().settings;
+        const newSettings = { ...settings, doNotDisturb: value };
+        set({ settings: newSettings });
+        invoke('update_app_settings', { newSettings }).catch(err => error('Failed to update settings', { error: String(err) }));
       },
 
       setDoNotDisturbStart: (value) => {
-        set((state) => ({
-          settings: { ...state.settings, doNotDisturbStart: value },
-        }));
+        const settings = get().settings;
+        const newSettings = { ...settings, doNotDisturbStart: value };
+        set({ settings: newSettings });
+        invoke('update_app_settings', { newSettings }).catch(err => error('Failed to update settings', { error: String(err) }));
       },
 
       setDoNotDisturbEnd: (value) => {
-        set((state) => ({
-          settings: { ...state.settings, doNotDisturbEnd: value },
-        }));
+        const settings = get().settings;
+        const newSettings = { ...settings, doNotDisturbEnd: value };
+        set({ settings: newSettings });
+        invoke('update_app_settings', { newSettings }).catch(err => error('Failed to update settings', { error: String(err) }));
       },
 
       addToHistory: (task) => {
@@ -265,7 +304,7 @@ export const useProgressStore = create<ProgressState>()(
         set({ history: [] });
       },
 
-syncFromHttpApi: async () => {
+      syncFromHttpApi: async () => {
         try {
           const port = get().settings.httpPort;
           const response = await fetch(`http://127.0.0.1:${port}/api/status`);
@@ -319,7 +358,8 @@ syncFromHttpApi: async () => {
         tasks: state.tasks,
         currentTaskId: state.currentTaskId,
         history: state.history,
-        settings: state.settings,
+        // Settings are now managed by backend
+        // settings: state.settings,
       }),
     }
   )

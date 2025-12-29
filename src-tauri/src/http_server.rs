@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 use std::sync::{Arc, Mutex};
 use tokio::spawn;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
-use tracing::{debug, info, error, instrument};
+use tracing::{debug, info, warn, error, instrument};
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Task {

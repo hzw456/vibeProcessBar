@@ -46,12 +46,12 @@ function App() {
   useEffect(() => {
     // Skip auto-resize during collapse transition (handled manually)
     if (isCollapseTransition) return;
-    
+
     const resizeWindow = async () => {
       const taskCount = displayTasks.length;
       const taskHeight = 36;
       const padding = 20;
-      
+
       let newHeight = padding;
       if (taskCount === 0) {
         newHeight = 60;
@@ -60,9 +60,9 @@ function App() {
       } else {
         newHeight = padding + taskCount * taskHeight;
       }
-      
+
       const width = isCollapsed ? 120 : 280;
-      
+
       try {
         await invoke('resize_window', { width, height: Math.max(50, newHeight) });
       } catch (e) {
@@ -78,7 +78,8 @@ function App() {
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', settings.theme);
-  }, [settings.theme]);
+    document.documentElement.style.setProperty('--app-font-size', `${settings.fontSize}px`);
+  }, [settings.theme, settings.fontSize]);
 
   useEffect(() => {
     if (settings.customColors.primaryColor) {
@@ -151,28 +152,28 @@ function App() {
     e.preventDefault();
     e.stopPropagation();
     setIsResizing(true);
-    
+
     const startX = e.clientX;
     const startY = e.clientY;
     const container = containerRef.current;
     if (!container) return;
-    
+
     const startWidth = container.offsetWidth;
     const startHeight = container.offsetHeight;
-    
+
     const handleMouseMove = (moveEvent: MouseEvent) => {
       const newWidth = Math.max(150, Math.min(400, startWidth + (moveEvent.clientX - startX)));
       const newHeight = Math.max(50, Math.min(150, startHeight + (moveEvent.clientY - startY)));
       container.style.width = `${newWidth}px`;
       container.style.height = `${newHeight}px`;
     };
-    
+
     const handleMouseUp = () => {
       setIsResizing(false);
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
     };
-    
+
     document.addEventListener('mousemove', handleMouseMove);
     document.addEventListener('mouseup', handleMouseUp);
   };
@@ -269,19 +270,19 @@ function App() {
     const expandedWidth = 280;
     const collapsedWidth = 120;
     const widthDiff = expandedWidth - collapsedWidth;
-    
+
     // Prevent auto-resize during transition
     setIsCollapseTransition(true);
-    
+
     try {
       const win = getCurrentWindow();
       const position = await win.innerPosition();
       const scaleFactor = await win.scaleFactor();
-      
+
       // Convert physical pixels to logical pixels
       const logicalX = position.x / scaleFactor;
       const logicalY = position.y / scaleFactor;
-      
+
       // Calculate height
       const taskCount = displayTasks.length;
       const taskHeight = 36;
@@ -295,7 +296,7 @@ function App() {
         newHeight = padding + taskCount * taskHeight;
       }
       newHeight = Math.max(50, newHeight);
-      
+
       if (!isCollapsed) {
         // Collapsing: resize to smaller width, then move right
         await invoke('resize_window', { width: collapsedWidth, height: newHeight });
@@ -307,19 +308,19 @@ function App() {
         await invoke('set_window_position', { x: newX, y: logicalY });
         await invoke('resize_window', { width: expandedWidth, height: newHeight });
       }
-      
-setIsCollapsed(!isCollapsed);
+
+      setIsCollapsed(!isCollapsed);
     } catch (e) {
-        error('Failed to adjust window position', { error: String(e) });
-        setIsCollapsed(!isCollapsed);
-      } finally {
+      error('Failed to adjust window position', { error: String(e) });
+      setIsCollapsed(!isCollapsed);
+    } finally {
       // Re-enable auto-resize after a short delay
       setTimeout(() => setIsCollapseTransition(false), 100);
     }
   };
 
   return (
-    <div 
+    <div
       ref={containerRef}
       className={`app-container ${completedTask ? 'has-completed' : ''} ${displayTasks.length > 1 ? 'multi-task' : ''} ${isCollapsed ? 'collapsed' : ''}`}
       onMouseDown={handleMouseDown}
@@ -353,146 +354,146 @@ setIsCollapsed(!isCollapsed);
         <>
           {/* Collapse button on left */}
           <button className="collapse-btn" onClick={handleCollapse}>›</button>
-          
+
           {/* Show completed notification */}
           {completedTask && (
             <div className="completed-banner">
               ✓ {tasks.find(t => t.id === completedTask)?.name || 'Task'} Completed!
             </div>
           )}
-      
-      {/* Multi-task view */}
-      {displayTasks.length > 1 ? (
-        <div className="multi-task-list">
-          {displayTasks.map((task) => {
-            // Calculate elapsed time (only for running/completed, not armed/active)
-            let timeStr = '';
-            if (task.status === 'armed') {
-              timeStr = '⏳'; // Armed: waiting for AI activity
-            } else if (task.status === 'active') {
-              timeStr = '👁'; // Active: window has focus
-            } else if (task.status === 'completed') {
-              const elapsed = (task.endTime || Date.now()) - task.startTime;
-              const minutes = Math.floor(elapsed / 60000);
-              const seconds = Math.floor((elapsed % 60000) / 1000);
-              timeStr = minutes > 0 ? `${minutes}m ${seconds}s` : `${seconds}s`;
-            } else if (task.status === 'running' && task.startTime > 0) {
-              const elapsed = Date.now() - task.startTime;
-              const minutes = Math.floor(elapsed / 60000);
-              const seconds = Math.floor((elapsed % 60000) / 1000);
-              timeStr = minutes > 0 ? `${minutes}m ${seconds}s` : `${seconds}s`;
-            }
-            
-            const isClickedCompleted = task.status === 'completed' && clickedCompletedTasks.has(task.id);
-            const showHighlight = task.status === 'completed' && !isClickedCompleted;
-            
-            return (
-              <div 
-                key={task.id} 
-                className={`task-row ${task.id === currentTaskId ? 'active' : ''} ${showHighlight ? 'completed' : ''} ${isClickedCompleted ? 'completed-clicked' : ''} ${task.status === 'armed' ? 'armed' : ''} ${task.status === 'active' ? 'active-state' : ''}`}
-                onClick={() => handleTaskClick(task)}
-              >
-                <span className={`mini-status status-${task.status}`}>
-                  {task.status === 'running' ? '◉' : task.status === 'completed' ? '✓' : task.status === 'armed' ? '◎' : task.status === 'active' ? '◈' : '○'}
-                </span>
-                <span className="task-name-mini">{task.name}</span>
-                <span className={`task-time-mini ${task.status === 'completed' ? 'completed-time' : ''} ${task.status === 'armed' ? 'armed-time' : ''} ${task.status === 'active' ? 'active-time' : ''}`}>
-                  {task.status === 'completed' ? `✓ ${timeStr}` : timeStr}
-                </span>
-                {task.ide && <span className="ide-badge-mini">{task.ide}</span>}
-              </div>
-            );
-          })}
-        </div>
-      ) : (
-        /* Single task view */
-        <>
-          {displayTasks.length === 0 ? (
-            <div className="app-header">
-              <span className="app-icon">◆</span>
-              <span className="app-title">Vibe Process Bar</span>
+
+          {/* Multi-task view */}
+          {displayTasks.length > 1 ? (
+            <div className="multi-task-list">
+              {displayTasks.map((task) => {
+                // Calculate elapsed time (only for running/completed, not armed/active)
+                let timeStr = '';
+                if (task.status === 'armed') {
+                  timeStr = '⏳'; // Armed: waiting for AI activity
+                } else if (task.status === 'active') {
+                  timeStr = '👁'; // Active: window has focus
+                } else if (task.status === 'completed') {
+                  const elapsed = (task.endTime || Date.now()) - task.startTime;
+                  const minutes = Math.floor(elapsed / 60000);
+                  const seconds = Math.floor((elapsed % 60000) / 1000);
+                  timeStr = minutes > 0 ? `${minutes}m ${seconds}s` : `${seconds}s`;
+                } else if (task.status === 'running' && task.startTime > 0) {
+                  const elapsed = Date.now() - task.startTime;
+                  const minutes = Math.floor(elapsed / 60000);
+                  const seconds = Math.floor((elapsed % 60000) / 1000);
+                  timeStr = minutes > 0 ? `${minutes}m ${seconds}s` : `${seconds}s`;
+                }
+
+                const isClickedCompleted = task.status === 'completed' && clickedCompletedTasks.has(task.id);
+                const showHighlight = task.status === 'completed' && !isClickedCompleted;
+
+                return (
+                  <div
+                    key={task.id}
+                    className={`task-row ${task.id === currentTaskId ? 'active' : ''} ${showHighlight ? 'completed' : ''} ${isClickedCompleted ? 'completed-clicked' : ''} ${task.status === 'armed' ? 'armed' : ''} ${task.status === 'active' ? 'active-state' : ''}`}
+                    onClick={() => handleTaskClick(task)}
+                  >
+                    <span className={`mini-status status-${task.status}`}>
+                      {task.status === 'running' ? '◉' : task.status === 'completed' ? '✓' : task.status === 'armed' ? '◎' : task.status === 'active' ? '◈' : '○'}
+                    </span>
+                    <span className="task-name-mini">{task.name}</span>
+                    <span className={`task-time-mini ${task.status === 'completed' ? 'completed-time' : ''} ${task.status === 'armed' ? 'armed-time' : ''} ${task.status === 'active' ? 'active-time' : ''}`}>
+                      {task.status === 'completed' ? `✓ ${timeStr}` : timeStr}
+                    </span>
+                    {task.ide && <span className="ide-badge-mini">{task.ide}</span>}
+                  </div>
+                );
+              })}
             </div>
-          ) : (() => {
-            // Calculate elapsed time for single task (not for armed/active)
-            const task = currentTask;
-            let elapsedTime: string | undefined;
-            if (task) {
-              if (task.status === 'armed') {
-                elapsedTime = '⏳'; // Armed: waiting
-              } else if (task.status === 'active') {
-                elapsedTime = '👁'; // Active: window has focus
-              } else if (task.status === 'completed') {
-                const elapsed = (task.endTime || Date.now()) - task.startTime;
-                const minutes = Math.floor(elapsed / 60000);
-                const seconds = Math.floor((elapsed % 60000) / 1000);
-                elapsedTime = minutes > 0 ? `${minutes}m ${seconds}s` : `${seconds}s`;
-              } else if (task.startTime > 0) {
-                const elapsed = Date.now() - task.startTime;
-                const minutes = Math.floor(elapsed / 60000);
-                const seconds = Math.floor((elapsed % 60000) / 1000);
-                elapsedTime = minutes > 0 ? `${minutes}m ${seconds}s` : `${seconds}s`;
-              }
-            }
-            return (
-              <StatusText 
-                taskName={currentTask?.name || ''}
-                status={currentTask?.status || 'idle'}
-                tokens={currentTask?.tokens || 0}
-                ide={currentTask?.ide}
-                onActivate={handleActivateWindow}
-                elapsedTime={elapsedTime}
-              />
-            );
-          })()}
-        </>
-      )}
-      
-      <div className="resize-handle" onMouseDown={handleResizeStart}></div>
-      {showMenu && (
-        <div className="context-menu" onClick={(e) => e.stopPropagation()}>
-          <div className="menu-header">Tasks</div>
-          {tasks.length === 0 ? (
-            <div className="menu-item disabled">No tasks</div>
           ) : (
-            tasks.map(task => (
-              <div 
-                key={task.id} 
-                className={`menu-item ${task.id === currentTaskId ? 'active' : ''}`}
-                onClick={() => handleTaskSelect(task.id)}
-              >
-                <span className={`status-dot status-${task.status}`}></span>
-                <span className="task-name">{task.name}</span>
-                <span className="task-progress">{task.progress}%</span>
-                <button 
-                  className="delete-btn"
-                  onClick={(e) => handleDeleteTask(task.id, e)}
-                >
-                  ×
-                </button>
-              </div>
-            ))
+            /* Single task view */
+            <>
+              {displayTasks.length === 0 ? (
+                <div className="app-header">
+                  <span className="app-icon">◆</span>
+                  <span className="app-title">Vibe Process Bar</span>
+                </div>
+              ) : (() => {
+                // Calculate elapsed time for single task (not for armed/active)
+                const task = currentTask;
+                let elapsedTime: string | undefined;
+                if (task) {
+                  if (task.status === 'armed') {
+                    elapsedTime = '⏳'; // Armed: waiting
+                  } else if (task.status === 'active') {
+                    elapsedTime = '👁'; // Active: window has focus
+                  } else if (task.status === 'completed') {
+                    const elapsed = (task.endTime || Date.now()) - task.startTime;
+                    const minutes = Math.floor(elapsed / 60000);
+                    const seconds = Math.floor((elapsed % 60000) / 1000);
+                    elapsedTime = minutes > 0 ? `${minutes}m ${seconds}s` : `${seconds}s`;
+                  } else if (task.startTime > 0) {
+                    const elapsed = Date.now() - task.startTime;
+                    const minutes = Math.floor(elapsed / 60000);
+                    const seconds = Math.floor((elapsed % 60000) / 1000);
+                    elapsedTime = minutes > 0 ? `${minutes}m ${seconds}s` : `${seconds}s`;
+                  }
+                }
+                return (
+                  <StatusText
+                    taskName={currentTask?.name || ''}
+                    status={currentTask?.status || 'idle'}
+                    tokens={currentTask?.tokens || 0}
+                    ide={currentTask?.ide}
+                    onActivate={handleActivateWindow}
+                    elapsedTime={elapsedTime}
+                  />
+                );
+              })()}
+            </>
           )}
-          <div className="menu-divider"></div>
-          <div className="menu-item" onClick={handleResetTask}>
-            Reset Current Task
-          </div>
-          <div className="menu-item submenu">
-            <span>Position</span>
-            <div className="submenu-content">
-              <div className="menu-item" onClick={() => handleMoveToCorner('top-left')}>Top Left</div>
-              <div className="menu-item" onClick={() => handleMoveToCorner('top-right')}>Top Right</div>
-              <div className="menu-item" onClick={() => handleMoveToCorner('bottom-left')}>Bottom Left</div>
-              <div className="menu-item" onClick={() => handleMoveToCorner('bottom-right')}>Bottom Right</div>
+
+          <div className="resize-handle" onMouseDown={handleResizeStart}></div>
+          {showMenu && (
+            <div className="context-menu" onClick={(e) => e.stopPropagation()}>
+              <div className="menu-header">Tasks</div>
+              {tasks.length === 0 ? (
+                <div className="menu-item disabled">No tasks</div>
+              ) : (
+                tasks.map(task => (
+                  <div
+                    key={task.id}
+                    className={`menu-item ${task.id === currentTaskId ? 'active' : ''}`}
+                    onClick={() => handleTaskSelect(task.id)}
+                  >
+                    <span className={`status-dot status-${task.status}`}></span>
+                    <span className="task-name">{task.name}</span>
+                    <span className="task-progress">{task.progress}%</span>
+                    <button
+                      className="delete-btn"
+                      onClick={(e) => handleDeleteTask(task.id, e)}
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))
+              )}
+              <div className="menu-divider"></div>
+              <div className="menu-item" onClick={handleResetTask}>
+                Reset Current Task
+              </div>
+              <div className="menu-item submenu">
+                <span>Position</span>
+                <div className="submenu-content">
+                  <div className="menu-item" onClick={() => handleMoveToCorner('top-left')}>Top Left</div>
+                  <div className="menu-item" onClick={() => handleMoveToCorner('top-right')}>Top Right</div>
+                  <div className="menu-item" onClick={() => handleMoveToCorner('bottom-left')}>Bottom Left</div>
+                  <div className="menu-item" onClick={() => handleMoveToCorner('bottom-right')}>Bottom Right</div>
+                </div>
+              </div>
+              <div className="menu-item" onClick={handleOpenSettings}>
+                Settings
+              </div>
+              <div className="menu-item" onClick={() => setShowMenu(false)}>
+                Close Menu
+              </div>
             </div>
-          </div>
-          <div className="menu-item" onClick={handleOpenSettings}>
-            Settings
-          </div>
-          <div className="menu-item" onClick={() => setShowMenu(false)}>
-            Close Menu
-          </div>
-        </div>
-      )}
+          )}
         </>
       )}
     </div>

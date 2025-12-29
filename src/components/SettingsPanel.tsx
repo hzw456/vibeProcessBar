@@ -4,12 +4,14 @@ import './SettingsPanel.css';
 
 interface SettingsPanelProps {
   onClose: () => void;
+  isStandalone?: boolean;
 }
 
-export function SettingsPanel({ onClose }: SettingsPanelProps) {
+export function SettingsPanel({ onClose, isStandalone = false }: SettingsPanelProps) {
   const {
     settings,
     setTheme,
+    setFontSize,
     setOpacity,
     setAlwaysOnTop,
     setAutoStart,
@@ -68,6 +70,7 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
         const config = JSON.parse(event.target?.result as string);
         if (config.settings) {
           if (config.settings.theme) setTheme(config.settings.theme);
+          if (config.settings.fontSize) setFontSize(config.settings.fontSize);
           if (config.settings.opacity) setOpacity(config.settings.opacity);
           if (config.settings.alwaysOnTop !== undefined) setAlwaysOnTop(config.settings.alwaysOnTop);
           if (config.settings.notifications !== undefined) setNotifications(config.settings.notifications);
@@ -89,6 +92,15 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
     reader.readAsText(file);
   };
 
+  if (isStandalone) {
+    return (
+      <div className="settings-panel standalone" onClick={e => e.stopPropagation()}>
+        {/* No header for standalone window as it has system title bar */}
+        {renderContent()}
+      </div>
+    );
+  }
+
   return (
     <div className="settings-overlay" onClick={onClose}>
       <div className="settings-panel" onClick={e => e.stopPropagation()}>
@@ -96,7 +108,14 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
           <h2>Settings</h2>
           <button className="close-btn" onClick={onClose}>×</button>
         </div>
+        {renderContent()}
+      </div>
+    </div>
+  );
 
+  function renderContent() {
+    return (
+      <>
         <div className="settings-tabs">
           <button
             className={`tab ${activeTab === 'general' ? 'active' : ''}`}
@@ -184,6 +203,17 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
                   <option value="forest">Forest</option>
                   <option value="midnight">Midnight</option>
                 </select>
+              </div>
+              <div className="setting-item">
+                <label>Font Size: {settings.fontSize}px</label>
+                <input
+                  type="range"
+                  min="10"
+                  max="24"
+                  step="1"
+                  value={settings.fontSize}
+                  onChange={e => setFontSize(parseInt(e.target.value))}
+                />
               </div>
               <div className="setting-item">
                 <label>Opacity: {Math.round(settings.opacity * 100)}%</label>
@@ -394,6 +424,7 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
           <div className="version-info">Vibe Progress Bar v0.1.0</div>
           <button className="reset-btn" onClick={() => {
             setTheme('dark');
+            setFontSize(14);
             setOpacity(0.85);
             setAlwaysOnTop(true);
             setAutoStart(false);
@@ -410,7 +441,7 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
             Reset to defaults
           </button>
         </div>
-      </div>
-    </div>
-  );
+      </>
+    );
+  }
 }

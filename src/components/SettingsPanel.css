@@ -24,6 +24,16 @@
   overflow: hidden;
 }
 
+.settings-panel.standalone {
+  width: 100%;
+  height: 100%;
+  /* Fill the window */
+  max-height: none;
+  border-radius: 0;
+  border: none;
+  box-shadow: none;
+}
+
 .settings-header {
   display: flex;
   justify-content: space-between;
