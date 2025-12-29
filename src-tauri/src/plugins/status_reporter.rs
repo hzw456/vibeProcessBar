@@ -14,6 +14,7 @@ use tauri::{
     plugin::{Plugin, Result as PluginResult},
     AppHandle, Runtime, State as TauriState,
 };
+use tracing::{debug, info, error};
 
 pub const DEFAULT_PORT: u16 = 31416;
 pub const DEFAULT_HOST: &str = "127.0.0.1";
@@ -119,19 +120,23 @@ async fn report_status(
     State(state): State<Arc<ServerState>>,
     Json(report): Json<StatusReport>,
 ) -> Result<Json<()>, StatusCode> {
+    debug!(window_id = %report.window_id, stage = %report.stage, progress = %report.progress, "Status report received");
+
     let event = StatusEvent {
-        window_id: report.window_id,
-        window_title: report.window_title,
+        window_id: report.window_id.clone(),
+        window_title: report.window_title.clone(),
         stage: report.stage.as_str().into(),
         progress: report.progress,
-        message: report.message,
+        message: report.message.clone(),
         timestamp: chrono::Utc::now(),
     };
 
-    let _ = state.tx.send(event);
+    let send_result = state.tx.send(event);
+    debug!(window_id = %report.window_id, "Event broadcast sent");
 
     if let Some(window) = state.app_handle.get_webview_window("main") {
-        let _ = window.emit("agent-status-update", &event);
+        let emit_result = window.emit("agent-status-update", &report);
+        debug!(window_id = %report.window_id, "Frontend event emitted");
     }
 
     Ok(Json(()))
@@ -151,6 +156,7 @@ impl<R: Runtime> Plugin<R> for StatusReporterPlugin {
     }
 
     fn init(&self, app: &AppHandle<R>) -> PluginResult<Self> {
+        info!(port = %self.port, host = %self.host, "Status reporter plugin initializing");
         let app_handle = app.clone();
         tokio::spawn(async move {
             let _ = self.start_server(app_handle).await;

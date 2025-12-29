@@ -1,15 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
-// @ts-ignore - ProgressBar may be used in future
-import { ProgressBar } from './components/ProgressBar';
 import { StatusText } from './components/StatusText';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { invoke } from '@tauri-apps/api/core';
 import { useProgressStore } from './stores/progressStore';
 import { useProgressNotifications } from './hooks/useProgressEvent';
 import { SHORTCUTS, registerGlobalShortcut, moveToCorner } from './utils/windowManager';
+import { debug, error } from './utils/logger';
 import './App.css';
 
-console.log('App.tsx loaded');
+debug('App.tsx loaded');
 
 function App() {
   const { tasks, currentTaskId, settings, setCurrentTask, updateProgress, resetTask, removeTask, syncFromHttpApi } = useProgressStore();
@@ -67,14 +66,14 @@ function App() {
       try {
         await invoke('resize_window', { width, height: Math.max(50, newHeight) });
       } catch (e) {
-        console.error('Failed to resize window:', e);
+        error('Failed to resize window', { error: String(e) });
       }
     };
     resizeWindow();
   }, [displayTasks.length, isCollapsed, isCollapseTransition]);
 
   useEffect(() => {
-    console.log('App mounted, tasks:', tasks.length, 'currentTask:', currentTask?.name);
+    debug('App mounted', { taskCount: tasks.length, taskName: currentTask?.name });
   }, [tasks, currentTask]);
 
   useEffect(() => {
@@ -233,35 +232,35 @@ function App() {
           ide: currentTask.ide,
           windowTitle: currentTask.windowTitle || null
         });
-      } catch (error) {
-        console.error('Failed to activate IDE window:', error);
+        debug('IDE window activated', { ide: currentTask.ide, windowTitle: currentTask.windowTitle });
+      } catch (err) {
+        error('Failed to activate IDE window', { error: String(err), ide: currentTask.ide });
       }
     }
   };
 
   const handleTaskClick = async (task: typeof currentTask) => {
     if (!task) return;
-    console.log('Task clicked:', task.id, 'ide:', task.ide, 'windowTitle:', task.windowTitle);
+    debug('Task clicked', { taskId: task.id, ide: task.ide, windowTitle: task.windowTitle });
     setCurrentTask(task.id);
-    
-    // Mark completed task as clicked (removes highlight)
+
     if (task.status === 'completed') {
       setClickedCompletedTasks(prev => new Set([...prev, task.id]));
     }
-    
+
     if (task.ide) {
       try {
-        console.log('Activating IDE window:', task.ide, task.windowTitle);
+        debug('Activating IDE window', { ide: task.ide, windowTitle: task.windowTitle });
         await invoke('activate_ide_window', {
           ide: task.ide,
           windowTitle: task.windowTitle || null
         });
-        console.log('IDE window activated successfully');
-      } catch (error) {
-        console.error('Failed to activate IDE window:', error);
+        debug('IDE window activated successfully', { ide: task.ide });
+      } catch (err) {
+        error('Failed to activate IDE window', { error: String(err), ide: task.ide });
       }
     } else {
-      console.log('No IDE specified for task');
+      debug('No IDE specified for task', { taskId: task.id });
     }
   };
 
@@ -309,12 +308,11 @@ function App() {
         await invoke('resize_window', { width: expandedWidth, height: newHeight });
       }
       
-      setIsCollapsed(!isCollapsed);
+setIsCollapsed(!isCollapsed);
     } catch (e) {
-      console.error('Failed to adjust window position:', e);
-      // Still toggle state even if position adjustment fails
-      setIsCollapsed(!isCollapsed);
-    } finally {
+        error('Failed to adjust window position', { error: String(e) });
+        setIsCollapsed(!isCollapsed);
+      } finally {
       // Re-enable auto-resize after a short delay
       setTimeout(() => setIsCollapseTransition(false), 100);
     }

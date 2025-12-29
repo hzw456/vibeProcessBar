@@ -3,6 +3,7 @@
 use tauri::{Manager, Runtime, WindowEvent};
 use serde_json::json;
 use std::process::Command;
+use tracing::{info, error};
 
 mod window_manager;
 mod http_server;
@@ -291,6 +292,8 @@ async fn trigger_notification<R: Runtime>(
 }
 
 fn main() {
+    tracing_subscriber::fmt::init();
+
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
         .invoke_handler(tauri::generate_handler![
@@ -331,6 +334,7 @@ fn main() {
             }
 
             http_server::start_server_background(31415);
+            info!(port = 31415, "HTTP server started on port 31415");
 
             let window_clone = window.clone();
             window.on_window_event(move |event| {

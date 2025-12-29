@@ -4,6 +4,36 @@ HTTP API for controlling the Vibe Process Bar floating window.
 
 **Base URL:** `http://localhost:31415`
 
+## Logging
+
+The application outputs structured logs to help with debugging:
+
+**Backend Logs (Rust):**
+- Output to stdout/stderr
+- Controlled by `RUST_LOG` environment variable
+- Levels: `trace` > `debug` > `info` > `warn` > `error`
+
+```bash
+# Enable debug logging
+RUST_LOG=debug ./vibeprocessbar
+
+# Enable verbose logging
+RUST_LOG=trace ./vibeprocessbar
+```
+
+**Frontend Logs (TypeScript):**
+- Output to browser DevTools Console
+- Format: `[LEVEL] message`
+
+**Log Locations:**
+| Component | Log Points |
+|-----------|-----------|
+| http_server.rs | HTTP requests, task state changes, errors |
+| status_reporter.rs | Status reports, event broadcasts |
+| progressStore.ts | HTTP sync, task mutations |
+| useProgressEvent.ts | Event emissions, handler calls |
+| App.tsx | UI actions (task selection, IDE activation) |
+
 ## Endpoints
 
 ### Get Status

@@ -2,6 +2,7 @@ use serde::{Deserialize, Serialize};
 use std::sync::{Arc, Mutex};
 use tokio::spawn;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tracing::{debug, info, error, instrument};
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Task {
@@ -86,6 +87,10 @@ async fn handle_connection(
     let request = String::from_utf8_lossy(&buffer[..bytes_read]);
     let body = extract_body(&request);
 
+    debug!(method = %request.lines().next().unwrap_or(""), path = %request.lines().next().map(|l| l.split_whitespace().nth(1).unwrap_or("")).unwrap_or(""), "HTTP request received");
+    let body_summary = body.chars().take(100).collect::<String>();
+    debug!(body = %body_summary, "Request body");
+
     let response = if request.starts_with("GET /api/status") {
         let tasks = state.tasks.lock().unwrap();
         let current_task_id = state.current_task_id.lock().unwrap();
@@ -102,15 +107,16 @@ async fn handle_connection(
         // ARMED state - task is waiting for AI activity, no timer yet
         match serde_json::from_str::<StartTaskRequest>(&body) {
             Ok(req) => {
+                info!(task_id = %req.task_id, name = %req.name, ide = %req.ide, "Task armed");
                 let task = Task {
                     id: req.task_id.clone(),
                     name: req.name,
                     progress: 0,
                     tokens: 0,
-                    status: "armed".to_string(),  // Special armed status
+                    status: "armed".to_string(),
                     ide: req.ide,
                     window_title: req.window_title,
-                    start_time: 0,  // No start time yet - will be set when running
+                    start_time: 0,
                     end_time: None,
                 };
                 let mut tasks = state.tasks.lock().unwrap();
@@ -124,6 +130,7 @@ async fn handle_connection(
     } else if request.starts_with("POST /api/task/start") {
         match serde_json::from_str::<StartTaskRequest>(&body) {
             Ok(req) => {
+                info!(task_id = %req.task_id, name = %req.name, "Task started");
                 let mut tasks = state.tasks.lock().unwrap();
                 // Check if task exists and is in armed state
                 let existing = tasks.iter_mut().find(|t| t.id == req.task_id);
@@ -155,6 +162,7 @@ async fn handle_connection(
     } else if request.starts_with("POST /api/task/progress") {
         match serde_json::from_str::<ProgressRequest>(&body) {
             Ok(req) => {
+                debug!(task_id = %req.task_id, progress = %req.progress, "Task progress updated");
                 let mut tasks = state.tasks.lock().unwrap();
                 let found = tasks.iter_mut().find(|t| t.id == req.task_id);
                 if let Some(task) = found {
@@ -169,6 +177,7 @@ async fn handle_connection(
     } else if request.starts_with("POST /api/task/token") {
         match serde_json::from_str::<TokenRequest>(&body) {
             Ok(req) => {
+                debug!(task_id = %req.task_id, tokens = %req.tokens, increment = %req.increment.unwrap_or(false), "Token count updated");
                 let mut tasks = state.tasks.lock().unwrap();
                 let found = tasks.iter_mut().find(|t| t.id == req.task_id);
                 if let Some(task) = found {
@@ -188,6 +197,7 @@ async fn handle_connection(
     } else if request.starts_with("POST /api/task/complete") {
         match serde_json::from_str::<CompleteRequest>(&body) {
             Ok(req) => {
+                info!(task_id = %req.task_id, "Task completed");
                 let mut tasks = state.tasks.lock().unwrap();
                 let found = tasks.iter_mut().find(|t| t.id == req.task_id);
                 if let Some(task) = found {
@@ -207,6 +217,7 @@ async fn handle_connection(
     } else if request.starts_with("POST /api/task/error") {
         match serde_json::from_str::<ErrorRequest>(&body) {
             Ok(req) => {
+                warn!(task_id = %req.task_id, message = %req.message, "Task error");
                 let mut tasks = state.tasks.lock().unwrap();
                 let found = tasks.iter_mut().find(|t| t.id == req.task_id);
                 if let Some(task) = found {
@@ -221,6 +232,7 @@ async fn handle_connection(
     } else if request.starts_with("POST /api/task/cancel") {
         match serde_json::from_str::<CancelRequest>(&body) {
             Ok(req) => {
+                info!(task_id = %req.task_id, "Task cancelled");
                 let mut tasks = state.tasks.lock().unwrap();
                 tasks.retain(|t| t.id != req.task_id);
                 let mut current_id = state.current_task_id.lock().unwrap();
@@ -290,14 +302,14 @@ fn extract_body(request: &str) -> String {
 pub async fn start_server(port: u16) -> Result<(), Box<dyn std::error::Error>> {
     let state = Arc::new(SharedState::new());
     let listener = tokio::net::TcpListener::bind(format!("127.0.0.1:{}", port)).await?;
-    println!("HTTP server listening on http://127.0.0.1:{}", port);
+    info!(port = %port, "HTTP server listening on 127.0.0.1:{}", port);
 
     loop {
         let (mut stream, _) = listener.accept().await?;
         let state = state.clone();
         spawn(async move {
             if let Err(e) = handle_connection(&mut stream, &state).await {
-                eprintln!("Connection error: {}", e);
+                error!(error = %e, "Connection error");
             }
         });
     }
@@ -308,7 +320,7 @@ pub fn start_server_background(port: u16) {
         let rt = tokio::runtime::Runtime::new().expect("Failed to create Tokio runtime");
         rt.block_on(async {
             if let Err(e) = start_server(port).await {
-                eprintln!("HTTP server error: {}", e);
+                error!(port = %port, error = %e, "HTTP server error");
             }
         });
     });

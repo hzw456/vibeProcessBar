@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef } from 'react';
 import { useProgressStore } from '../stores/progressStore';
 import { showNotification, playCompletionSound, isInDoNotDisturb } from '../utils/notifications';
+import { debug } from '../utils/logger';
 
 export function useProgressEvent() {
   const eventHandlers = useRef<Map<string, Set<(data: unknown) => void>>>(new Map());
@@ -10,12 +11,14 @@ export function useProgressEvent() {
       eventHandlers.current.set(event, new Set());
     }
     eventHandlers.current.get(event)!.add(handler);
+    debug('Event handler registered', { event });
     return () => {
       eventHandlers.current.get(event)?.delete(handler);
     };
   }, []);
 
   const emit = useCallback((event: string, data: unknown) => {
+    debug('Event emitted', { event, data });
     eventHandlers.current.get(event)?.forEach(handler => handler(data));
   }, []);
 
