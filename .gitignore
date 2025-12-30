@@ -1,6 +1,8 @@
 node_modules/
 dist/
 .DS_Store
+._*
+.openspec/
 *.log
 .target/
 Cargo.lock
