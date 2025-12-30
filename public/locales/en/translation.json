@@ -1,0 +1,124 @@
+{
+  "app": {
+    "title": "Vibe Process Bar",
+    "icon": "◆"
+  },
+  "status": {
+    "idle": "Ready",
+    "armed": "Armed...",
+    "active": "Active",
+    "running": "Running...",
+    "completed": "Done",
+    "error": "Error",
+    "completedWithTime": "{{taskName}} - {{elapsedTime}}"
+  },
+  "menu": {
+    "title": "Tasks",
+    "noTasks": "No tasks",
+    "resetTask": "Reset Current Task",
+    "position": "Position",
+    "topLeft": "Top Left",
+    "topRight": "Top Right",
+    "bottomLeft": "Bottom Left",
+    "bottomRight": "Bottom Right",
+    "settings": "Settings",
+    "closeMenu": "Close Menu"
+  },
+  "notification": {
+    "taskCompleted": "{{taskName}} Completed!"
+  },
+  "settings": {
+    "title": "Settings",
+    "tabs": {
+      "general": "General",
+      "appearance": "Appearance",
+      "notifications": "Notifications",
+      "tasks": "Tasks",
+      "shortcuts": "Shortcuts"
+    },
+    "general": {
+      "autoStart": "Auto-start on login",
+      "alwaysOnTop": "Always on top",
+      "httpPort": "HTTP API Port",
+      "configManagement": "Export/Import Config",
+      "manage": "Manage"
+    },
+    "appearance": {
+      "theme": "Theme",
+      "themeOptions": {
+        "dark": "Dark (Default)",
+        "light": "Light",
+        "purple": "Purple",
+        "ocean": "Ocean",
+        "forest": "Forest",
+        "midnight": "Midnight"
+      },
+      "fontSize": "Font Size: {{size}}px",
+      "opacity": "Opacity: {{percentage}}%",
+      "customPrimaryColor": "Custom Primary Color",
+      "customBackground": "Custom Background",
+      "resetColors": "Reset Custom Colors",
+      "reset": "Reset"
+    },
+    "notifications": {
+      "desktopNotifications": "Desktop notifications",
+      "soundAlerts": "Sound alerts",
+      "volume": "Volume: {{percentage}}%",
+      "completionThreshold": "Completion threshold: {{percentage}}%",
+      "doNotDisturb": "Do Not Disturb",
+      "startTime": "Start Time",
+      "endTime": "End Time"
+    },
+    "tasks": {
+      "history": "Task History",
+      "historyCount": "{{count}} tasks",
+      "clearHistory": "Clear History",
+      "clear": "Clear"
+    },
+    "shortcuts": {
+      "title": "Global Shortcuts",
+      "description": "Right-click the progress bar to access the context menu.",
+      "rightClick": "Open context menu",
+      "drag": "Move window",
+      "scroll": "Adjust progress",
+      "clickStatus": "Activate IDE window"
+    },
+    "importExport": {
+      "title": "Import/Export Configuration",
+      "exportConfig": "Export Config",
+      "importConfig": "Import Config",
+      "cancel": "Cancel"
+    },
+    "footer": {
+      "version": "Vibe Progress Bar v{{version}}",
+      "resetDefaults": "Reset to defaults"
+    }
+  },
+  "time": {
+    "minutesSeconds": "{{minutes}}m {{seconds}}s",
+    "seconds": "{{seconds}}s",
+    "waiting": "⏳",
+    "active": "👁"
+  },
+  "language": {
+    "selector": "Language",
+    "en": "English",
+    "zh-CN": "简体中文",
+    "zh-TW": "繁體中文",
+    "es": "Español",
+    "fr": "Français",
+    "de": "Deutsch",
+    "ja": "日本語",
+    "ko": "한국어",
+    "ru": "Русский",
+    "pt": "Português",
+    "ar": "العربية"
+  },
+  "tray": {
+    "settings": "Settings",
+    "quit": "Quit"
+  },
+  "settingsWindow": {
+    "title": "Settings"
+  }
+}

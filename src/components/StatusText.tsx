@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import './StatusText.css';
 
 interface StatusTextProps {
@@ -10,6 +11,8 @@ interface StatusTextProps {
 }
 
 export function StatusText({ taskName, status, tokens = 0, ide, onActivate, elapsedTime }: StatusTextProps) {
+  const { t } = useTranslation();
+
   const getStatusIcon = () => {
     switch (status) {
       case 'idle':
@@ -28,23 +31,23 @@ export function StatusText({ taskName, status, tokens = 0, ide, onActivate, elap
         return '○';
     }
   };
-
+  
   const getStatusText = () => {
     switch (status) {
       case 'idle':
-        return 'Ready';
+        return t('status.idle');
       case 'armed':
-        return taskName || 'Armed...';
+        return taskName || t('status.armed');
       case 'active':
-        return taskName || 'Active';
+        return taskName || t('status.active');
       case 'running':
-        return taskName || 'Running...';
+        return taskName || t('status.running');
       case 'completed':
-        return elapsedTime ? `${taskName} - ${elapsedTime}` : taskName || 'Done';
+        return elapsedTime ? t('status.completedWithTime', { taskName, elapsedTime }) : taskName || t('status.completed');
       case 'error':
-        return 'Error';
+        return t('status.error');
       default:
-        return 'Ready';
+        return t('status.idle');
     }
   };
 

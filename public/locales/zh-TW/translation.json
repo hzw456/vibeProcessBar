@@ -1,0 +1,124 @@
+{
+  "app": {
+    "title": "Vibe 進度條",
+    "icon": "◆"
+  },
+  "status": {
+    "idle": "就緒",
+    "armed": "等待中...",
+    "active": "活動中",
+    "running": "運行中...",
+    "completed": "完成",
+    "error": "錯誤",
+    "completedWithTime": "{{taskName}} - {{elapsedTime}}"
+  },
+  "menu": {
+    "title": "任務",
+    "noTasks": "無任務",
+    "resetTask": "重置當前任務",
+    "position": "位置",
+    "topLeft": "左上",
+    "topRight": "右上",
+    "bottomLeft": "左下",
+    "bottomRight": "右下",
+    "settings": "設置",
+    "closeMenu": "關閉菜單"
+  },
+  "notification": {
+    "taskCompleted": "{{taskName}} 已完成！"
+  },
+  "settings": {
+    "title": "設置",
+    "tabs": {
+      "general": "常規",
+      "appearance": "外觀",
+      "notifications": "通知",
+      "tasks": "任務",
+      "shortcuts": "快捷鍵"
+    },
+    "general": {
+      "autoStart": "登錄時自動啟動",
+      "alwaysOnTop": "始終置頂",
+      "httpPort": "HTTP API 端口",
+      "configManagement": "導出/導入配置",
+      "manage": "管理"
+    },
+    "appearance": {
+      "theme": "主題",
+      "themeOptions": {
+        "dark": "深色 (默認)",
+        "light": "淺色",
+        "purple": "紫色",
+        "ocean": "海洋",
+        "forest": "森林",
+        "midnight": "午夜"
+      },
+      "fontSize": "字體大小: {{size}}px",
+      "opacity": "透明度: {{percentage}}%",
+      "customPrimaryColor": "自定義主色",
+      "customBackground": "自定義背景",
+      "resetColors": "重置自定義顏色",
+      "reset": "重置"
+    },
+    "notifications": {
+      "desktopNotifications": "桌面通知",
+      "soundAlerts": "聲音提醒",
+      "volume": "音量: {{percentage}}%",
+      "completionThreshold": "完成閾值: {{percentage}}%",
+      "doNotDisturb": "勿擾模式",
+      "startTime": "開始時間",
+      "endTime": "結束時間"
+    },
+    "tasks": {
+      "history": "任務歷史",
+      "historyCount": "{{count}} 個任務",
+      "clearHistory": "清除歷史",
+      "clear": "清除"
+    },
+    "shortcuts": {
+      "title": "全局快捷鍵",
+      "description": "右鍵點擊進度條打開上下文菜單。",
+      "rightClick": "打開上下文菜單",
+      "drag": "移動窗口",
+      "scroll": "調整進度",
+      "clickStatus": "激活 IDE 窗口"
+    },
+    "importExport": {
+      "title": "導入/導出配置",
+      "exportConfig": "導出配置",
+      "importConfig": "導入配置",
+      "cancel": "取消"
+    },
+    "footer": {
+      "version": "Vibe 進度條 v{{version}}",
+      "resetDefaults": "重置為默認"
+    }
+  },
+  "time": {
+    "minutesSeconds": "{{minutes}}分{{seconds}}秒",
+    "seconds": "{{seconds}}秒",
+    "waiting": "⏳",
+    "active": "👁"
+  },
+  "language": {
+    "selector": "語言",
+    "en": "English",
+    "zh-CN": "简体中文",
+    "zh-TW": "繁體中文",
+    "es": "Español",
+    "fr": "Français",
+    "de": "Deutsch",
+    "ja": "日本語",
+    "ko": "한국어",
+    "ru": "Русский",
+    "pt": "Português",
+    "ar": "العربية"
+  },
+  "tray": {
+    "settings": "設置",
+    "quit": "退出"
+  },
+  "settingsWindow": {
+    "title": "設置"
+  }
+}

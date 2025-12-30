@@ -17,6 +17,16 @@ async fn activate_window<R: Runtime>(window: tauri::Window<R>, window_id: String
 }
 
 #[tauri::command]
+async fn get_translated_string<R: Runtime>(
+    window: tauri::Window<R>,
+    key: String
+) -> Result<String, String> {
+    window.emit("get-translated-string", key.clone())
+        .map_err(|e| e.to_string())?;
+    Ok(key)
+}
+
+#[tauri::command]
 fn open_settings_window<R: Runtime>(app: tauri::AppHandle<R>) -> Result<(), String> {
     if let Some(window) = app.get_webview_window("settings") {
         let _ = window.show();
@@ -369,6 +379,7 @@ fn main() {
             trigger_notification,
             activate_ide_window,
             open_settings_window,
+            get_translated_string,
             get_app_settings,
             update_app_settings
         ])

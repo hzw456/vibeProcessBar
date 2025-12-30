@@ -1,0 +1,124 @@
+{
+  "app": {
+    "title": "Vibe 진행 표시줄",
+    "icon": "◆"
+  },
+  "status": {
+    "idle": "준비됨",
+    "armed": "대기 중...",
+    "active": "활성",
+    "running": "실행 중...",
+    "completed": "완료",
+    "error": "오류",
+    "completedWithTime": "{{taskName}} - {{elapsedTime}}"
+  },
+  "menu": {
+    "title": "작업",
+    "noTasks": "작업 없음",
+    "resetTask": "현재 작업 재설정",
+    "position": "위치",
+    "topLeft": "왼쪽 위",
+    "topRight": "오른쪽 위",
+    "bottomLeft": "왼쪽 아래",
+    "bottomRight": "오른쪽 아래",
+    "settings": "설정",
+    "closeMenu": "메뉴 닫기"
+  },
+  "notification": {
+    "taskCompleted": "{{taskName}} 완료됨!"
+  },
+  "settings": {
+    "title": "설정",
+    "tabs": {
+      "general": "일반",
+      "appearance": "외관",
+      "notifications": "알림",
+      "tasks": "작업",
+      "shortcuts": "단축키"
+    },
+    "general": {
+      "autoStart": "로그인 시 자동 시작",
+      "alwaysOnTop": "항상 위에 표시",
+      "httpPort": "HTTP API 포트",
+      "configManagement": "구성 내보내기/가져오기",
+      "manage": "관리"
+    },
+    "appearance": {
+      "theme": "테마",
+      "themeOptions": {
+        "dark": "다크 (기본값)",
+        "light": "라이트",
+        "purple": "퍼플",
+        "ocean": "오션",
+        "forest": "포레스트",
+        "midnight": "미드나잇"
+      },
+      "fontSize": "글꼴 크기: {{size}}px",
+      "opacity": "불투명도: {{percentage}}%",
+      "customPrimaryColor": "사용자 지정 주 색상",
+      "customBackground": "사용자 지정 배경",
+      "resetColors": "사용자 지정 색상 재설정",
+      "reset": "재설정"
+    },
+    "notifications": {
+      "desktopNotifications": "데스크톱 알림",
+      "soundAlerts": "소리 알림",
+      "volume": "볼륨: {{percentage}}%",
+      "completionThreshold": "완료 임계값: {{percentage}}%",
+      "doNotDisturb": "방해 금지",
+      "startTime": "시작 시간",
+      "endTime": "종료 시간"
+    },
+    "tasks": {
+      "history": "작업 기록",
+      "historyCount": "{{count}} 작업",
+      "clearHistory": "기록 지우기",
+      "clear": "지우기"
+    },
+    "shortcuts": {
+      "title": "글로벌 단축키",
+      "description": "컨텍스트 메뉴에 접근하려면 진행 표시줄을 마우스 오른쪽 버튼으로 클릭하세요.",
+      "rightClick": "컨텍스트 메뉴 열기",
+      "drag": "창 이동",
+      "scroll": "진행률 조정",
+      "clickStatus": "IDE 창 활성화"
+    },
+    "importExport": {
+      "title": "구성 가져오기/내보내기",
+      "exportConfig": "구성 내보내기",
+      "importConfig": "구성 가져오기",
+      "cancel": "취소"
+    },
+    "footer": {
+      "version": "Vibe 진행 표시줄 v{{version}}",
+      "resetDefaults": "기본값으로 재설정"
+    }
+  },
+  "time": {
+    "minutesSeconds": "{{minutes}}분 {{seconds}}초",
+    "seconds": "{{seconds}}초",
+    "waiting": "⏳",
+    "active": "👁"
+  },
+  "language": {
+    "selector": "언어",
+    "en": "English",
+    "zh-CN": "简体中文",
+    "zh-TW": "繁體中文",
+    "es": "Español",
+    "fr": "Français",
+    "de": "Deutsch",
+    "ja": "日本語",
+    "ko": "한국어",
+    "ru": "Русский",
+    "pt": "Português",
+    "ar": "العربية"
+  },
+  "tray": {
+    "settings": "설정",
+    "quit": "종료"
+  },
+  "settingsWindow": {
+    "title": "설정"
+  }
+}

@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import './utils/i18n';
 import { StatusText } from './components/StatusText';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { invoke } from '@tauri-apps/api/core';
@@ -11,6 +13,7 @@ import './App.css';
 debug('App.tsx loaded');
 
 function App() {
+  const { t } = useTranslation();
   const { tasks, currentTaskId, settings, setCurrentTask, updateProgress, resetTask, removeTask, syncFromHttpApi } = useProgressStore();
   const containerRef = useRef<HTMLDivElement>(null);
   const [showMenu, setShowMenu] = useState(false);
@@ -384,7 +387,7 @@ function App() {
           {/* Show completed notification */}
           {completedTask && (
             <div className="completed-banner">
-              ✓ {tasks.find(t => t.id === completedTask)?.name || 'Task'} Completed!
+              ✓ {t('notification.taskCompleted', { taskName: tasks.find(t => t.id === completedTask)?.name || t('menu.title') })}
             </div>
           )}
 
@@ -436,8 +439,8 @@ function App() {
             <>
               {displayTasks.length === 0 ? (
                 <div className="app-header">
-                  <span className="app-icon">◆</span>
-                  <span className="app-title">Vibe Process Bar</span>
+                  <span className="app-icon">{t('app.icon')}</span>
+                  <span className="app-title">{t('app.title')}</span>
                 </div>
               ) : (() => {
                 // Calculate elapsed time for single task (not for armed/active)
@@ -477,9 +480,9 @@ function App() {
           <div className="resize-handle" onMouseDown={handleResizeStart}></div>
           {showMenu && (
             <div className="context-menu" onClick={(e) => e.stopPropagation()}>
-              <div className="menu-header">Tasks</div>
+              <div className="menu-header">{t('menu.title')}</div>
               {tasks.length === 0 ? (
-                <div className="menu-item disabled">No tasks</div>
+                <div className="menu-item disabled">{t('menu.noTasks')}</div>
               ) : (
                 tasks.map(task => (
                   <div
@@ -501,22 +504,22 @@ function App() {
               )}
               <div className="menu-divider"></div>
               <div className="menu-item" onClick={handleResetTask}>
-                Reset Current Task
+                {t('menu.resetTask')}
               </div>
               <div className="menu-item submenu">
-                <span>Position</span>
+                <span>{t('menu.position')}</span>
                 <div className="submenu-content">
-                  <div className="menu-item" onClick={() => handleMoveToCorner('top-left')}>Top Left</div>
-                  <div className="menu-item" onClick={() => handleMoveToCorner('top-right')}>Top Right</div>
-                  <div className="menu-item" onClick={() => handleMoveToCorner('bottom-left')}>Bottom Left</div>
-                  <div className="menu-item" onClick={() => handleMoveToCorner('bottom-right')}>Bottom Right</div>
+                  <div className="menu-item" onClick={() => handleMoveToCorner('top-left')}>{t('menu.topLeft')}</div>
+                  <div className="menu-item" onClick={() => handleMoveToCorner('top-right')}>{t('menu.topRight')}</div>
+                  <div className="menu-item" onClick={() => handleMoveToCorner('bottom-left')}>{t('menu.bottomLeft')}</div>
+                  <div className="menu-item" onClick={() => handleMoveToCorner('bottom-right')}>{t('menu.bottomRight')}</div>
                 </div>
               </div>
               <div className="menu-item" onClick={handleOpenSettings}>
-                Settings
+                {t('menu.settings')}
               </div>
               <div className="menu-item" onClick={() => setShowMenu(false)}>
-                Close Menu
+                {t('menu.closeMenu')}
               </div>
             </div>
           )}

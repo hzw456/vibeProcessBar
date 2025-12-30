@@ -1,5 +1,7 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useProgressStore } from '../stores/progressStore';
+import { LanguageSelector } from './LanguageSelector';
 import './SettingsPanel.css';
 
 interface SettingsPanelProps {
@@ -8,8 +10,10 @@ interface SettingsPanelProps {
 }
 
 export function SettingsPanel({ onClose, isStandalone = false }: SettingsPanelProps) {
+  const { t } = useTranslation();
   const {
     settings,
+    setLanguage,
     setTheme,
     setFontSize,
     setOpacity,
@@ -105,7 +109,7 @@ export function SettingsPanel({ onClose, isStandalone = false }: SettingsPanelPr
     <div className="settings-overlay" onClick={onClose}>
       <div className="settings-panel" onClick={e => e.stopPropagation()}>
         <div className="settings-header">
-          <h2>Settings</h2>
+          <h2>{t('settings.title')}</h2>
           <button className="close-btn" onClick={onClose}>×</button>
         </div>
         {renderContent()}
@@ -121,39 +125,40 @@ export function SettingsPanel({ onClose, isStandalone = false }: SettingsPanelPr
             className={`tab ${activeTab === 'general' ? 'active' : ''}`}
             onClick={() => setActiveTab('general')}
           >
-            General
+            {t('settings.tabs.general')}
           </button>
           <button
             className={`tab ${activeTab === 'appearance' ? 'active' : ''}`}
             onClick={() => setActiveTab('appearance')}
           >
-            Appearance
+            {t('settings.tabs.appearance')}
           </button>
           <button
             className={`tab ${activeTab === 'notifications' ? 'active' : ''}`}
             onClick={() => setActiveTab('notifications')}
           >
-            Notifications
+            {t('settings.tabs.notifications')}
           </button>
           <button
             className={`tab ${activeTab === 'tasks' ? 'active' : ''}`}
             onClick={() => setActiveTab('tasks')}
           >
-            Tasks
+            {t('settings.tabs.tasks')}
           </button>
           <button
             className={`tab ${activeTab === 'shortcuts' ? 'active' : ''}`}
             onClick={() => setActiveTab('shortcuts')}
           >
-            Shortcuts
+            {t('settings.tabs.shortcuts')}
           </button>
         </div>
 
         <div className="settings-content">
           {activeTab === 'general' && (
             <div className="settings-section">
+              <LanguageSelector />
               <div className="setting-item">
-                <label>Auto-start on login</label>
+                <label>{t('settings.general.autoStart')}</label>
                 <input
                   type="checkbox"
                   checked={settings.autoStart}
@@ -161,7 +166,7 @@ export function SettingsPanel({ onClose, isStandalone = false }: SettingsPanelPr
                 />
               </div>
               <div className="setting-item">
-                <label>Always on top</label>
+                <label>{t('settings.general.alwaysOnTop')}</label>
                 <input
                   type="checkbox"
                   checked={settings.alwaysOnTop}
@@ -169,7 +174,7 @@ export function SettingsPanel({ onClose, isStandalone = false }: SettingsPanelPr
                 />
               </div>
               <div className="setting-item">
-                <label>HTTP API Port</label>
+                <label>{t('settings.general.httpPort')}</label>
                 <input
                   type="number"
                   className="http-input"
@@ -180,9 +185,9 @@ export function SettingsPanel({ onClose, isStandalone = false }: SettingsPanelPr
                 />
               </div>
               <div className="setting-item">
-                <label>Export/Import Config</label>
+                <label>{t('settings.general.configManagement')}</label>
                 <button className="action-btn" onClick={() => setShowImportExport(true)}>
-                  Manage
+                  {t('settings.general.manage')}
                 </button>
               </div>
             </div>
@@ -191,21 +196,21 @@ export function SettingsPanel({ onClose, isStandalone = false }: SettingsPanelPr
           {activeTab === 'appearance' && (
             <div className="settings-section">
               <div className="setting-item">
-                <label>Theme</label>
+                <label>{t('settings.appearance.theme')}</label>
                 <select
                   value={settings.theme}
                   onChange={e => setTheme(e.target.value as 'dark' | 'light' | 'purple' | 'ocean' | 'forest' | 'midnight')}
                 >
-                  <option value="dark">Dark (Default)</option>
-                  <option value="light">Light</option>
-                  <option value="purple">Purple</option>
-                  <option value="ocean">Ocean</option>
-                  <option value="forest">Forest</option>
-                  <option value="midnight">Midnight</option>
+                  <option value="dark">{t('settings.appearance.themeOptions.dark')}</option>
+                  <option value="light">{t('settings.appearance.themeOptions.light')}</option>
+                  <option value="purple">{t('settings.appearance.themeOptions.purple')}</option>
+                  <option value="ocean">{t('settings.appearance.themeOptions.ocean')}</option>
+                  <option value="forest">{t('settings.appearance.themeOptions.forest')}</option>
+                  <option value="midnight">{t('settings.appearance.themeOptions.midnight')}</option>
                 </select>
               </div>
               <div className="setting-item">
-                <label>Font Size: {settings.fontSize}px</label>
+                <label>{t('settings.appearance.fontSize', { size: settings.fontSize })}</label>
                 <input
                   type="range"
                   min="10"
@@ -216,7 +221,7 @@ export function SettingsPanel({ onClose, isStandalone = false }: SettingsPanelPr
                 />
               </div>
               <div className="setting-item">
-                <label>Opacity: {Math.round(settings.opacity * 100)}%</label>
+                <label>{t('settings.appearance.opacity', { percentage: Math.round(settings.opacity * 100) })}</label>
                 <input
                   type="range"
                   min="0.3"
@@ -227,7 +232,7 @@ export function SettingsPanel({ onClose, isStandalone = false }: SettingsPanelPr
                 />
               </div>
               <div className="setting-item">
-                <label>Custom Primary Color</label>
+                <label>{t('settings.appearance.customPrimaryColor')}</label>
                 <div className="color-input-wrapper">
                   <input
                     type="color"
@@ -245,7 +250,7 @@ export function SettingsPanel({ onClose, isStandalone = false }: SettingsPanelPr
                 </div>
               </div>
               <div className="setting-item">
-                <label>Custom Background</label>
+                <label>{t('settings.appearance.customBackground')}</label>
                 <div className="color-input-wrapper">
                   <input
                     type="color"
@@ -263,12 +268,12 @@ export function SettingsPanel({ onClose, isStandalone = false }: SettingsPanelPr
                 </div>
               </div>
               <div className="setting-item">
-                <label>Reset Custom Colors</label>
+                <label>{t('settings.appearance.resetColors')}</label>
                 <button
                   className="action-btn small"
                   onClick={() => setCustomColors({ primaryColor: '', backgroundColor: '', textColor: '' })}
                 >
-                  Reset
+                  {t('settings.appearance.reset')}
                 </button>
               </div>
             </div>
@@ -277,7 +282,7 @@ export function SettingsPanel({ onClose, isStandalone = false }: SettingsPanelPr
           {activeTab === 'notifications' && (
             <div className="settings-section">
               <div className="setting-item">
-                <label>Desktop notifications</label>
+                <label>{t('settings.notifications.desktopNotifications')}</label>
                 <input
                   type="checkbox"
                   checked={settings.notifications}
@@ -285,7 +290,7 @@ export function SettingsPanel({ onClose, isStandalone = false }: SettingsPanelPr
                 />
               </div>
               <div className="setting-item">
-                <label>Sound alerts</label>
+                <label>{t('settings.notifications.soundAlerts')}</label>
                 <input
                   type="checkbox"
                   checked={settings.sound}
@@ -294,7 +299,7 @@ export function SettingsPanel({ onClose, isStandalone = false }: SettingsPanelPr
               </div>
               {settings.sound && (
                 <div className="setting-item indent">
-                  <label>Volume: {Math.round(settings.soundVolume * 100)}%</label>
+                  <label>{t('settings.notifications.volume', { percentage: Math.round(settings.soundVolume * 100) })}</label>
                   <input
                     type="range"
                     min="0"
@@ -306,7 +311,7 @@ export function SettingsPanel({ onClose, isStandalone = false }: SettingsPanelPr
                 </div>
               )}
               <div className="setting-item">
-                <label>Completion threshold: {settings.reminderThreshold}%</label>
+                <label>{t('settings.notifications.completionThreshold', { percentage: settings.reminderThreshold })}</label>
                 <input
                   type="range"
                   min="50"
@@ -317,7 +322,7 @@ export function SettingsPanel({ onClose, isStandalone = false }: SettingsPanelPr
                 />
               </div>
               <div className="setting-item">
-                <label>Do Not Disturb</label>
+                <label>{t('settings.notifications.doNotDisturb')}</label>
                 <input
                   type="checkbox"
                   checked={settings.doNotDisturb}
@@ -327,7 +332,7 @@ export function SettingsPanel({ onClose, isStandalone = false }: SettingsPanelPr
               {settings.doNotDisturb && (
                 <>
                   <div className="setting-item indent">
-                    <label>Start Time</label>
+                    <label>{t('settings.notifications.startTime')}</label>
                     <input
                       type="time"
                       value={settings.doNotDisturbStart}
@@ -336,7 +341,7 @@ export function SettingsPanel({ onClose, isStandalone = false }: SettingsPanelPr
                     />
                   </div>
                   <div className="setting-item indent">
-                    <label>End Time</label>
+                    <label>{t('settings.notifications.endTime')}</label>
                     <input
                       type="time"
                       value={settings.doNotDisturbEnd}
@@ -352,16 +357,16 @@ export function SettingsPanel({ onClose, isStandalone = false }: SettingsPanelPr
           {activeTab === 'tasks' && (
             <div className="settings-section">
               <div className="setting-item">
-                <label>Task History</label>
-                <span className="info-text">{history.length} tasks</span>
+                <label>{t('settings.tasks.history')}</label>
+                <span className="info-text">{t('settings.tasks.historyCount', { count: history.length })}</span>
               </div>
               <div className="setting-item">
-                <label>Clear History</label>
+                <label>{t('settings.tasks.clearHistory')}</label>
                 <button
                   className="action-btn danger small"
                   onClick={clearHistory}
                 >
-                  Clear
+                  {t('settings.tasks.clear')}
                 </button>
               </div>
             </div>
@@ -370,23 +375,23 @@ export function SettingsPanel({ onClose, isStandalone = false }: SettingsPanelPr
           {activeTab === 'shortcuts' && (
             <div className="settings-section">
               <div className="shortcuts-info">
-                <h4>Global Shortcuts</h4>
-                <p>Right-click the progress bar to access the context menu.</p>
+                <h4>{t('settings.shortcuts.title')}</h4>
+                <p>{t('settings.shortcuts.description')}</p>
                 <div className="shortcut-list">
                   <div className="shortcut-item">
-                    <span className="shortcut-key">Right-click</span>
+                    <span className="shortcut-key">{t('settings.shortcuts.rightClick')}</span>
                     <span className="shortcut-desc">Open context menu</span>
                   </div>
                   <div className="shortcut-item">
-                    <span className="shortcut-key">Drag</span>
+                    <span className="shortcut-key">{t('settings.shortcuts.drag')}</span>
                     <span className="shortcut-desc">Move window</span>
                   </div>
                   <div className="shortcut-item">
-                    <span className="shortcut-key">Scroll</span>
+                    <span className="shortcut-key">{t('settings.shortcuts.scroll')}</span>
                     <span className="shortcut-desc">Adjust progress</span>
                   </div>
                   <div className="shortcut-item">
-                    <span className="shortcut-key">Click status</span>
+                    <span className="shortcut-key">{t('settings.shortcuts.clickStatus')}</span>
                     <span className="shortcut-desc">Activate IDE window</span>
                   </div>
                 </div>
@@ -398,13 +403,13 @@ export function SettingsPanel({ onClose, isStandalone = false }: SettingsPanelPr
         {showImportExport && (
           <div className="import-export-modal">
             <div className="modal-content">
-              <h3>Import/Export Configuration</h3>
+              <h3>{t('settings.importExport.title')}</h3>
               <div className="modal-actions">
                 <button className="action-btn" onClick={handleExportConfig}>
-                  Export Config
+                  {t('settings.importExport.exportConfig')}
                 </button>
                 <label className="action-btn">
-                  Import Config
+                  {t('settings.importExport.importConfig')}
                   <input
                     type="file"
                     accept=".json"
@@ -413,7 +418,7 @@ export function SettingsPanel({ onClose, isStandalone = false }: SettingsPanelPr
                   />
                 </label>
                 <button className="action-btn secondary" onClick={() => setShowImportExport(false)}>
-                  Cancel
+                  {t('settings.importExport.cancel')}
                 </button>
               </div>
             </div>
@@ -421,8 +426,9 @@ export function SettingsPanel({ onClose, isStandalone = false }: SettingsPanelPr
         )}
 
         <div className="settings-footer">
-          <div className="version-info">Vibe Progress Bar v0.1.0</div>
+          <div className="version-info">{t('settings.footer.version', { version: '0.1.0' })}</div>
           <button className="reset-btn" onClick={() => {
+            setLanguage('en');
             setTheme('dark');
             setFontSize(14);
             setOpacity(0.85);
@@ -438,7 +444,7 @@ export function SettingsPanel({ onClose, isStandalone = false }: SettingsPanelPr
             setDoNotDisturbStart('22:00');
             setDoNotDisturbEnd('08:00');
           }}>
-            Reset to defaults
+            {t('settings.footer.resetDefaults')}
           </button>
         </div>
       </>

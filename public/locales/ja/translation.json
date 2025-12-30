@@ -1,0 +1,124 @@
+{
+  "app": {
+    "title": "Vibe プロセンバー",
+    "icon": "◆"
+  },
+  "status": {
+    "idle": "準備完了",
+    "armed": "待機中...",
+    "active": "アクティブ",
+    "running": "実行中...",
+    "completed": "完了",
+    "error": "エラー",
+    "completedWithTime": "{{taskName}} - {{elapsedTime}}"
+  },
+  "menu": {
+    "title": "タスク",
+    "noTasks": "タスクなし",
+    "resetTask": "現在のタスクをリセット",
+    "position": "位置",
+    "topLeft": "左上",
+    "topRight": "右上",
+    "bottomLeft": "左下",
+    "bottomRight": "右下",
+    "settings": "設定",
+    "closeMenu": "メニューを閉じる"
+  },
+  "notification": {
+    "taskCompleted": "{{taskName}} 完了！"
+  },
+  "settings": {
+    "title": "設定",
+    "tabs": {
+      "general": "一般",
+      "appearance": "外観",
+      "notifications": "通知",
+      "tasks": "タスク",
+      "shortcuts": "ショートカット"
+    },
+    "general": {
+      "autoStart": "ログイン時に自動起動",
+      "alwaysOnTop": "常に最前面に表示",
+      "httpPort": "HTTP API ポート",
+      "configManagement": "設定のエクスポート/インポート",
+      "manage": "管理"
+    },
+    "appearance": {
+      "theme": "テーマ",
+      "themeOptions": {
+        "dark": "ダーク (デフォルト)",
+        "light": "ライト",
+        "purple": "パープル",
+        "ocean": "オーシャン",
+        "forest": "フォレスト",
+        "midnight": "ミッドナイト"
+      },
+      "fontSize": "フォントサイズ: {{size}}px",
+      "opacity": "不透明度: {{percentage}}%",
+      "customPrimaryColor": "カスタムプライマリカラー",
+      "customBackground": "カスタム背景",
+      "resetColors": "カスタム色をリセット",
+      "reset": "リセット"
+    },
+    "notifications": {
+      "desktopNotifications": "デスクトップ通知",
+      "soundAlerts": "サウンドアラート",
+      "volume": "音量: {{percentage}}%",
+      "completionThreshold": "完了閾値: {{percentage}}%",
+      "doNotDisturb": "集中モード",
+      "startTime": "開始時間",
+      "endTime": "終了時間"
+    },
+    "tasks": {
+      "history": "タスク履歴",
+      "historyCount": "{{count}} タスク",
+      "clearHistory": "履歴をクリア",
+      "clear": "クリア"
+    },
+    "shortcuts": {
+      "title": "グローバルショートカット",
+      "description": "コンテキストメニューにアクセスするには、プログレスバーを右クリックしてください。",
+      "rightClick": "コンテキストメニューを開く",
+      "drag": "ウィンドウを移動",
+      "scroll": "進捗を調整",
+      "clickStatus": "IDEウィンドウをアクティブ化"
+    },
+    "importExport": {
+      "title": "設定のインポート/エクスポート",
+      "exportConfig": "設定をエクスポート",
+      "importConfig": "設定をインポート",
+      "cancel": "キャンセル"
+    },
+    "footer": {
+      "version": "Vibe プロセンバー v{{version}}",
+      "resetDefaults": "デフォルトにリセット"
+    }
+  },
+  "time": {
+    "minutesSeconds": "{{minutes}}分{{seconds}}秒",
+    "seconds": "{{seconds}}秒",
+    "waiting": "⏳",
+    "active": "👁"
+  },
+  "language": {
+    "selector": "言語",
+    "en": "English",
+    "zh-CN": "简体中文",
+    "zh-TW": "繁體中文",
+    "es": "Español",
+    "fr": "Français",
+    "de": "Deutsch",
+    "ja": "日本語",
+    "ko": "한국어",
+    "ru": "Русский",
+    "pt": "Português",
+    "ar": "العربية"
+  },
+  "tray": {
+    "settings": "設定",
+    "quit": "終了"
+  },
+  "settingsWindow": {
+    "title": "設定"
+  }
+}

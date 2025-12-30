@@ -1,0 +1,124 @@
+{
+  "app": {
+    "title": "Vibe Fortschrittsleiste",
+    "icon": "◆"
+  },
+  "status": {
+    "idle": "Bereit",
+    "armed": "Bereit...",
+    "active": "Aktiv",
+    "running": "Läuft...",
+    "completed": "Fertig",
+    "error": "Fehler",
+    "completedWithTime": "{{taskName}} - {{elapsedTime}}"
+  },
+  "menu": {
+    "title": "Aufgaben",
+    "noTasks": "Keine Aufgaben",
+    "resetTask": "Aktuelle Aufgabe zurücksetzen",
+    "position": "Position",
+    "topLeft": "Oben Links",
+    "topRight": "Oben Rechts",
+    "bottomLeft": "Unten Links",
+    "bottomRight": "Unten Rechts",
+    "settings": "Einstellungen",
+    "closeMenu": "Menü Schließen"
+  },
+  "notification": {
+    "taskCompleted": "{{taskName}} Abgeschlossen!"
+  },
+  "settings": {
+    "title": "Einstellungen",
+    "tabs": {
+      "general": "Allgemein",
+      "appearance": "Erscheinungsbild",
+      "notifications": "Benachrichtigungen",
+      "tasks": "Aufgaben",
+      "shortcuts": "Tastenkürzel"
+    },
+    "general": {
+      "autoStart": "Autostart bei Anmeldung",
+      "alwaysOnTop": "Immer im Vordergrund",
+      "httpPort": "HTTP API Port",
+      "configManagement": "Konfiguration Exportieren/Importieren",
+      "manage": "Verwalten"
+    },
+    "appearance": {
+      "theme": "Design",
+      "themeOptions": {
+        "dark": "Dunkel (Standard)",
+        "light": "Hell",
+        "purple": "Lila",
+        "ocean": "Ozean",
+        "forest": "Wald",
+        "midnight": "Mitternacht"
+      },
+      "fontSize": "Schriftgröße: {{size}}px",
+      "opacity": "Deckkraft: {{percentage}}%",
+      "customPrimaryColor": "Benutzerdefinierte Hauptfarbe",
+      "customBackground": "Benutzerdefinierter Hintergrund",
+      "resetColors": "Benutzerdefinierte Farben zurücksetzen",
+      "reset": "Zurücksetzen"
+    },
+    "notifications": {
+      "desktopNotifications": "Desktop-Benachrichtigungen",
+      "soundAlerts": "Tonalarme",
+      "volume": "Lautstärke: {{percentage}}%",
+      "completionThreshold": "Abschlussschwelle: {{percentage}}%",
+      "doNotDisturb": "Nicht stören",
+      "startTime": "Startzeit",
+      "endTime": "Endzeit"
+    },
+    "tasks": {
+      "history": "Aufgabenverlauf",
+      "historyCount": "{{count}} Aufgaben",
+      "clearHistory": "Verlauf löschen",
+      "clear": "Löschen"
+    },
+    "shortcuts": {
+      "title": "Globale Tastenkürzel",
+      "description": "Rechtsklick auf die Fortschrittsleiste für das Kontextmenü.",
+      "rightClick": "Kontextmenü öffnen",
+      "drag": "Fenster verschieben",
+      "scroll": "Fortschritt anpassen",
+      "clickStatus": "IDE-Fenster aktivieren"
+    },
+    "importExport": {
+      "title": "Konfiguration Importieren/Exportieren",
+      "exportConfig": "Konfiguration Exportieren",
+      "importConfig": "Konfiguration Importieren",
+      "cancel": "Abbrechen"
+    },
+    "footer": {
+      "version": "Vibe Fortschrittsleiste v{{version}}",
+      "resetDefaults": "Auf Standardwerte zurücksetzen"
+    }
+  },
+  "time": {
+    "minutesSeconds": "{{minutes}}m {{seconds}}s",
+    "seconds": "{{seconds}}s",
+    "waiting": "⏳",
+    "active": "👁"
+  },
+  "language": {
+    "selector": "Sprache",
+    "en": "English",
+    "zh-CN": "简体中文",
+    "zh-TW": "繁體中文",
+    "es": "Español",
+    "fr": "Français",
+    "de": "Deutsch",
+    "ja": "日本語",
+    "ko": "한국어",
+    "ru": "Русский",
+    "pt": "Português",
+    "ar": "العربية"
+  },
+  "tray": {
+    "settings": "Einstellungen",
+    "quit": "Beenden"
+  },
+  "settingsWindow": {
+    "title": "Einstellungen"
+  }
+}

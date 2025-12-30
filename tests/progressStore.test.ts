@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { useProgressStore, ProgressTask } from '../stores/progressStore';
+import { useProgressStore, ProgressTask } from '../src/stores/progressStore';
 
 describe('ProgressStore', () => {
   beforeEach(() => {
@@ -8,6 +8,7 @@ describe('ProgressStore', () => {
       currentTaskId: null,
       history: [],
       settings: {
+        language: 'en',
         theme: 'dark',
         fontSize: 14,
         opacity: 0.85,

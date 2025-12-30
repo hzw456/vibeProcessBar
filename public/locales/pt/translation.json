@@ -1,0 +1,124 @@
+{
+  "app": {
+    "title": "Vibe Barra de Progresso",
+    "icon": "◆"
+  },
+  "status": {
+    "idle": "Pronto",
+    "armed": "Armado...",
+    "active": "Ativo",
+    "running": "Em execução...",
+    "completed": "Concluído",
+    "error": "Erro",
+    "completedWithTime": "{{taskName}} - {{elapsedTime}}"
+  },
+  "menu": {
+    "title": "Tarefas",
+    "noTasks": "Sem tarefas",
+    "resetTask": "Redefinir tarefa atual",
+    "position": "Posição",
+    "topLeft": "Superior Esquerdo",
+    "topRight": "Superior Direito",
+    "bottomLeft": "Inferior Esquerdo",
+    "bottomRight": "Inferior Direito",
+    "settings": "Configurações",
+    "closeMenu": "Fechar Menu"
+  },
+  "notification": {
+    "taskCompleted": "{{taskName}} Concluída!"
+  },
+  "settings": {
+    "title": "Configurações",
+    "tabs": {
+      "general": "Geral",
+      "appearance": "Aparência",
+      "notifications": "Notificações",
+      "tasks": "Tarefas",
+      "shortcuts": "Atalhos"
+    },
+    "general": {
+      "autoStart": "Iniciar automaticamente ao登录",
+      "alwaysOnTop": "Sempre visível",
+      "httpPort": "Porta API HTTP",
+      "configManagement": "Exportar/Importar Configuração",
+      "manage": "Gerenciar"
+    },
+    "appearance": {
+      "theme": "Tema",
+      "themeOptions": {
+        "dark": "Escuro (Padrão)",
+        "light": "Claro",
+        "purple": "Roxo",
+        "ocean": "Oceano",
+        "forest": "Floresta",
+        "midnight": "Meia-noite"
+      },
+      "fontSize": "Tamanho da fonte: {{size}}px",
+      "opacity": "Opacidade: {{percentage}}%",
+      "customPrimaryColor": "Cor primária personalizada",
+      "customBackground": "Fundo personalizado",
+      "resetColors": "Redefinir cores personalizadas",
+      "reset": "Redefinir"
+    },
+    "notifications": {
+      "desktopNotifications": "Notificações da área de trabalho",
+      "soundAlerts": "Alertas sonoros",
+      "volume": "Volume: {{percentage}}%",
+      "completionThreshold": "Limite de conclusão: {{percentage}}%",
+      "doNotDisturb": "Não perturbar",
+      "startTime": "Hora de início",
+      "endTime": "Hora de fim"
+    },
+    "tasks": {
+      "history": "Histórico de tarefas",
+      "historyCount": "{{count}} tarefas",
+      "clearHistory": "Limpar histórico",
+      "clear": "Limpar"
+    },
+    "shortcuts": {
+      "title": "Atalhos Globais",
+      "description": "Clique com o botão direito na barra de progresso para acessar o menu de contexto.",
+      "rightClick": "Abrir menu de contexto",
+      "drag": "Mover janela",
+      "scroll": "Ajustar progresso",
+      "clickStatus": "Ativar janela IDE"
+    },
+    "importExport": {
+      "title": "Importar/Exportar Configuração",
+      "exportConfig": "Exportar Configuração",
+      "importConfig": "Importar Configuração",
+      "cancel": "Cancelar"
+    },
+    "footer": {
+      "version": "Vibe Barra de Progresso v{{version}}",
+      "resetDefaults": "Restaurar padrões"
+    }
+  },
+  "time": {
+    "minutesSeconds": "{{minutes}}m {{seconds}}s",
+    "seconds": "{{seconds}}s",
+    "waiting": "⏳",
+    "active": "👁"
+  },
+  "language": {
+    "selector": "Idioma",
+    "en": "English",
+    "zh-CN": "简体中文",
+    "zh-TW": "繁體中文",
+    "es": "Español",
+    "fr": "Français",
+    "de": "Deutsch",
+    "ja": "日本語",
+    "ko": "한국어",
+    "ru": "Русский",
+    "pt": "Português",
+    "ar": "العربية"
+  },
+  "tray": {
+    "settings": "Configurações",
+    "quit": "Sair"
+  },
+  "settingsWindow": {
+    "title": "Configurações"
+  }
+}

@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { debug, error } from '../utils/logger';
 import { invoke } from '@tauri-apps/api/core';
+import type { SupportedLanguage } from '../utils/i18n';
 
 export interface ProgressTask {
   id: string;
@@ -21,6 +22,7 @@ interface ProgressState {
   tasks: ProgressTask[];
   currentTaskId: string | null;
   settings: {
+    language: SupportedLanguage;
     theme: 'dark' | 'light' | 'purple' | 'ocean' | 'forest' | 'midnight';
     fontSize: number;
     opacity: number;
@@ -49,6 +51,7 @@ interface ProgressState {
   updateStatus: (id: string, status: ProgressTask['status']) => void;
   completeTask: (id: string, totalTokens?: number) => void;
   resetTask: (id: string) => void;
+  setLanguage: (language: SupportedLanguage) => void;
   setTheme: (theme: 'dark' | 'light' | 'purple' | 'ocean' | 'forest' | 'midnight') => void;
   setFontSize: (size: number) => void;
   setOpacity: (opacity: number) => void;
@@ -77,6 +80,7 @@ export const useProgressStore = create<ProgressState>()(
       currentTaskId: null,
       history: [],
       settings: {
+        language: 'en',
         theme: 'dark',
         fontSize: 14,
         opacity: 0.85,
@@ -189,6 +193,13 @@ export const useProgressStore = create<ProgressState>()(
               : t
           ),
         }));
+      },
+
+      setLanguage: (language) => {
+        const settings = get().settings;
+        const newSettings = { ...settings, language };
+        set({ settings: newSettings });
+        invoke('update_app_settings', { newSettings }).catch(err => error('Failed to update settings', { error: String(err) }));
       },
 
       setTheme: (theme) => {
@@ -356,6 +367,7 @@ export const useProgressStore = create<ProgressState>()(
     }),
     {
       name: 'vibe-progress-storage',
+      skipHydration: typeof window === 'undefined',
       partialize: (state) => ({
         tasks: state.tasks,
         currentTaskId: state.currentTaskId,
