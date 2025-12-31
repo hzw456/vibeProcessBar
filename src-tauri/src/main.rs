@@ -151,6 +151,39 @@ fn activate_ide(ide: &str, window_title: Option<&str>) -> Result<(), String> {
                 end tell
                 "#.to_string()
             }
+            "antigravity" => {
+                if let Some(title) = window_title {
+                    // For Antigravity, search for window containing the title and raise it
+                    format!(
+                        r#"
+                        tell application "System Events"
+                            set agProcess to application process "Antigravity"
+                            set frontmost of agProcess to true
+                            
+                            set winCount to count of windows of agProcess
+                            set searchTitle to "{}"
+                            
+                            repeat with i from 1 to winCount
+                                try
+                                    set w to window i of agProcess
+                                    set winTitle to title of w
+                                    if winTitle contains searchTitle then
+                                        perform action "AXRaise" of w
+                                        exit repeat
+                                    end if
+                                end try
+                            end repeat
+                        end tell
+                        tell application "Antigravity" to activate
+                    "#,
+                        title
+                    )
+                } else {
+                    r#"
+                    tell application "Antigravity" to activate
+                    "#.to_string()
+                }
+            }
             _ => {
                 return Err(format!("Unknown IDE: {}", ide));
             }
