@@ -115,8 +115,12 @@
     "ar": "العربية"
   },
   "tray": {
+    "showWindow": "☀ Afficher la fenêtre",
+    "hideWindow": "☾ Masquer la fenêtre",
     "settings": "Paramètres",
-    "quit": "Quitter"
+    "quit": "Quitter",
+    "noTasks": "Aucune tâche",
+    "tasks": "Tâches"
   },
   "settingsWindow": {
     "title": "Paramètres"

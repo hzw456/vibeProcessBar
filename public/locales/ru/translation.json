@@ -115,8 +115,12 @@
     "ar": "العربية"
   },
   "tray": {
+    "showWindow": "☀ Показать окно",
+    "hideWindow": "☾ Скрыть окно",
     "settings": "Настройки",
-    "quit": "Выйти"
+    "quit": "Выйти",
+    "noTasks": "Нет задач",
+    "tasks": "Задачи"
   },
   "settingsWindow": {
     "title": "Настройки"

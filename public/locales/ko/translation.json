@@ -115,8 +115,12 @@
     "ar": "العربية"
   },
   "tray": {
+    "showWindow": "☀ 창 표시",
+    "hideWindow": "☾ 창 숨기기",
     "settings": "설정",
-    "quit": "종료"
+    "quit": "종료",
+    "noTasks": "작업 없음",
+    "tasks": "작업"
   },
   "settingsWindow": {
     "title": "설정"

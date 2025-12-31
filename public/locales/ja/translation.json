@@ -115,8 +115,12 @@
     "ar": "العربية"
   },
   "tray": {
+    "showWindow": "☀ ウィンドウを表示",
+    "hideWindow": "☾ ウィンドウを非表示",
     "settings": "設定",
-    "quit": "終了"
+    "quit": "終了",
+    "noTasks": "タスクなし",
+    "tasks": "タスク"
   },
   "settingsWindow": {
     "title": "設定"

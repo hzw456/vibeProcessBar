@@ -115,8 +115,12 @@
     "ar": "العربية"
   },
   "tray": {
+    "showWindow": "☀ Fenster anzeigen",
+    "hideWindow": "☾ Fenster ausblenden",
     "settings": "Einstellungen",
-    "quit": "Beenden"
+    "quit": "Beenden",
+    "noTasks": "Keine Aufgaben",
+    "tasks": "Aufgaben"
   },
   "settingsWindow": {
     "title": "Einstellungen"

@@ -41,6 +41,7 @@ interface ProgressState {
     doNotDisturb: boolean;
     doNotDisturbStart: string;
     doNotDisturbEnd: string;
+    windowVisible: boolean;
   };
   history: ProgressTask[];
   addTask: (name: string, adapter?: string, ide?: string, windowTitle?: string) => string;
@@ -66,6 +67,7 @@ interface ProgressState {
   setDoNotDisturb: (value: boolean) => void;
   setDoNotDisturbStart: (value: string) => void;
   setDoNotDisturbEnd: (value: string) => void;
+  setWindowVisible: (value: boolean) => void;
   addToHistory: (task: ProgressTask) => void;
   clearHistory: () => void;
   syncFromHttpApi: () => Promise<void>;
@@ -99,6 +101,7 @@ export const useProgressStore = create<ProgressState>()(
         doNotDisturb: false,
         doNotDisturbStart: '22:00',
         doNotDisturbEnd: '08:00',
+        windowVisible: true,
       },
 
       loadSettings: async () => {
@@ -304,6 +307,13 @@ export const useProgressStore = create<ProgressState>()(
         const newSettings = { ...settings, doNotDisturbEnd: value };
         set({ settings: newSettings });
         invoke('update_app_settings', { newSettings }).catch(err => error('Failed to update settings', { error: String(err) }));
+      },
+
+      setWindowVisible: (value) => {
+        const settings = get().settings;
+        const newSettings = { ...settings, windowVisible: value };
+        set({ settings: newSettings });
+        invoke('set_window_visibility', { visible: value }).catch(err => error('Failed to set window visibility', { error: String(err) }));
       },
 
       addToHistory: (task) => {

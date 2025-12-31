@@ -429,7 +429,7 @@ function App() {
                     <span className={`task-time-mini ${task.status === 'completed' ? 'completed-time' : ''} ${task.status === 'armed' ? 'armed-time' : ''} ${task.status === 'active' ? 'active-time' : ''}`}>
                       {task.status === 'completed' ? `✓ ${timeStr}` : timeStr}
                     </span>
-                    {task.ide && <span className="ide-badge-mini">{task.ide}</span>}
+                    {task.ide && <span className="ide-badge-mini">{t(`ide.${task.ide.toLowerCase().replace(/\s+/g, '-')}`) !== `ide.${task.ide.toLowerCase().replace(/\s+/g, '-')}` ? t(`ide.${task.ide.toLowerCase().replace(/\s+/g, '-')}`) : task.ide}</span>}
                   </div>
                 );
               })}

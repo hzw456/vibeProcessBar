@@ -114,9 +114,43 @@
     "pt": "Português",
     "ar": "العربية"
   },
+  "ide": {
+    "cursor": "Cursor",
+    "windsurf": "Windsurf",
+    "codeium": "Codeium",
+    "codeium-editor": "Codeium",
+    "trae": "Trae",
+    "void": "Void",
+    "void-editor": "Void",
+    "void editor": "Void",
+    "pearai": "PearAI",
+    "pear-ai": "PearAI",
+    "pear ai": "PearAI",
+    "blueberryai": "BlueberryAI",
+    "blueberry ai": "BlueberryAI",
+    "blueberry": "BlueberryAI",
+    "aide": "Aide",
+    "codestoryai": "Aide",
+    "codestory ai": "Aide",
+    "codebuddy": "CodeBuddy",
+    "code buddy": "CodeBuddy",
+    "tencent codebuddy": "CodeBuddy",
+    "kilocode": "Kilo Code",
+    "kilo-code": "Kilo Code",
+    "kilo": "Kilo",
+    "kiro": "Kiro",
+    "antigravity": "Antigravity",
+    "claude": "Claude",
+    "claude-code": "Claude Code",
+    "vscode": "VS Code"
+  },
   "tray": {
+    "showWindow": "☀ 显示窗口",
+    "hideWindow": "☾ 隐藏窗口",
     "settings": "设置",
-    "quit": "退出"
+    "quit": "退出",
+    "noTasks": "无任务",
+    "tasks": "任务"
   },
   "settingsWindow": {
     "title": "设置"

@@ -115,8 +115,12 @@
     "ar": "العربية"
   },
   "tray": {
+    "showWindow": "☀ Mostrar janela",
+    "hideWindow": "☾ Ocultar janela",
     "settings": "Configurações",
-    "quit": "Sair"
+    "quit": "Sair",
+    "noTasks": "Sem tarefas",
+    "tasks": "Tarefas"
   },
   "settingsWindow": {
     "title": "Configurações"

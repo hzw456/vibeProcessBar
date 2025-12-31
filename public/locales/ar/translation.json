@@ -115,8 +115,12 @@
     "ar": "العربية"
   },
   "tray": {
+    "showWindow": "☀ إظهار النافذة",
+    "hideWindow": "☾ إخفاء النافذة",
     "settings": "الإعدادات",
-    "quit": "خروج"
+    "quit": "خروج",
+    "noTasks": "لا توجد مهام",
+    "tasks": "المهام"
   },
   "settingsWindow": {
     "title": "الإعدادات"

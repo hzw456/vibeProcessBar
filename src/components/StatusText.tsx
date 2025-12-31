@@ -67,6 +67,12 @@ export function StatusText({ taskName, status, tokens = 0, ide, onActivate, elap
     }
   };
 
+  const getTranslatedIdeName = (ideName: string) => {
+    const key = ideName.toLowerCase().replace(/\s+/g, '-');
+    const translation = t(`ide.${key}`);
+    return translation !== `ide.${key}` ? translation : ideName;
+  };
+
   return (
     <div className="status-container" onClick={handleClick} style={{ cursor: ide ? 'pointer' : 'default' }}>
       <span className={`status-icon status-${status}`}>{getStatusIcon()}</span>
@@ -78,7 +84,7 @@ export function StatusText({ taskName, status, tokens = 0, ide, onActivate, elap
       )}
       {ide && (
         <span className="ide-badge" title={`Click to activate ${ide}`}>
-          {ide}
+          {getTranslatedIdeName(ide)}
         </span>
       )}
     </div>

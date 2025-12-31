@@ -115,8 +115,12 @@
     "ar": "العربية"
   },
   "tray": {
+    "showWindow": "☀ 顯示窗口",
+    "hideWindow": "☾ 隱藏窗口",
     "settings": "設置",
-    "quit": "退出"
+    "quit": "退出",
+    "noTasks": "無任務",
+    "tasks": "任務"
   },
   "settingsWindow": {
     "title": "設置"

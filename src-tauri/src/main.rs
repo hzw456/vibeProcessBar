@@ -2,14 +2,19 @@
 
 use tauri::{Manager, Runtime, WindowEvent, Emitter};
 use tauri::menu::{Menu, MenuItem};
-use tauri::tray::{TrayIconBuilder, TrayIconEvent, MouseButton, MouseButtonState};
+use tauri::tray::TrayIconBuilder;
 use serde_json::json;
 use std::process::Command;
 use tracing::info;
+use std::sync::Mutex;
 
 mod window_manager;
 mod http_server;
 mod settings;
+mod db;
+
+use settings::{AppSettings, SettingsState};
+use db::DatabaseState;
 
 #[tauri::command]
 async fn activate_window<R: Runtime>(window: tauri::Window<R>, window_id: String) -> Result<(), String> {
@@ -32,20 +37,18 @@ fn open_settings_window<R: Runtime>(app: tauri::AppHandle<R>) -> Result<(), Stri
         let _ = window.show();
         let _ = window.set_focus();
     } else {
-        // Calculate position: center of screen effectively
-        // We'll let the OS decide or center it
         let _ = tauri::WebviewWindowBuilder::new(
             &app,
             "settings",
             tauri::WebviewUrl::App("index.html".into()),
         )
-        .title("设置")
+        .title("Settings")
         .inner_size(800.0, 600.0)
         .resizable(false)
         .minimizable(false)
         .maximizable(false)
-        .decorations(true) // Use system title bar
-        .transparent(false) // Standard opaque window
+        .decorations(true)
+        .transparent(false)
         .build()
         .map_err(|e| e.to_string())?;
     }
@@ -54,7 +57,7 @@ fn open_settings_window<R: Runtime>(app: tauri::AppHandle<R>) -> Result<(), Stri
 
 #[tauri::command]
 async fn activate_ide_window<R: Runtime>(
-    window: tauri::Window<R>,
+    _window: tauri::Window<R>,
     ide: String,
     window_title: Option<String>
 ) -> Result<(), String> {
@@ -65,6 +68,7 @@ fn activate_ide(ide: &str, window_title: Option<&str>) -> Result<(), String> {
     #[cfg(target_os = "macos")]
     {
         let script = match ide.to_lowercase().as_str() {
+            // VSCode-based AI IDEs (forks with extension support)
             "cursor" => {
                 if let Some(title) = window_title {
                     format!(
@@ -72,11 +76,8 @@ fn activate_ide(ide: &str, window_title: Option<&str>) -> Result<(), String> {
                         tell application "Cursor"
                             activate
                             delay 0.5
-                            tell application "System Events"
-                                keystroke "p" using command down
-                            end tell
+                            tell application "System Events" to keystroke "{}"
                         end tell
-                        tell application "System Events" to keystroke "{}"
                     "#,
                         title
                     )
@@ -89,18 +90,118 @@ fn activate_ide(ide: &str, window_title: Option<&str>) -> Result<(), String> {
                     "#.to_string()
                 }
             }
+            "windsurf" | "codeium" | "codeium editor" => {
+                if let Some(title) = window_title {
+                    format!(
+                        r#"
+                        tell application "Windsurf"
+                            activate
+                            delay 0.5
+                            tell application "System Events" to keystroke "{}"
+                        end tell
+                    "#,
+                        title
+                    )
+                } else {
+                    r#"
+                    tell application "Windsurf"
+                        activate
+                        delay 0.3
+                    end tell
+                    "#.to_string()
+                }
+            }
+            "trae" => {
+                if let Some(title) = window_title {
+                    format!(
+                        r#"
+                        tell application "Trae"
+                            activate
+                            delay 0.5
+                            tell application "System Events" to keystroke "{}"
+                        end tell
+                    "#,
+                        title
+                    )
+                } else {
+                    r#"
+                    tell application "Trae"
+                        activate
+                        delay 0.3
+                    end tell
+                    "#.to_string()
+                }
+            }
+            "void" | "void editor" | "void-editor" => {
+                if let Some(title) = window_title {
+                    format!(
+                        r#"
+                        tell application "Void"
+                            activate
+                            delay 0.5
+                            tell application "System Events" to keystroke "{}"
+                        end tell
+                    "#,
+                        title
+                    )
+                } else {
+                    r#"
+                    tell application "Void"
+                        activate
+                        delay 0.3
+                    end tell
+                    "#.to_string()
+                }
+            }
+            "pearai" | "pear-ai" | "pear ai" => {
+                r#"
+                tell application "PearAI"
+                    activate
+                    delay 0.3
+                end tell
+                "#.to_string()
+            }
+            "blueberryai" | "blueberry ai" | "blueberry" => {
+                r#"
+                tell application "BlueberryAI"
+                    activate
+                    delay 0.3
+                end tell
+                "#.to_string()
+            }
+            "aide" | "codestoryai" | "codestory ai" => {
+                r#"
+                tell application "Aide"
+                    activate
+                    delay 0.3
+                end tell
+                "#.to_string()
+            }
+            "codebuddy" | "code buddy" | "tencent codebuddy" => {
+                r#"
+                tell application "CodeBuddy"
+                    activate
+                    delay 0.3
+                end tell
+                "#.to_string()
+            }
+            "kilocode" | "kilo-code" | "kilo" => {
+                r#"
+                tell application "Kilo Code"
+                    activate
+                    delay 0.3
+                end tell
+                "#.to_string()
+            }
             "kiro" => {
                 if let Some(title) = window_title {
-                    // For Kiro, search for window containing the title and raise it
                     format!(
                         r#"
                         tell application "System Events"
                             set kiroProcess to application process "Kiro"
                             set frontmost of kiroProcess to true
-                            
                             set winCount to count of windows of kiroProcess
                             set searchTitle to "{}"
-                            
                             repeat with i from 1 to winCount
                                 try
                                     set w to window i of kiroProcess
@@ -119,6 +220,36 @@ fn activate_ide(ide: &str, window_title: Option<&str>) -> Result<(), String> {
                 } else {
                     r#"
                     tell application "Kiro" to activate
+                    "#.to_string()
+                }
+            }
+            "antigravity" => {
+                if let Some(title) = window_title {
+                    format!(
+                        r#"
+                        tell application "System Events"
+                            set agProcess to application process "Antigravity"
+                            set frontmost of agProcess to true
+                            set winCount to count of windows of agProcess
+                            set searchTitle to "{}"
+                            repeat with i from 1 to winCount
+                                try
+                                    set w to window i of agProcess
+                                    set winTitle to title of w
+                                    if winTitle contains searchTitle then
+                                        perform action "AXRaise" of w
+                                        exit repeat
+                                    end if
+                                end try
+                            end repeat
+                        end tell
+                        tell application "Antigravity" to activate
+                    "#,
+                        title
+                    )
+                } else {
+                    r#"
+                    tell application "Antigravity" to activate
                     "#.to_string()
                 }
             }
@@ -151,39 +282,6 @@ fn activate_ide(ide: &str, window_title: Option<&str>) -> Result<(), String> {
                 end tell
                 "#.to_string()
             }
-            "antigravity" => {
-                if let Some(title) = window_title {
-                    // For Antigravity, search for window containing the title and raise it
-                    format!(
-                        r#"
-                        tell application "System Events"
-                            set agProcess to application process "Antigravity"
-                            set frontmost of agProcess to true
-                            
-                            set winCount to count of windows of agProcess
-                            set searchTitle to "{}"
-                            
-                            repeat with i from 1 to winCount
-                                try
-                                    set w to window i of agProcess
-                                    set winTitle to title of w
-                                    if winTitle contains searchTitle then
-                                        perform action "AXRaise" of w
-                                        exit repeat
-                                    end if
-                                end try
-                            end repeat
-                        end tell
-                        tell application "Antigravity" to activate
-                    "#,
-                        title
-                    )
-                } else {
-                    r#"
-                    tell application "Antigravity" to activate
-                    "#.to_string()
-                }
-            }
             _ => {
                 return Err(format!("Unknown IDE: {}", ide));
             }
@@ -204,6 +302,16 @@ fn activate_ide(ide: &str, window_title: Option<&str>) -> Result<(), String> {
     {
         let ide_exe = match ide {
             "cursor" => "Cursor.exe",
+            "windsurf" | "codeium" | "codeium editor" => "Windsurf.exe",
+            "trae" => "Trae.exe",
+            "void" | "void editor" | "void-editor" => "Void.exe",
+            "pearai" | "pear-ai" | "pear ai" => "PearAI.exe",
+            "blueberryai" | "blueberry ai" | "blueberry" => "BlueberryAI.exe",
+            "aide" | "codestoryai" | "codestory ai" => "Aide.exe",
+            "codebuddy" | "code buddy" | "tencent codebuddy" => "CodeBuddy.exe",
+            "kilocode" | "kilo-code" | "kilo" => "Kilo Code.exe",
+            "kiro" => "Kiro.exe",
+            "antigravity" => "Antigravity.exe",
             "claude" | "claude-code" => "Claude.exe",
             "vscode" | "visual studio code" => "Code.exe",
             _ => {
@@ -236,8 +344,18 @@ fn activate_ide(ide: &str, window_title: Option<&str>) -> Result<(), String> {
     {
         let ide_name = match ide {
             "cursor" => "Cursor",
+            "windsurf" | "codeium" | "codeium editor" => "Windsurf",
+            "trae" => "Trae",
+            "void" | "void editor" | "void-editor" => "Void",
+            "pearai" | "pear-ai" | "pear ai" => "PearAI",
+            "blueberryai" | "blueberry ai" | "blueberry" => "BlueberryAI",
+            "aide" | "codestoryai" | "codestory ai" => "Aide",
+            "codebuddy" | "code buddy" | "tencent codebuddy" => "CodeBuddy",
+            "kilocode" | "kilo-code" | "kilo" => "Kilo Code",
+            "kiro" => "Kiro",
+            "antigravity" => "Antigravity",
             "claude" | "claude-code" => "Claude",
-            "vscode" | "visual studio code" => "code" ,
+            "vscode" | "visual studio code" => "code",
             _ => return Err(format!("Unknown IDE: {}", ide)),
         };
 
@@ -264,7 +382,6 @@ fn activate_ide(ide: &str, window_title: Option<&str>) -> Result<(), String> {
 fn get_app_version() -> String {
     env!("CARGO_PKG_VERSION").to_string()
 }
-
 #[tauri::command]
 fn minimize_window(window: tauri::Window) {
     window.minimize().unwrap();
@@ -359,33 +476,174 @@ async fn trigger_notification<R: Runtime>(
     _title: String,
     _body: String
 ) -> Result<(), String> {
-    // Notification functionality - can be implemented with tauri-plugin-notification if needed
     Ok(())
 }
 
 #[tauri::command]
-async fn get_app_settings(state: tauri::State<'_, settings::SettingsState>) -> Result<settings::AppSettings, String> {
-    let settings = state.settings.lock().map_err(|_| "Failed to lock settings mutex")?;
-    Ok(settings.clone())
+async fn get_app_settings(
+    state: tauri::State<'_, settings::SettingsState>,
+    db_state: tauri::State<'_, db::DatabaseState>,
+) -> Result<AppSettings, String> {
+    let settings = state.get_settings();
+    Ok(settings)
 }
 
 #[tauri::command]
 async fn update_app_settings<R: Runtime>(
     app: tauri::AppHandle<R>,
     state: tauri::State<'_, settings::SettingsState>,
-    new_settings: settings::AppSettings
+    db_state: tauri::State<'_, db::DatabaseState>,
+    new_settings: AppSettings
 ) -> Result<(), String> {
     {
         let mut settings = state.settings.lock().map_err(|_| "Failed to lock settings mutex")?;
         *settings = new_settings.clone();
-    } // Drop lock before saving/emitting
+    }
 
-    state.save()?; // Save to disk
+    {
+        let conn = db_state.get_connection();
+        state.save(&conn)?;
+    }
 
-    // Emit event to all windows
-    app.emit("settings-changed", new_settings).map_err(|e| e.to_string())?;
-    
+    app.emit("settings-changed", new_settings.clone()).map_err(|e| e.to_string())?;
+
     Ok(())
+}
+
+#[tauri::command]
+async fn get_window_visibility(
+    state: tauri::State<'_, settings::SettingsState>,
+    _db_state: tauri::State<'_, db::DatabaseState>,
+) -> Result<bool, String> {
+    let settings = state.get_settings();
+    Ok(settings.window_visible)
+}
+
+#[tauri::command]
+async fn set_window_visibility<R: Runtime>(
+    app: tauri::AppHandle<R>,
+    state: tauri::State<'_, settings::SettingsState>,
+    db_state: tauri::State<'_, db::DatabaseState>,
+    visible: bool,
+) -> Result<(), String> {
+    {
+        let mut settings = state.settings.lock().map_err(|_| "Failed to lock settings mutex")?;
+        settings.window_visible = visible;
+    }
+
+    {
+        let conn = db_state.get_connection();
+        let settings = state.settings.lock().map_err(|_| "Failed to lock settings mutex")?;
+        settings.save(&conn).map_err(|e| e.to_string())?;
+    }
+
+    app.emit("window-visibility-changed", visible).map_err(|e| e.to_string())?;
+
+    Ok(())
+}
+
+#[tauri::command]
+fn get_tray_translations(language: String) -> serde_json::Value {
+    let translations: std::collections::HashMap<&str, &str> = match language.as_str() {
+        "zh-CN" => vec![
+            ("showWindow", "☀ 显示窗口"),
+            ("hideWindow", "☾ 隐藏窗口"),
+            ("settings", "设置"),
+            ("quit", "退出"),
+            ("noTasks", "无任务"),
+            ("tasks", "任务"),
+        ].into_iter().collect(),
+        "zh-TW" => vec![
+            ("showWindow", "☀ 顯示窗口"),
+            ("hideWindow", "☾ 隱藏窗口"),
+            ("settings", "設置"),
+            ("quit", "退出"),
+            ("noTasks", "無任務"),
+            ("tasks", "任務"),
+        ].into_iter().collect(),
+        "de" => vec![
+            ("showWindow", "☀ Fenster anzeigen"),
+            ("hideWindow", "☾ Fenster ausblenden"),
+            ("settings", "Einstellungen"),
+            ("quit", "Beenden"),
+            ("noTasks", "Keine Aufgaben"),
+            ("tasks", "Aufgaben"),
+        ].into_iter().collect(),
+        "es" => vec![
+            ("showWindow", "☀ Mostrar ventana"),
+            ("hideWindow", "☾ Ocultar ventana"),
+            ("settings", "Configuración"),
+            ("quit", "Salir"),
+            ("noTasks", "Sin tareas"),
+            ("tasks", "Tareas"),
+        ].into_iter().collect(),
+        "fr" => vec![
+            ("showWindow", "☀ Afficher la fenêtre"),
+            ("hideWindow", "☾ Masquer la fenêtre"),
+            ("settings", "Paramètres"),
+            ("quit", "Quitter"),
+            ("noTasks", "Aucune tâche"),
+            ("tasks", "Tâches"),
+        ].into_iter().collect(),
+        "ja" => vec![
+            ("showWindow", "☀ ウィンドウを表示"),
+            ("hideWindow", "☾ ウィンドウを非表示"),
+            ("settings", "設定"),
+            ("quit", "終了"),
+            ("noTasks", "タスクなし"),
+            ("tasks", "タスク"),
+        ].into_iter().collect(),
+        "ko" => vec![
+            ("showWindow", "☀ 창 표시"),
+            ("hideWindow", "☾ 창 숨기기"),
+            ("settings", "설정"),
+            ("quit", "종료"),
+            ("noTasks", "작업 없음"),
+            ("tasks", "작업"),
+        ].into_iter().collect(),
+        "pt" => vec![
+            ("showWindow", "☀ Mostrar janela"),
+            ("hideWindow", "☾ Ocultar janela"),
+            ("settings", "Configurações"),
+            ("quit", "Sair"),
+            ("noTasks", "Sem tarefas"),
+            ("tasks", "Tarefas"),
+        ].into_iter().collect(),
+        "ru" => vec![
+            ("showWindow", "☀ Показать окно"),
+            ("hideWindow", "☾ Скрыть окно"),
+            ("settings", "Настройки"),
+            ("quit", "Выйти"),
+            ("noTasks", "Нет задач"),
+            ("tasks", "Задачи"),
+        ].into_iter().collect(),
+        "ar" => vec![
+            ("showWindow", "☀ إظهار النافذة"),
+            ("hideWindow", "☾ إخفاء النافذة"),
+            ("settings", "الإعدادات"),
+            ("quit", "خروج"),
+            ("noTasks", "لا توجد مهام"),
+            ("tasks", "المهام"),
+        ].into_iter().collect(),
+        _ => vec![
+            ("showWindow", "☀ Show Window"),
+            ("hideWindow", "☾ Hide Window"),
+            ("settings", "Settings"),
+            ("quit", "Quit"),
+            ("noTasks", "No tasks"),
+            ("tasks", "Tasks"),
+        ].into_iter().collect(),
+    };
+
+    serde_json::to_value(translations).unwrap_or_default()
+}
+
+#[tauri::command]
+async fn get_current_language(
+    state: tauri::State<'_, settings::SettingsState>,
+) -> Result<String, String> {
+    let settings = state.get_settings();
+    Ok(settings.language)
 }
 
 fn main() {
@@ -414,39 +672,74 @@ fn main() {
             open_settings_window,
             get_translated_string,
             get_app_settings,
-            update_app_settings
+            update_app_settings,
+            get_window_visibility,
+            set_window_visibility,
+            get_tray_translations,
+            get_current_language,
         ])
         .setup(|app| {
-            // Initialize settings state
-            let settings_state = settings::SettingsState::new(app.app_handle());
+            let app_handle = app.app_handle().clone();
+            
+            let db_state = DatabaseState::new(&app_handle);
+            app.manage(db_state.clone());
+
+            let settings_state = SettingsState::new(&app_handle);
+            settings_state.load(&db_state.get_connection());
             app.manage(settings_state);
 
-            let window = app.get_webview_window("main").unwrap();
+            let window = app_handle.get_webview_window("main").unwrap();
 
-            // Set webview background to transparent
             #[cfg(target_os = "macos")]
             {
                 use window_vibrancy::{apply_vibrancy, NSVisualEffectMaterial, NSVisualEffectState};
-                // Apply vibrancy effect for macOS - this makes the window background translucent
                 let _ = apply_vibrancy(&window, NSVisualEffectMaterial::HudWindow, Some(NSVisualEffectState::Active), Some(12.0));
             }
 
-            // Apply blur effect for Windows
             #[cfg(target_os = "windows")]
             {
                 use window_vibrancy::apply_blur;
                 let _ = apply_blur(&window, Some((18, 18, 18, 200)));
             }
 
+            let db_state = app.state::<db::DatabaseState>();
+            let json_path = {
+                let app_handle = app.app_handle();
+                app_handle.path()
+                    .app_config_dir()
+                    .expect("Failed to get app config dir")
+                    .join("settings.json")
+            };
+
+            if json_path.exists() {
+                let _ = db_state.migrate_from_json(&json_path);
+            }
+
             http_server::start_server_background(31415);
             info!(port = 31415, "HTTP server started on port 31415");
 
-            // Setup system tray
-            let settings_item = MenuItem::with_id(app, "settings", "设置", true, None::<&str>)?;
-            let quit_item = MenuItem::with_id(app, "quit", "退出", true, None::<&str>)?;
-            let menu = Menu::with_items(app, &[&settings_item, &quit_item])?;
+            let settings_state = app.state::<settings::SettingsState>();
+            let current_settings = settings_state.get_settings();
+            let language = current_settings.language;
+            let translations = get_tray_translations(language);
 
-            // Load tray icon from PNG file
+            let show_window_text = translations.get("showWindow")
+                .and_then(|v| v.as_str())
+                .unwrap_or("☀ Show Window");
+            let hide_window_text = translations.get("hideWindow")
+                .and_then(|v| v.as_str())
+                .unwrap_or("☾ Hide Window");
+            let settings_text = translations.get("settings")
+                .and_then(|v| v.as_str())
+                .unwrap_or("Settings");
+            let quit_text = translations.get("quit")
+                .and_then(|v| v.as_str())
+                .unwrap_or("Quit");
+
+            let window_toggle_item = MenuItem::with_id(&app_handle, "toggle-window", hide_window_text, true, None::<&str>)?;
+            let settings_item = MenuItem::with_id(&app_handle, "settings", settings_text, true, None::<&str>)?;
+            let quit_item = MenuItem::with_id(&app_handle, "quit", quit_text, true, None::<&str>)?;
+
             let icon_bytes = include_bytes!("../icons/32x32.png");
             let img = image::load_from_memory(icon_bytes).expect("Failed to load icon");
             let rgba = img.to_rgba8();
@@ -455,20 +748,80 @@ fn main() {
 
             info!("Creating system tray with icon {}x{}", width, height);
 
+            let app_handle_clone = app.app_handle().clone();
+            let translations_clone = translations.clone();
+
+            let rebuild_menu = move |app: &tauri::AppHandle, is_visible: bool| {
+                let lang = {
+                    let state = app.state::<settings::SettingsState>();
+                    state.get_settings().language
+                };
+                let trans = get_tray_translations(lang);
+                let window_text = if is_visible {
+                    trans.get("hideWindow").and_then(|v| v.as_str()).unwrap_or("☾ Hide Window")
+                } else {
+                    trans.get("showWindow").and_then(|v| v.as_str()).unwrap_or("☀ Show Window")
+                };
+                let settings_text = trans.get("settings").and_then(|v| v.as_str()).unwrap_or("Settings");
+                let quit_text = trans.get("quit").and_then(|v| v.as_str()).unwrap_or("Quit");
+
+                let window_toggle = MenuItem::with_id(app, "toggle-window", window_text, true, None::<&str>).ok();
+                let settings = MenuItem::with_id(app, "settings", settings_text, true, None::<&str>).ok();
+                let quit = MenuItem::with_id(app, "quit", quit_text, true, None::<&str>).ok();
+
+                if let (Some(w), Some(s), Some(q)) = (window_toggle, settings, quit) {
+                    let menu = tauri::menu::Menu::with_items(app, &[&w, &s, &q]).ok();
+                    if let Some(m) = menu {
+                        let _ = app.tray_by_id("main-tray").unwrap().set_menu(Some(m));
+                    }
+                }
+            };
+
             let tray = TrayIconBuilder::with_id("main-tray")
                 .icon(icon)
                 .icon_as_template(false)
                 .tooltip("Vibe Process Bar")
-                .menu(&menu)
+                .menu(&tauri::menu::Menu::with_items(&app_handle, &[&window_toggle_item, &settings_item, &quit_item])?)
                 .show_menu_on_left_click(true)
                 .on_menu_event(move |app, event| {
                     match event.id.as_ref() {
+                        "toggle-window" => {
+                            let db_state = app.state::<db::DatabaseState>();
+                            let settings_state = app.state::<settings::SettingsState>();
+                            
+                            let conn = db_state.get_connection();
+                            let settings = AppSettings::load(&conn);
+                            drop(conn);
+
+                            let window = app.get_webview_window("main").unwrap();
+                            let is_visible = window.is_visible().unwrap_or(true);
+
+                            if is_visible {
+                                let _ = window.hide();
+                                let mut settings = settings_state.settings.lock().unwrap();
+                                settings.window_visible = false;
+                                drop(settings);
+                                let conn = db_state.get_connection();
+                                let _ = settings_state.save(&conn);
+                                drop(conn);
+                                let _ = app.tray_by_id("main-tray").unwrap().set_tooltip(Some("Vibe Process Bar (Hidden)"));
+                                rebuild_menu(app, false);
+                            } else {
+                                let _ = window.show();
+                                let mut settings = settings_state.settings.lock().unwrap();
+                                settings.window_visible = true;
+                                drop(settings);
+                                let conn = db_state.get_connection();
+                                let _ = settings_state.save(&conn);
+                                drop(conn);
+                                let _ = app.tray_by_id("main-tray").unwrap().set_tooltip(Some("Vibe Process Bar"));
+                                rebuild_menu(app, true);
+                            }
+                        }
                         "settings" => {
-                            // Show settings window
                             let _ = open_settings_window(app.app_handle().clone());
                         }
                         "quit" => {
-                            // Exit the application
                             app.exit(0);
                         }
                         _ => {}
@@ -477,15 +830,23 @@ fn main() {
                 .build(app)?;
 
             info!("System tray created successfully with id: {:?}", tray.id());
-            
-            // Leak the tray to prevent it from being dropped
-            // This is safe because we want the tray to live for the entire application lifetime
+
             Box::leak(Box::new(tray));
 
             let window_clone = window.clone();
+            let app_handle_clone = app.app_handle().clone();
+
             window.on_window_event(move |event| {
                 if let WindowEvent::CloseRequested { api, .. } = event {
                     api.prevent_close();
+                    let db_state = app_handle_clone.state::<db::DatabaseState>();
+                    let settings_state = app_handle_clone.state::<settings::SettingsState>();
+                    
+                    let conn = db_state.get_connection();
+                    let mut settings = settings_state.settings.lock().unwrap();
+                    settings.window_visible = false;
+                    let _ = settings_state.save(&conn);
+                    
                     window_clone.hide().unwrap();
                 }
             });
