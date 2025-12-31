@@ -1,14 +1,20 @@
-import { vi, beforeEach } from 'vitest';
+import { vi, beforeAll, afterAll } from 'vitest';
 
-const localStorageMock = {
-  getItem: vi.fn(),
-  setItem: vi.fn(() => {}),
+const storageMock = {
+  getItem: vi.fn((_key: string) => null),
+  setItem: vi.fn((_key: string, _value: string) => {}),
+  removeItem: vi.fn((_key: string) => {}),
   clear: vi.fn(),
-  removeItem: vi.fn(),
-  length: 0,
-  key: vi.fn(),
+  get length(): number { return 0 },
+  key: vi.fn((_index: number) => null),
 };
 
-beforeEach(() => {
-  vi.stubGlobal('localStorage', localStorageMock);
+beforeAll(() => {
+  vi.stubGlobal('localStorage', storageMock);
+  vi.stubGlobal('sessionStorage', storageMock);
+  vi.stubGlobal('storage', storageMock);
+});
+
+afterAll(() => {
+  vi.restoreAllMocks();
 });

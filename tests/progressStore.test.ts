@@ -27,6 +27,7 @@ describe('ProgressStore', () => {
         doNotDisturb: false,
         doNotDisturbStart: '22:00',
         doNotDisturbEnd: '08:00',
+        windowVisible: true,
       },
     });
   });
