@@ -59,12 +59,14 @@ fn open_settings_window<R: Runtime>(app: tauri::AppHandle<R>) -> Result<(), Stri
 async fn activate_ide_window<R: Runtime>(
     _window: tauri::Window<R>,
     ide: String,
-    window_title: Option<String>
+    window_title: Option<String>,
+    project_path: Option<String>
 ) -> Result<(), String> {
-    activate_ide(&ide, window_title.as_deref())
+    activate_ide(&ide, window_title.as_deref(), project_path.as_deref())
 }
 
-fn activate_ide(ide: &str, window_title: Option<&str>) -> Result<(), String> {
+fn activate_ide(ide: &str, window_title: Option<&str>, project_path: Option<&str>) -> Result<(), String> {
+    info!("activate_ide called with ide={}, window_title={:?}, project_path={:?}", ide, window_title, project_path);
     #[cfg(target_os = "macos")]
     {
         let script = match ide.to_lowercase().as_str() {
@@ -198,13 +200,13 @@ fn activate_ide(ide: &str, window_title: Option<&str>) -> Result<(), String> {
                     format!(
                         r#"
                         tell application "System Events"
-                            set kiroProcess to application process "Kiro"
-                            set frontmost of kiroProcess to true
-                            set winCount to count of windows of kiroProcess
+                            set kiroProc to first application process whose bundle identifier is "dev.kiro.desktop"
+                            set frontmost of kiroProc to true
+                            set winCount to count of windows of kiroProc
                             set searchTitle to "{}"
                             repeat with i from 1 to winCount
                                 try
-                                    set w to window i of kiroProcess
+                                    set w to window i of kiroProc
                                     set winTitle to title of w
                                     if winTitle contains searchTitle then
                                         perform action "AXRaise" of w
@@ -228,13 +230,13 @@ fn activate_ide(ide: &str, window_title: Option<&str>) -> Result<(), String> {
                     format!(
                         r#"
                         tell application "System Events"
-                            set agProcess to application process "Antigravity"
-                            set frontmost of agProcess to true
-                            set winCount to count of windows of agProcess
+                            set agProc to first application process whose bundle identifier is "com.google.antigravity"
+                            set frontmost of agProc to true
+                            set winCount to count of windows of agProc
                             set searchTitle to "{}"
                             repeat with i from 1 to winCount
                                 try
-                                    set w to window i of agProcess
+                                    set w to window i of agProc
                                     set winTitle to title of w
                                     if winTitle contains searchTitle then
                                         perform action "AXRaise" of w
@@ -275,25 +277,50 @@ fn activate_ide(ide: &str, window_title: Option<&str>) -> Result<(), String> {
                 }
             }
             "vscode" | "visual studio code" => {
-                r#"
-                tell application "Visual Studio Code"
-                    activate
-                    delay 0.3
-                end tell
-                "#.to_string()
+                if let Some(title) = window_title {
+                    format!(
+                        r#"
+                        tell application "System Events"
+                            set vscodeProc to first application process whose bundle identifier is "com.microsoft.VSCode"
+                            set frontmost of vscodeProc to true
+                            set winCount to count of windows of vscodeProc
+                            set searchTitle to "{}"
+                            repeat with i from 1 to winCount
+                                try
+                                    set w to window i of vscodeProc
+                                    set winTitle to title of w
+                                    if winTitle contains searchTitle then
+                                        perform action "AXRaise" of w
+                                        exit repeat
+                                    end if
+                                end try
+                            end repeat
+                        end tell
+                        tell application "Visual Studio Code" to activate
+                    "#,
+                        title
+                    )
+                } else {
+                    r#"
+                    tell application "Visual Studio Code" to activate
+                    "#.to_string()
+                }
             }
             _ => {
                 return Err(format!("Unknown IDE: {}", ide));
             }
         };
 
+        info!("Running AppleScript for IDE: {}", ide);
         let output = Command::new("osascript")
             .args(&["-e", &script])
             .output()
             .map_err(|e| e.to_string())?;
 
         if !output.status.success() {
-            return Err(String::from_utf8_lossy(&output.stderr).to_string());
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            info!("AppleScript failed for {}: {}", ide, stderr);
+            return Err(stderr.to_string());
         }
         Ok(())
     }

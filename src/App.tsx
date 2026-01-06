@@ -231,25 +231,15 @@ function App() {
 
   const handleActivateWindow = async () => {
     if (currentTask) {
-      // Check for project path first (priority for VS Code)
-      if (currentTask.projectPath && (currentTask.ide?.toLowerCase().includes('code') || currentTask.ide?.toLowerCase() === 'vscode')) {
-        try {
-          debug('Opening VS Code project', { path: currentTask.projectPath });
-          await invoke('open_url', { url: `vscode://file/${currentTask.projectPath}` });
-          return;
-        } catch (err) {
-          error('Failed to open VS Code project', { error: String(err) });
-          // Fallback to activate_ide_window
-        }
-      }
-
+      // Use activate_ide_window for all IDEs (AppleScript-based window activation)
       if (currentTask.ide) {
         try {
           await invoke('activate_ide_window', {
             ide: currentTask.ide,
-            windowTitle: currentTask.windowTitle || null
+            windowTitle: currentTask.windowTitle || null,
+            projectPath: currentTask.projectPath || null
           });
-          debug('IDE window activated', { ide: currentTask.ide, windowTitle: currentTask.windowTitle });
+          debug('IDE window activated', { ide: currentTask.ide, windowTitle: currentTask.windowTitle, projectPath: currentTask.projectPath });
         } catch (err) {
           error('Failed to activate IDE window', { error: String(err), ide: currentTask.ide });
         }
@@ -266,24 +256,14 @@ function App() {
       setClickedCompletedTasks(prev => new Set([...prev, task.id]));
     }
 
-    // Check for project path first (priority for VS Code)
-    if (task.projectPath && (task.ide?.toLowerCase().includes('code') || task.ide?.toLowerCase() === 'vscode')) {
-      try {
-        debug('Opening VS Code project', { path: task.projectPath });
-        await invoke('open_url', { url: `vscode://file/${task.projectPath}` });
-        return;
-      } catch (err) {
-        error('Failed to open VS Code project', { error: String(err) });
-        // Fallback to activate_ide_window
-      }
-    }
-
+    // Use activate_ide_window for all IDEs (AppleScript-based window activation)
     if (task.ide) {
       try {
-        debug('Activating IDE window', { ide: task.ide, windowTitle: task.windowTitle });
+        debug('Activating IDE window', { ide: task.ide, windowTitle: task.windowTitle, projectPath: task.projectPath });
         await invoke('activate_ide_window', {
           ide: task.ide,
-          windowTitle: task.windowTitle || null
+          windowTitle: task.windowTitle || null,
+          projectPath: task.projectPath || null
         });
         debug('IDE window activated successfully', { ide: task.ide });
       } catch (err) {
