@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 use std::sync::{Arc, Mutex};
 use tokio::spawn;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
-use tracing::{debug, info, warn, error, instrument};
+use tracing::{debug, info, warn, error};
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Task {
@@ -16,6 +16,27 @@ pub struct Task {
     pub start_time: u64,
     pub end_time: Option<u64>,
     pub project_path: Option<String>,
+    pub active_file: Option<String>,  // 新增：当前活动文件名用于窗口匹配
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct RegisterTaskRequest {
+    pub task_id: String,
+    pub name: String,
+    pub ide: String,
+    pub window_title: String,
+    pub project_path: Option<String>,
+    pub active_file: Option<String>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct UpdateTaskRequest {
+    pub task_id: String,
+    pub name: Option<String>,
+    pub ide: Option<String>,
+    pub window_title: Option<String>,
+    pub project_path: Option<String>,
+    pub active_file: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -25,6 +46,7 @@ pub struct StartTaskRequest {
     pub ide: String,
     pub window_title: String,
     pub project_path: Option<String>,
+    pub active_file: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -106,8 +128,82 @@ async fn handle_connection(
             "taskCount": tasks.len()
         });
         format_response(200, &resp.to_string())
+    } else if request.starts_with("POST /api/task/register") {
+        // REGISTER state - 扩展启动时注册任务
+        match serde_json::from_str::<RegisterTaskRequest>(&body) {
+            Ok(req) => {
+                info!(task_id = %req.task_id, name = %req.name, ide = %req.ide, active_file = ?req.active_file, "Task registered");
+                let mut tasks = state.tasks.lock().unwrap();
+                let existing = tasks.iter_mut().find(|t| t.id == req.task_id);
+                
+                if let Some(task) = existing {
+                   task.name = req.name;
+                   task.ide = req.ide;
+                   task.window_title = req.window_title;
+                   task.status = "registered".to_string();
+                   if let Some(path) = req.project_path {
+                       task.project_path = Some(path);
+                   }
+                   if let Some(file) = req.active_file {
+                       task.active_file = Some(file);
+                   }
+                   task.progress = 0;
+                   task.tokens = 0;
+                   task.start_time = 0;
+                   task.end_time = None;
+                } else {
+                   let task = Task {
+                        id: req.task_id.clone(),
+                        name: req.name,
+                        progress: 0,
+                        tokens: 0,
+                        status: "registered".to_string(),
+                        ide: req.ide,
+                        window_title: req.window_title,
+                        start_time: 0,
+                        end_time: None,
+                        project_path: req.project_path,
+                        active_file: req.active_file,
+                    };
+                    tasks.push(task);
+                }
+                *state.current_task_id.lock().unwrap() = Some(req.task_id);
+                format_response(200, r#"{"status":"ok"}"#)
+            }
+            Err(e) => format_response(400, &format!(r#"{{"error":"Invalid request: {}"}}"#, e))
+        }
+    } else if request.starts_with("POST /api/task/update") {
+        // UPDATE - 更新任务信息（如活动文件变化）
+        match serde_json::from_str::<UpdateTaskRequest>(&body) {
+            Ok(req) => {
+                debug!(task_id = %req.task_id, active_file = ?req.active_file, "Task updated");
+                let mut tasks = state.tasks.lock().unwrap();
+                let found = tasks.iter_mut().find(|t| t.id == req.task_id);
+                if let Some(task) = found {
+                    if let Some(name) = req.name {
+                        task.name = name;
+                    }
+                    if let Some(ide) = req.ide {
+                        task.ide = ide;
+                    }
+                    if let Some(title) = req.window_title {
+                        task.window_title = title;
+                    }
+                    if let Some(path) = req.project_path {
+                        task.project_path = Some(path);
+                    }
+                    if let Some(file) = req.active_file {
+                        task.active_file = Some(file);
+                    }
+                    format_response(200, r#"{"status":"ok"}"#)
+                } else {
+                    format_response(404, r#"{"error":"Task not found"}"#)
+                }
+            }
+            Err(e) => format_response(400, &format!(r#"{{"error":"Invalid request: {}"}}"#, e))
+        }
     } else if request.starts_with("POST /api/task/armed") {
-        // ARMED state - task is waiting for AI activity, no timer yet
+        // ARMED state - 保留兼容性
         match serde_json::from_str::<StartTaskRequest>(&body) {
             Ok(req) => {
                 info!(task_id = %req.task_id, name = %req.name, ide = %req.ide, "Task armed");
@@ -122,10 +218,9 @@ async fn handle_connection(
                    if let Some(path) = req.project_path {
                        task.project_path = Some(path);
                    }
-                   
-                   // Keep existing progress/tokens? Or reset?
-                   // Usually arming implies a new phase, maybe reset progress but keep tokens?
-                   // The original code created a NEW task with 0 progress/tokens.
+                   if let Some(file) = req.active_file {
+                       task.active_file = Some(file);
+                   }
                    task.progress = 0;
                    task.tokens = 0;
                    task.start_time = 0;
@@ -142,6 +237,7 @@ async fn handle_connection(
                         start_time: 0,
                         end_time: None,
                         project_path: req.project_path,
+                        active_file: req.active_file,
                     };
                     tasks.push(task);
                 }
@@ -155,15 +251,18 @@ async fn handle_connection(
             Ok(req) => {
                 info!(task_id = %req.task_id, name = %req.name, "Task started");
                 let mut tasks = state.tasks.lock().unwrap();
-                // Check if task exists and is in armed state
+                // Check if task exists and is in registered/armed state
                 let existing = tasks.iter_mut().find(|t| t.id == req.task_id);
                 if let Some(task) = existing {
-                    // Update existing armed task to running
+                    // Update existing task to running
                     task.status = "running".to_string();
                     task.start_time = chrono::Utc::now().timestamp_millis() as u64;
                     task.name = req.name;
                     if let Some(path) = req.project_path {
                         task.project_path = Some(path);
+                    }
+                    if let Some(file) = req.active_file {
+                        task.active_file = Some(file);
                     }
                 } else {
                     // Create new running task
@@ -178,6 +277,7 @@ async fn handle_connection(
                         start_time: chrono::Utc::now().timestamp_millis() as u64,
                         end_time: None,
                         project_path: req.project_path,
+                        active_file: req.active_file,
                     };
                     tasks.push(task);
                 }

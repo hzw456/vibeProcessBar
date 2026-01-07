@@ -1,4 +1,4 @@
-use rusqlite::{Connection, Result};
+use rusqlite::Connection;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use tauri::{AppHandle, Manager};

@@ -9,13 +9,14 @@ export interface ProgressTask {
   name: string;
   progress: number;
   tokens: number;
-  status: 'idle' | 'running' | 'completed' | 'error' | 'armed' | 'active';
+  status: 'idle' | 'running' | 'completed' | 'error' | 'armed' | 'active' | 'registered';
   startTime: number;
   endTime?: number;
   adapter?: string;
   ide?: string;
   windowTitle?: string;
   projectPath?: string;
+  activeFile?: string;  // 当前活动文件名，用于窗口匹配
 }
 
 interface ProgressState {
@@ -345,6 +346,7 @@ export const useProgressStore = create<ProgressState>()(
                 ide: apiTask.ide,
                 windowTitle: apiTask.window_title,
                 projectPath: apiTask.project_path,
+                activeFile: apiTask.active_file,
               }));
 
               set((state) => {

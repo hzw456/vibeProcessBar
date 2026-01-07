@@ -1,16 +1,24 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import './utils/i18n';
 import { StatusText } from './components/StatusText';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { invoke } from '@tauri-apps/api/core';
-import { useProgressStore } from './stores/progressStore';
+import { useProgressStore, ProgressTask } from './stores/progressStore';
 import { useProgressNotifications } from './hooks/useProgressEvent';
 import { SHORTCUTS, registerGlobalShortcut, moveToCorner } from './utils/windowManager';
 import { debug, error } from './utils/logger';
 import './App.css';
 
 debug('App.tsx loaded');
+
+// IDE 窗口类型
+interface IdeWindow {
+  bundle_id: string;
+  ide: string;
+  window_title: string;
+  window_index: number;
+}
 
 function App() {
   const { t } = useTranslation();
@@ -24,12 +32,69 @@ function App() {
   const [isCollapsed, setIsCollapsed] = useState(false); // Start expanded
   const [isCollapseTransition, setIsCollapseTransition] = useState(false); // Skip auto-resize during collapse
   const prevTasksRef = useRef<typeof tasks>([]);
+  const [ideWindows, setIdeWindows] = useState<IdeWindow[]>([]); // IDE 窗口列表
 
   useProgressNotifications();
 
-  // Keep tasks in original order, no sorting
-  const displayTasks = tasks.filter(t => t.status === 'completed' || t.status === 'running' || t.status === 'idle' || t.status === 'armed' || t.status === 'active');
-  const currentTask = tasks.find(t => t.id === currentTaskId) || tasks.find(t => t.status === 'running') || tasks[0] || null;
+  // 扫描 IDE 窗口
+  const scanIdeWindows = useCallback(async () => {
+    try {
+      const windows = await invoke<IdeWindow[]>('get_ide_windows');
+      debug('Scanned IDE windows', { count: windows.length, windows });
+      setIdeWindows(windows);
+    } catch (err) {
+      error('Failed to scan IDE windows', { error: String(err) });
+    }
+  }, []);
+
+  // 启动时扫描 IDE 窗口，并定期刷新
+  useEffect(() => {
+    scanIdeWindows();
+    const interval = setInterval(scanIdeWindows, 5000); // 每 5 秒刷新一次
+    return () => clearInterval(interval);
+  }, [scanIdeWindows]);
+
+  // 合并 API 任务和 IDE 窗口
+  // API 任务优先（有状态信息），IDE 窗口作为补充
+  const allDisplayItems = [...tasks];
+
+  // 将 IDE 窗口转换为任务格式（如果没有对应的 API 任务）
+  ideWindows.forEach(win => {
+    const existingTask = tasks.find(t =>
+      t.ide === win.ide &&
+      (t.windowTitle === win.window_title || win.window_title.includes(t.windowTitle || ''))
+    );
+    if (!existingTask) {
+      // 创建一个虚拟任务来显示 IDE 窗口
+      const virtualTask: ProgressTask = {
+        id: `ide_${win.ide}_${win.window_index}`,
+        name: win.window_title,
+        progress: 0,
+        tokens: 0,
+        status: 'idle',
+        startTime: 0,
+        ide: win.ide,
+        windowTitle: win.window_title,
+      };
+      allDisplayItems.push(virtualTask);
+    }
+  });
+
+  // Sort tasks to prevent jumping
+  // Primary sort by IDE type, secondary sort by window title/name
+  allDisplayItems.sort((a, b) => {
+    const ideA = a.ide || '';
+    const ideB = b.ide || '';
+    if (ideA !== ideB) {
+      return ideA.localeCompare(ideB);
+    }
+    const nameA = a.windowTitle || a.name || '';
+    const nameB = b.windowTitle || b.name || '';
+    return nameA.localeCompare(nameB);
+  });
+
+  const displayTasks = allDisplayItems.filter(t => t.status === 'completed' || t.status === 'running' || t.status === 'idle' || t.status === 'armed' || t.status === 'active' || t.status === 'registered');
+  const currentTask = tasks.find(t => t.id === currentTaskId) || tasks.find(t => t.status === 'running') || displayTasks[0] || null;
 
   // Detect newly completed tasks
   useEffect(() => {
@@ -237,9 +302,10 @@ function App() {
           await invoke('activate_ide_window', {
             ide: currentTask.ide,
             windowTitle: currentTask.windowTitle || null,
-            projectPath: currentTask.projectPath || null
+            projectPath: currentTask.projectPath || null,
+            activeFile: currentTask.activeFile || null  // 用于窗口匹配
           });
-          debug('IDE window activated', { ide: currentTask.ide, windowTitle: currentTask.windowTitle, projectPath: currentTask.projectPath });
+          debug('IDE window activated', { ide: currentTask.ide, windowTitle: currentTask.windowTitle, projectPath: currentTask.projectPath, activeFile: currentTask.activeFile });
         } catch (err) {
           error('Failed to activate IDE window', { error: String(err), ide: currentTask.ide });
         }
@@ -249,7 +315,7 @@ function App() {
 
   const handleTaskClick = async (task: typeof currentTask) => {
     if (!task) return;
-    debug('Task clicked', { taskId: task.id, ide: task.ide, windowTitle: task.windowTitle, projectPath: task.projectPath });
+    debug('Task clicked', { taskId: task.id, ide: task.ide, windowTitle: task.windowTitle, projectPath: task.projectPath, activeFile: task.activeFile });
     setCurrentTask(task.id);
 
     if (task.status === 'completed') {
@@ -259,11 +325,12 @@ function App() {
     // Use activate_ide_window for all IDEs (AppleScript-based window activation)
     if (task.ide) {
       try {
-        debug('Activating IDE window', { ide: task.ide, windowTitle: task.windowTitle, projectPath: task.projectPath });
+        debug('Activating IDE window', { ide: task.ide, windowTitle: task.windowTitle, projectPath: task.projectPath, activeFile: task.activeFile });
         await invoke('activate_ide_window', {
           ide: task.ide,
           windowTitle: task.windowTitle || null,
-          projectPath: task.projectPath || null
+          projectPath: task.projectPath || null,
+          activeFile: task.activeFile || null  // 用于窗口匹配
         });
         debug('IDE window activated successfully', { ide: task.ide });
       } catch (err) {
@@ -350,7 +417,7 @@ function App() {
                 displayTasks.map(task => (
                   <div key={task.id} className={`collapsed-task-item ${task.status}`} onClick={() => handleTaskClick(task)}>
                     <span className="collapsed-status">
-                      {task.status === 'running' ? '◉' : task.status === 'completed' ? '✓' : task.status === 'armed' ? '◎' : task.status === 'active' ? '◈' : '○'}
+                      {task.status === 'running' ? '◉' : task.status === 'completed' ? '✓' : task.status === 'armed' ? '◎' : task.status === 'active' ? '◈' : task.status === 'registered' ? '◇' : '○'}
                     </span>
                     <span className="collapsed-task-name">{task.name?.substring(0, 8) || task.ide}</span>
                   </div>
@@ -375,12 +442,14 @@ function App() {
           {displayTasks.length > 1 ? (
             <div className="multi-task-list">
               {displayTasks.map((task) => {
-                // Calculate elapsed time (only for running/completed, not armed/active)
+                // Calculate elapsed time (only for running/completed, not armed/active/registered)
                 let timeStr = '';
                 if (task.status === 'armed') {
                   timeStr = '⏳'; // Armed: waiting for AI activity
                 } else if (task.status === 'active') {
                   timeStr = '👁'; // Active: window has focus
+                } else if (task.status === 'registered') {
+                  timeStr = '◇'; // Registered: waiting for AI activity
                 } else if (task.status === 'completed') {
                   const elapsed = (task.endTime || Date.now()) - task.startTime;
                   const minutes = Math.floor(elapsed / 60000);
@@ -403,7 +472,7 @@ function App() {
                     onClick={() => handleTaskClick(task)}
                   >
                     <span className={`mini-status status-${task.status}`}>
-                      {task.status === 'running' ? '◉' : task.status === 'completed' ? '✓' : task.status === 'armed' ? '◎' : task.status === 'active' ? '◈' : '○'}
+                      {task.status === 'running' ? '◉' : task.status === 'completed' ? '✓' : task.status === 'armed' ? '◎' : task.status === 'active' ? '◈' : task.status === 'registered' ? '◇' : '○'}
                     </span>
                     <span className="task-name-mini">{task.name}</span>
                     <span className={`task-time-mini ${task.status === 'completed' ? 'completed-time' : ''} ${task.status === 'armed' ? 'armed-time' : ''} ${task.status === 'active' ? 'active-time' : ''}`}>

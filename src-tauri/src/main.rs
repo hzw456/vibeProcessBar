@@ -1,12 +1,11 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use tauri::{Manager, Runtime, WindowEvent, Emitter};
-use tauri::menu::{Menu, MenuItem};
+use tauri::menu::MenuItem;
 use tauri::tray::TrayIconBuilder;
 use serde_json::json;
 use std::process::Command;
 use tracing::info;
-use std::sync::Mutex;
 
 mod window_manager;
 mod http_server;
@@ -55,18 +54,133 @@ fn open_settings_window<R: Runtime>(app: tauri::AppHandle<R>) -> Result<(), Stri
     Ok(())
 }
 
+/// IDE bundle identifiers for window scanning
+const IDE_BUNDLES: &[(&str, &str)] = &[
+    ("com.microsoft.VSCode", "vscode"),
+    ("com.todesktop.230313mzl4w4u92", "cursor"),
+    ("dev.kiro.desktop", "kiro"),
+    ("com.google.antigravity", "antigravity"),
+    ("com.codeium.windsurf", "windsurf"),
+    ("com.trae.app", "trae"),
+];
+
+#[derive(serde::Serialize, Clone, Debug)]
+pub struct IdeWindow {
+    pub bundle_id: String,
+    pub ide: String,
+    pub window_title: String,
+    pub window_index: i32,
+}
+
+/// Scan all IDE windows using a single AppleScript call
+/// This avoids the bug where querying by PID returns incomplete results
+#[tauri::command]
+async fn get_ide_windows() -> Result<Vec<IdeWindow>, String> {
+    #[cfg(target_os = "macos")]
+    {
+        let mut all_windows = Vec::new();
+        
+        // Use a single AppleScript to iterate all Electron processes and get their windows
+        // Format: appPath|||pid|||winName1|||winName2\n
+        let script = r#"
+            set output to ""
+            tell application "System Events"
+                repeat with p in (every application process whose name is "Electron")
+                    try
+                        set pId to unix id of p
+                        set appFile to application file of p
+                        set appPath to POSIX path of appFile
+                        set winNames to name of every window of p
+                        set AppleScript's text item delimiters to "|||"
+                        set winNamesStr to winNames as text
+                        if winNamesStr is not "" then
+                            set output to output & appPath & ":::" & pId & ":::" & winNamesStr & "\n"
+                        end if
+                    end try
+                end repeat
+            end tell
+            return output
+        "#;
+        
+        let output = Command::new("osascript")
+            .args(&["-e", script])
+            .output();
+        
+        if let Ok(result) = output {
+            if result.status.success() {
+                let stdout = String::from_utf8_lossy(&result.stdout);
+                
+                for line in stdout.lines() {
+                    let line = line.trim();
+                    if line.is_empty() {
+                        continue;
+                    }
+                    
+                    // Format: appPath:::pid:::winName1|||winName2|||...
+                    let parts: Vec<&str> = line.splitn(3, ":::").collect();
+                    if parts.len() != 3 {
+                        continue;
+                    }
+                    
+                    let app_path = parts[0];
+                    let pid = parts[1];
+                    let win_names_str = parts[2];
+                    
+                    // Determine IDE type from app path
+                    let ide = if app_path.contains("Antigravity") {
+                        "antigravity"
+                    } else if app_path.contains("Kiro") {
+                        "kiro"
+                    } else if app_path.contains("Cursor") {
+                        "cursor"
+                    } else if app_path.contains("Windsurf") {
+                        "windsurf"
+                    } else if app_path.contains("Trae") {
+                        "trae"
+                    } else {
+                        "vscode"
+                    };
+                    
+                    // Split window names by |||
+                    let win_names: Vec<&str> = win_names_str.split("|||").collect();
+                    for (idx, win_title) in win_names.iter().enumerate() {
+                        let win_title = win_title.trim();
+                        if !win_title.is_empty() {
+                            all_windows.push(IdeWindow {
+                                bundle_id: format!("pid:{}", pid),
+                                ide: ide.to_string(),
+                                window_title: win_title.to_string(),
+                                window_index: (idx + 1) as i32,
+                            });
+                        }
+                    }
+                }
+            }
+        }
+        
+        info!("Scanned {} IDE windows", all_windows.len());
+        Ok(all_windows)
+    }
+    
+    #[cfg(not(target_os = "macos"))]
+    {
+        Ok(Vec::new())
+    }
+}
+
 #[tauri::command]
 async fn activate_ide_window<R: Runtime>(
     _window: tauri::Window<R>,
     ide: String,
     window_title: Option<String>,
-    project_path: Option<String>
+    project_path: Option<String>,
+    active_file: Option<String>
 ) -> Result<(), String> {
-    activate_ide(&ide, window_title.as_deref(), project_path.as_deref())
+    activate_ide(&ide, window_title.as_deref(), project_path.as_deref(), active_file.as_deref())
 }
 
-fn activate_ide(ide: &str, window_title: Option<&str>, project_path: Option<&str>) -> Result<(), String> {
-    info!("activate_ide called with ide={}, window_title={:?}, project_path={:?}", ide, window_title, project_path);
+fn activate_ide(ide: &str, window_title: Option<&str>, project_path: Option<&str>, active_file: Option<&str>) -> Result<(), String> {
+    info!("activate_ide called with ide={}, window_title={:?}, project_path={:?}, active_file={:?}", ide, window_title, project_path, active_file);
     #[cfg(target_os = "macos")]
     {
         let script = match ide.to_lowercase().as_str() {
@@ -204,13 +318,17 @@ fn activate_ide(ide: &str, window_title: Option<&str>, project_path: Option<&str
                             set frontmost of kiroProc to true
                             set winCount to count of windows of kiroProc
                             set searchTitle to "{}"
+                            set matchSuffix to " —"
                             repeat with i from 1 to winCount
                                 try
                                     set w to window i of kiroProc
                                     set winTitle to title of w
-                                    if winTitle contains searchTitle then
-                                        perform action "AXRaise" of w
-                                        exit repeat
+                                    if winTitle starts with searchTitle then
+                                        set afterTitle to text ((length of searchTitle) + 1) thru -1 of winTitle
+                                        if afterTitle starts with matchSuffix or afterTitle is "" then
+                                            perform action "AXRaise" of w
+                                            exit repeat
+                                        end if
                                     end if
                                 end try
                             end repeat
@@ -234,13 +352,17 @@ fn activate_ide(ide: &str, window_title: Option<&str>, project_path: Option<&str
                             set frontmost of agProc to true
                             set winCount to count of windows of agProc
                             set searchTitle to "{}"
+                            set matchSuffix to " —"
                             repeat with i from 1 to winCount
                                 try
                                     set w to window i of agProc
                                     set winTitle to title of w
-                                    if winTitle contains searchTitle then
-                                        perform action "AXRaise" of w
-                                        exit repeat
+                                    if winTitle starts with searchTitle then
+                                        set afterTitle to text ((length of searchTitle) + 1) thru -1 of winTitle
+                                        if afterTitle starts with matchSuffix or afterTitle is "" then
+                                            perform action "AXRaise" of w
+                                            exit repeat
+                                        end if
                                     end if
                                 end try
                             end repeat
@@ -289,7 +411,7 @@ fn activate_ide(ide: &str, window_title: Option<&str>, project_path: Option<&str
                                 try
                                     set w to window i of vscodeProc
                                     set winTitle to title of w
-                                    if winTitle contains searchTitle then
+                                    if winTitle starts with searchTitle then
                                         perform action "AXRaise" of w
                                         exit repeat
                                     end if
@@ -696,6 +818,7 @@ fn main() {
             start_http_server,
             trigger_notification,
             activate_ide_window,
+            get_ide_windows,
             open_settings_window,
             get_translated_string,
             get_app_settings,

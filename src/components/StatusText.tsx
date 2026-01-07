@@ -3,7 +3,7 @@ import './StatusText.css';
 
 interface StatusTextProps {
   taskName: string;
-  status: 'idle' | 'running' | 'completed' | 'error' | 'armed' | 'active';
+  status: 'idle' | 'running' | 'completed' | 'error' | 'armed' | 'active' | 'registered';
   tokens?: number;
   ide?: string;
   onActivate?: () => void;
@@ -21,6 +21,8 @@ export function StatusText({ taskName, status, tokens = 0, ide, onActivate, elap
         return '◎';
       case 'active':
         return '◈';
+      case 'registered':
+        return '◇';
       case 'running':
         return '◉';
       case 'completed':
@@ -31,7 +33,7 @@ export function StatusText({ taskName, status, tokens = 0, ide, onActivate, elap
         return '○';
     }
   };
-  
+
   const getStatusText = () => {
     switch (status) {
       case 'idle':
@@ -40,6 +42,8 @@ export function StatusText({ taskName, status, tokens = 0, ide, onActivate, elap
         return taskName || t('status.armed');
       case 'active':
         return taskName || t('status.active');
+      case 'registered':
+        return taskName || t('status.registered', 'Waiting');
       case 'running':
         return taskName || t('status.running');
       case 'completed':
