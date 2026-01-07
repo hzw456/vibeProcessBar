@@ -310,32 +310,53 @@ fn activate_ide(ide: &str, window_title: Option<&str>, project_path: Option<&str
                 "#.to_string()
             }
             "kiro" => {
-                if let Some(title) = window_title {
+                // Build AppleScript with fallback: try active_file first, then window_title
+                let primary_search = active_file.unwrap_or("");
+                let fallback_search = window_title.unwrap_or("");
+                
+                if !primary_search.is_empty() || !fallback_search.is_empty() {
                     format!(
                         r#"
                         tell application "System Events"
-                            set kiroProc to first application process whose bundle identifier is "dev.kiro.desktop"
-                            set frontmost of kiroProc to true
-                            set winCount to count of windows of kiroProc
-                            set searchTitle to "{}"
-                            set matchSuffix to " —"
-                            repeat with i from 1 to winCount
+                            set primaryTerm to "{}"
+                            set fallbackTerm to "{}"
+                            set foundWindow to false
+                            repeat with p in (every application process whose name is "Electron")
                                 try
-                                    set w to window i of kiroProc
-                                    set winTitle to title of w
-                                    if winTitle starts with searchTitle then
-                                        set afterTitle to text ((length of searchTitle) + 1) thru -1 of winTitle
-                                        if afterTitle starts with matchSuffix or afterTitle is "" then
-                                            perform action "AXRaise" of w
-                                            exit repeat
+                                    set appPath to POSIX path of (application file of p)
+                                    if appPath contains "Kiro" then
+                                        -- First try primary search term (active_file)
+                                        if primaryTerm is not "" then
+                                            repeat with w in (every window of p)
+                                                set winTitle to title of w
+                                                if winTitle contains primaryTerm then
+                                                    set frontmost of p to true
+                                                    perform action "AXRaise" of w
+                                                    set foundWindow to true
+                                                    exit repeat
+                                                end if
+                                            end repeat
                                         end if
+                                        -- If not found, try fallback search term (window_title)
+                                        if not foundWindow and fallbackTerm is not "" then
+                                            repeat with w in (every window of p)
+                                                set winTitle to title of w
+                                                if winTitle contains fallbackTerm then
+                                                    set frontmost of p to true
+                                                    perform action "AXRaise" of w
+                                                    set foundWindow to true
+                                                    exit repeat
+                                                end if
+                                            end repeat
+                                        end if
+                                        if foundWindow then exit repeat
                                     end if
                                 end try
                             end repeat
                         end tell
                         tell application "Kiro" to activate
                     "#,
-                        title
+                        primary_search, fallback_search
                     )
                 } else {
                     r#"
@@ -344,32 +365,53 @@ fn activate_ide(ide: &str, window_title: Option<&str>, project_path: Option<&str
                 }
             }
             "antigravity" => {
-                if let Some(title) = window_title {
+                // Build AppleScript with fallback: try active_file first, then window_title
+                let primary_search = active_file.unwrap_or("");
+                let fallback_search = window_title.unwrap_or("");
+                
+                if !primary_search.is_empty() || !fallback_search.is_empty() {
                     format!(
                         r#"
                         tell application "System Events"
-                            set agProc to first application process whose bundle identifier is "com.google.antigravity"
-                            set frontmost of agProc to true
-                            set winCount to count of windows of agProc
-                            set searchTitle to "{}"
-                            set matchSuffix to " —"
-                            repeat with i from 1 to winCount
+                            set primaryTerm to "{}"
+                            set fallbackTerm to "{}"
+                            set foundWindow to false
+                            repeat with p in (every application process whose name is "Electron")
                                 try
-                                    set w to window i of agProc
-                                    set winTitle to title of w
-                                    if winTitle starts with searchTitle then
-                                        set afterTitle to text ((length of searchTitle) + 1) thru -1 of winTitle
-                                        if afterTitle starts with matchSuffix or afterTitle is "" then
-                                            perform action "AXRaise" of w
-                                            exit repeat
+                                    set appPath to POSIX path of (application file of p)
+                                    if appPath contains "Antigravity" then
+                                        -- First try primary search term (active_file)
+                                        if primaryTerm is not "" then
+                                            repeat with w in (every window of p)
+                                                set winTitle to title of w
+                                                if winTitle contains primaryTerm then
+                                                    set frontmost of p to true
+                                                    perform action "AXRaise" of w
+                                                    set foundWindow to true
+                                                    exit repeat
+                                                end if
+                                            end repeat
                                         end if
+                                        -- If not found, try fallback search term (window_title)
+                                        if not foundWindow and fallbackTerm is not "" then
+                                            repeat with w in (every window of p)
+                                                set winTitle to title of w
+                                                if winTitle contains fallbackTerm then
+                                                    set frontmost of p to true
+                                                    perform action "AXRaise" of w
+                                                    set foundWindow to true
+                                                    exit repeat
+                                                end if
+                                            end repeat
+                                        end if
+                                        if foundWindow then exit repeat
                                     end if
                                 end try
                             end repeat
                         end tell
                         tell application "Antigravity" to activate
                     "#,
-                        title
+                        primary_search, fallback_search
                     )
                 } else {
                     r#"
@@ -399,28 +441,35 @@ fn activate_ide(ide: &str, window_title: Option<&str>, project_path: Option<&str
                 }
             }
             "vscode" | "visual studio code" => {
-                if let Some(title) = window_title {
+                // Prefer matching by active_file if provided, fallback to window_title
+                let search_term = active_file.or(window_title);
+                if let Some(search) = search_term {
                     format!(
                         r#"
                         tell application "System Events"
-                            set vscodeProc to first application process whose bundle identifier is "com.microsoft.VSCode"
-                            set frontmost of vscodeProc to true
-                            set winCount to count of windows of vscodeProc
-                            set searchTitle to "{}"
-                            repeat with i from 1 to winCount
+                            set searchTerm to "{}"
+                            set foundWindow to false
+                            repeat with p in (every application process whose name is "Electron")
                                 try
-                                    set w to window i of vscodeProc
-                                    set winTitle to title of w
-                                    if winTitle starts with searchTitle then
-                                        perform action "AXRaise" of w
-                                        exit repeat
+                                    set appPath to POSIX path of (application file of p)
+                                    if appPath contains "Visual Studio Code" then
+                                        repeat with w in (every window of p)
+                                            set winTitle to title of w
+                                            if winTitle contains searchTerm then
+                                                set frontmost of p to true
+                                                perform action "AXRaise" of w
+                                                set foundWindow to true
+                                                exit repeat
+                                            end if
+                                        end repeat
+                                        if foundWindow then exit repeat
                                     end if
                                 end try
                             end repeat
                         end tell
                         tell application "Visual Studio Code" to activate
                     "#,
-                        title
+                        search
                     )
                 } else {
                     r#"

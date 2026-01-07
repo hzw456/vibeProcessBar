@@ -7,6 +7,7 @@ use tracing::{debug, info, warn, error};
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Task {
     pub id: String,
+    pub window_id: Option<String>,  // UUID 用于精确匹配窗口
     pub name: String,
     pub progress: u32,
     pub tokens: u64,
@@ -16,12 +17,13 @@ pub struct Task {
     pub start_time: u64,
     pub end_time: Option<u64>,
     pub project_path: Option<String>,
-    pub active_file: Option<String>,  // 新增：当前活动文件名用于窗口匹配
+    pub active_file: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct RegisterTaskRequest {
     pub task_id: String,
+    pub window_id: Option<String>,
     pub name: String,
     pub ide: String,
     pub window_title: String,
@@ -32,6 +34,7 @@ pub struct RegisterTaskRequest {
 #[derive(Serialize, Deserialize, Debug)]
 pub struct UpdateTaskRequest {
     pub task_id: String,
+    pub window_id: Option<String>,
     pub name: Option<String>,
     pub ide: Option<String>,
     pub window_title: Option<String>,
@@ -42,6 +45,7 @@ pub struct UpdateTaskRequest {
 #[derive(Serialize, Deserialize, Debug)]
 pub struct StartTaskRequest {
     pub task_id: String,
+    pub window_id: Option<String>,
     pub name: String,
     pub ide: String,
     pub window_title: String,
@@ -65,6 +69,7 @@ pub struct TokenRequest {
 #[derive(Serialize, Deserialize, Debug)]
 pub struct CompleteRequest {
     pub task_id: String,
+    pub window_id: Option<String>,
     pub total_tokens: Option<u64>,
 }
 
@@ -77,6 +82,7 @@ pub struct ErrorRequest {
 #[derive(Serialize, Deserialize, Debug)]
 pub struct CancelRequest {
     pub task_id: String,
+    pub window_id: Option<String>,
     pub status: Option<String>,
 }
 
@@ -154,6 +160,7 @@ async fn handle_connection(
                 } else {
                    let task = Task {
                         id: req.task_id.clone(),
+                        window_id: req.window_id.clone(),
                         name: req.name,
                         progress: 0,
                         tokens: 0,
@@ -228,6 +235,7 @@ async fn handle_connection(
                 } else {
                    let task = Task {
                         id: req.task_id.clone(),
+                        window_id: req.window_id.clone(),
                         name: req.name,
                         progress: 0,
                         tokens: 0,
@@ -268,6 +276,7 @@ async fn handle_connection(
                     // Create new running task
                     let task = Task {
                         id: req.task_id.clone(),
+                        window_id: req.window_id.clone(),
                         name: req.name,
                         progress: 0,
                         tokens: 0,
