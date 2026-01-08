@@ -313,10 +313,26 @@ function App() {
     }
   };
 
-  const handleTaskClick = async (task: typeof currentTask) => {
+  // Ref to track if activation is in progress to prevent multiple clicks
+  const isActivatingRef = useRef(false);
+
+  const handleTaskClick = (task: typeof currentTask) => {
     if (!task) return;
-    debug('Task clicked', { taskId: task.id, ide: task.ide, windowTitle: task.windowTitle, projectPath: task.projectPath, activeFile: task.activeFile });
+    debug('Task clicked (select)', { taskId: task.id });
     setCurrentTask(task.id);
+  };
+
+  const handleTaskDoubleClick = async (task: typeof currentTask) => {
+    if (!task) return;
+
+    // Prevent multiple concurrent activations
+    if (isActivatingRef.current) {
+      debug('Activation already in progress, ignoring double click');
+      return;
+    }
+
+    isActivatingRef.current = true;
+    debug('Task double-clicked (activate)', { taskId: task.id, ide: task.ide, windowTitle: task.windowTitle, projectPath: task.projectPath, activeFile: task.activeFile });
 
     if (task.status === 'completed') {
       setClickedCompletedTasks(prev => new Set([...prev, task.id]));
@@ -330,14 +346,20 @@ function App() {
           ide: task.ide,
           windowTitle: task.windowTitle || null,
           projectPath: task.projectPath || null,
-          activeFile: task.activeFile || null  // 用于窗口匹配
+          activeFile: task.activeFile || null  // Used for window matching
         });
         debug('IDE window activated successfully', { ide: task.ide });
       } catch (err) {
         error('Failed to activate IDE window', { error: String(err), ide: task.ide });
+      } finally {
+        // Reset activation flag after a short delay to prevent accidental double triggers
+        setTimeout(() => {
+          isActivatingRef.current = false;
+        }, 500);
       }
     } else {
       debug('No IDE specified for task', { taskId: task.id });
+      isActivatingRef.current = false;
     }
   };
 
@@ -415,7 +437,12 @@ function App() {
                 <div className="collapsed-empty">◆</div>
               ) : (
                 displayTasks.map(task => (
-                  <div key={task.id} className={`collapsed-task-item ${task.status}`} onClick={() => handleTaskClick(task)}>
+                  <div
+                    key={task.id}
+                    className={`collapsed-task-item ${task.status}`}
+                    onClick={() => handleTaskClick(task)}
+                    onDoubleClick={() => handleTaskDoubleClick(task)}
+                  >
                     <span className="collapsed-status">
                       {task.status === 'running' ? '◉' : task.status === 'completed' ? '✓' : task.status === 'armed' ? '◎' : task.status === 'active' ? '◈' : task.status === 'registered' ? '◇' : '○'}
                     </span>
@@ -454,12 +481,11 @@ function App() {
                   const elapsed = (task.endTime || Date.now()) - task.startTime;
                   const minutes = Math.floor(elapsed / 60000);
                   const seconds = Math.floor((elapsed % 60000) / 1000);
-                  timeStr = minutes > 0 ? `${minutes}m ${seconds}s` : `${seconds}s`;
-                } else if (task.status === 'running' && task.startTime > 0) {
+                  timeStr = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+                } else if (task.status === 'running') {
                   const elapsed = Date.now() - task.startTime;
                   const minutes = Math.floor(elapsed / 60000);
-                  const seconds = Math.floor((elapsed % 60000) / 1000);
-                  timeStr = minutes > 0 ? `${minutes}m ${seconds}s` : `${seconds}s`;
+                  timeStr = `${minutes}m`;
                 }
 
                 const isClickedCompleted = task.status === 'completed' && clickedCompletedTasks.has(task.id);
@@ -470,6 +496,7 @@ function App() {
                     key={task.id}
                     className={`task-row ${task.id === currentTaskId ? 'active' : ''} ${showHighlight ? 'completed' : ''} ${isClickedCompleted ? 'completed-clicked' : ''} ${task.status === 'armed' ? 'armed' : ''} ${task.status === 'active' ? 'active-state' : ''}`}
                     onClick={() => handleTaskClick(task)}
+                    onDoubleClick={() => handleTaskDoubleClick(task)}
                   >
                     <span className={`mini-status status-${task.status}`}>
                       {task.status === 'running' ? '◉' : task.status === 'completed' ? '✓' : task.status === 'armed' ? '◎' : task.status === 'active' ? '◈' : task.status === 'registered' ? '◇' : '○'}

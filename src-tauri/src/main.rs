@@ -72,6 +72,11 @@ pub struct IdeWindow {
     pub window_index: i32,
 }
 
+// Global state for storing scanned IDE windows for tray menu
+lazy_static::lazy_static! {
+    static ref SCANNED_WINDOWS: std::sync::Mutex<Vec<IdeWindow>> = std::sync::Mutex::new(Vec::new());
+}
+
 /// Scan all IDE windows using a single AppleScript call
 /// This avoids the bug where querying by PID returns incomplete results
 #[tauri::command]
@@ -159,6 +164,12 @@ async fn get_ide_windows() -> Result<Vec<IdeWindow>, String> {
         }
         
         info!("Scanned {} IDE windows", all_windows.len());
+        
+        // Update global state for tray menu
+        if let Ok(mut windows) = SCANNED_WINDOWS.lock() {
+            *windows = all_windows.clone();
+        }
+        
         Ok(all_windows)
     }
     
@@ -969,9 +980,74 @@ fn main() {
                 let quit = MenuItem::with_id(app, "quit", quit_text, true, None::<&str>).ok();
 
                 if let (Some(w), Some(s), Some(q)) = (window_toggle, settings, quit) {
-                    let menu = tauri::menu::Menu::with_items(app, &[&w, &s, &q]).ok();
-                    if let Some(m) = menu {
-                        let _ = app.tray_by_id("main-tray").unwrap().set_menu(Some(m));
+                    // Get tasks from http_server state
+                    let tasks: Vec<http_server::Task> = http_server::get_state().tasks.lock()
+                        .map(|t| t.clone())
+                        .unwrap_or_default();
+                    
+                    // Get IDE windows from global state
+                    let ide_windows: Vec<IdeWindow> = SCANNED_WINDOWS.lock()
+                        .map(|w| w.clone())
+                        .unwrap_or_default();
+                    
+                    // Build menu items
+                    let mut items: Vec<&dyn tauri::menu::IsMenuItem<tauri::Wry>> = vec![&w, &s, &q];
+                    
+                    // Add separator and tasks if any
+                    let sep1 = tauri::menu::PredefinedMenuItem::separator(app).ok();
+                    let mut task_items: Vec<MenuItem<tauri::Wry>> = Vec::new();
+                    
+                    for task in &tasks {
+                        // Status icon based on task status
+                        let status_icon = match task.status.as_str() {
+                            "running" => "🔄",
+                            "armed" => "⏳",
+                            "completed" => "✅",
+                            "error" => "❌",
+                            "cancelled" => "⏹️",
+                            _ => "•",
+                        };
+                        let title = format!("{} {} - {}", status_icon, task.name, task.status);
+                        let id = format!("task_{}", task.id);
+                        if let Ok(item) = MenuItem::with_id(app, &id, &title, false, None::<&str>) {
+                            task_items.push(item);
+                        }
+                    }
+                    
+                    // Add separator and windows
+                    let sep2 = tauri::menu::PredefinedMenuItem::separator(app).ok();
+                    let mut window_items: Vec<MenuItem<tauri::Wry>> = Vec::new();
+                    
+                    for (idx, win) in ide_windows.iter().enumerate() {
+                        let id = format!("activate_win_{}", idx);
+                        let title = format!("{} - {}", win.ide, win.window_title);
+                        if let Ok(item) = MenuItem::with_id(app, &id, &title, true, None::<&str>) {
+                            window_items.push(item);
+                        }
+                    }
+                    
+                    // Add tasks section
+                    if !task_items.is_empty() {
+                        if let Some(ref sep) = sep1 {
+                            items.push(sep);
+                        }
+                        for item in &task_items {
+                            items.push(item);
+                        }
+                    }
+                    
+                    // Add windows section
+                    if !window_items.is_empty() {
+                        if let Some(ref sep) = sep2 {
+                            items.push(sep);
+                        }
+                        for item in &window_items {
+                            items.push(item);
+                        }
+                    }
+                    
+                    if let Ok(menu) = tauri::menu::Menu::with_items(app, &items) {
+                        let _ = app.tray_by_id("main-tray").unwrap().set_menu(Some(menu));
                     }
                 }
             };
@@ -1023,7 +1099,22 @@ fn main() {
                         "quit" => {
                             app.exit(0);
                         }
-                        _ => {}
+                        other => {
+                            // Handle window activation events
+                            if other.starts_with("activate_win_") {
+                                if let Some(index_str) = other.strip_prefix("activate_win_") {
+                                    if let Ok(index) = index_str.parse::<usize>() {
+                                        let windows: Vec<IdeWindow> = SCANNED_WINDOWS.lock()
+                                            .map(|w| w.clone())
+                                            .unwrap_or_default();
+                                        if let Some(win) = windows.get(index) {
+                                            info!("Activating window from tray: {} ({})", win.window_title, win.ide);
+                                            let _ = activate_ide(&win.ide, Some(&win.window_title), None, None);
+                                        }
+                                    }
+                                }
+                            }
+                        }
                     }
                 })
                 .build(app)?;
