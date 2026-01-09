@@ -1,18 +1,16 @@
-import i18n from 'i18next';
-import { initReactI18next } from 'react-i18next';
-import Backend from 'i18next-http-backend';
+import { createI18n } from 'vue-i18n';
 
-export type SupportedLanguage = 
-  | 'en' 
-  | 'zh-CN' 
-  | 'zh-TW' 
-  | 'es' 
-  | 'fr' 
-  | 'de' 
-  | 'ja' 
-  | 'ko' 
-  | 'ru' 
-  | 'pt' 
+export type SupportedLanguage =
+  | 'en'
+  | 'zh-CN'
+  | 'zh-TW'
+  | 'es'
+  | 'fr'
+  | 'de'
+  | 'ja'
+  | 'ko'
+  | 'ru'
+  | 'pt'
   | 'ar';
 
 export interface LanguageInfo {
@@ -45,25 +43,45 @@ export const isRTL = (code: string): boolean => {
   return lang?.dir === 'rtl' || false;
 };
 
-const DEFAULT_LANGUAGE: SupportedLanguage = 'en';
+// Dynamically load locale messages
+async function loadLocaleMessages(locale: string): Promise<Record<string, any>> {
+  try {
+    const response = await fetch(`/locales/${locale}/translation.json`);
+    if (response.ok) {
+      return await response.json();
+    }
+  } catch (e) {
+    console.warn(`Failed to load locale ${locale}:`, e);
+  }
+  return {};
+}
 
-i18n
-  .use(Backend)
-  .use(initReactI18next)
-  .init({
-    supportedLngs: SUPPORTED_LANGUAGES.map(l => l.code),
-    fallbackLng: DEFAULT_LANGUAGE,
-    defaultNS: 'translation',
-    ns: ['translation'],
-    backend: {
-      loadPath: '/locales/{{lng}}/translation.json',
-    },
-    interpolation: {
-      escapeValue: false,
-    },
-    react: {
-      useSuspense: false,
-    },
-  });
+// Create i18n instance
+export const i18n = createI18n({
+  legacy: false, // Use Composition API mode
+  locale: 'en',
+  fallbackLocale: 'en',
+  messages: {},
+  globalInjection: true,
+});
 
-export { i18n };
+// Function to change language
+export async function setLanguage(locale: SupportedLanguage): Promise<void> {
+  if (!i18n.global.availableLocales.includes(locale)) {
+    const messages = await loadLocaleMessages(locale);
+    i18n.global.setLocaleMessage(locale, messages);
+  }
+  i18n.global.locale.value = locale;
+  document.documentElement.setAttribute('dir', isRTL(locale) ? 'rtl' : 'ltr');
+}
+
+// Initialize with default language
+export async function initI18n(locale: SupportedLanguage = 'en'): Promise<void> {
+  // Load default locale
+  const enMessages = await loadLocaleMessages('en');
+  i18n.global.setLocaleMessage('en', enMessages);
+
+  if (locale !== 'en') {
+    await setLanguage(locale);
+  }
+}

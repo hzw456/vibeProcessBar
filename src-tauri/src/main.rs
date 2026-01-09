@@ -985,11 +985,6 @@ fn main() {
                         .map(|t| t.clone())
                         .unwrap_or_default();
                     
-                    // Get IDE windows from global state
-                    let ide_windows: Vec<IdeWindow> = SCANNED_WINDOWS.lock()
-                        .map(|w| w.clone())
-                        .unwrap_or_default();
-                    
                     // Build menu items
                     let mut items: Vec<&dyn tauri::menu::IsMenuItem<tauri::Wry>> = vec![&w, &s, &q];
                     
@@ -1005,24 +1000,14 @@ fn main() {
                             "completed" => "✅",
                             "error" => "❌",
                             "cancelled" => "⏹️",
+                            "registered" => "📋",
+                            "active" => "👁️",
                             _ => "•",
                         };
                         let title = format!("{} {} - {}", status_icon, task.name, task.status);
                         let id = format!("task_{}", task.id);
-                        if let Ok(item) = MenuItem::with_id(app, &id, &title, false, None::<&str>) {
-                            task_items.push(item);
-                        }
-                    }
-                    
-                    // Add separator and windows
-                    let sep2 = tauri::menu::PredefinedMenuItem::separator(app).ok();
-                    let mut window_items: Vec<MenuItem<tauri::Wry>> = Vec::new();
-                    
-                    for (idx, win) in ide_windows.iter().enumerate() {
-                        let id = format!("activate_win_{}", idx);
-                        let title = format!("{} - {}", win.ide, win.window_title);
                         if let Ok(item) = MenuItem::with_id(app, &id, &title, true, None::<&str>) {
-                            window_items.push(item);
+                            task_items.push(item);
                         }
                     }
                     
@@ -1032,16 +1017,6 @@ fn main() {
                             items.push(sep);
                         }
                         for item in &task_items {
-                            items.push(item);
-                        }
-                    }
-                    
-                    // Add windows section
-                    if !window_items.is_empty() {
-                        if let Some(ref sep) = sep2 {
-                            items.push(sep);
-                        }
-                        for item in &window_items {
                             items.push(item);
                         }
                     }
@@ -1100,8 +1075,25 @@ fn main() {
                             app.exit(0);
                         }
                         other => {
+                            // Handle task activation events
+                            if other.starts_with("task_") {
+                                if let Some(task_id) = other.strip_prefix("task_") {
+                                    let tasks: Vec<http_server::Task> = http_server::get_state().tasks.lock()
+                                        .map(|t| t.clone())
+                                        .unwrap_or_default();
+                                    if let Some(task) = tasks.iter().find(|t| t.id == task_id) {
+                                        info!("Activating task from tray: {} ({})", task.name, task.ide);
+                                        let _ = activate_ide(
+                                            &task.ide,
+                                            Some(&task.window_title),
+                                            task.project_path.as_deref(),
+                                            task.active_file.as_deref()
+                                        );
+                                    }
+                                }
+                            }
                             // Handle window activation events
-                            if other.starts_with("activate_win_") {
+                            else if other.starts_with("activate_win_") {
                                 if let Some(index_str) = other.strip_prefix("activate_win_") {
                                     if let Ok(index) = index_str.parse::<usize>() {
                                         let windows: Vec<IdeWindow> = SCANNED_WINDOWS.lock()
@@ -1120,6 +1112,92 @@ fn main() {
                 .build(app)?;
 
             info!("System tray created successfully with id: {:?}", tray.id());
+
+            // Periodically check and refresh tray menu only when tasks change
+            let app_handle_for_timer = app.app_handle().clone();
+            std::thread::spawn(move || {
+                let mut last_task_snapshot: String = String::new();
+                
+                loop {
+                    std::thread::sleep(std::time::Duration::from_millis(500));
+                    
+                    // Get current tasks and create a snapshot for comparison
+                    let tasks: Vec<http_server::Task> = http_server::get_state().tasks.lock()
+                        .map(|t| t.clone())
+                        .unwrap_or_default();
+                    
+                    // Create a simple snapshot of task IDs and statuses
+                    let current_snapshot: String = tasks.iter()
+                        .map(|t| format!("{}:{}", t.id, t.status))
+                        .collect::<Vec<_>>()
+                        .join(",");
+                    
+                    // Only rebuild menu if tasks have changed
+                    if current_snapshot != last_task_snapshot {
+                        last_task_snapshot = current_snapshot;
+                        
+                        let app = &app_handle_for_timer;
+                        let window = app.get_webview_window("main");
+                        let is_visible = window.map(|w| w.is_visible().unwrap_or(true)).unwrap_or(true);
+                        
+                        let lang = {
+                            let state = app.state::<settings::SettingsState>();
+                            state.get_settings().language
+                        };
+                        let trans = get_tray_translations(lang);
+                        let window_text = if is_visible {
+                            trans.get("hideWindow").and_then(|v| v.as_str()).unwrap_or("☾ Hide Window")
+                        } else {
+                            trans.get("showWindow").and_then(|v| v.as_str()).unwrap_or("☀ Show Window")
+                        };
+                        let settings_text = trans.get("settings").and_then(|v| v.as_str()).unwrap_or("Settings");
+                        let quit_text = trans.get("quit").and_then(|v| v.as_str()).unwrap_or("Quit");
+
+                        let window_toggle = tauri::menu::MenuItem::with_id(app, "toggle-window", window_text, true, None::<&str>).ok();
+                        let settings = tauri::menu::MenuItem::with_id(app, "settings", settings_text, true, None::<&str>).ok();
+                        let quit = tauri::menu::MenuItem::with_id(app, "quit", quit_text, true, None::<&str>).ok();
+
+                        if let (Some(w), Some(s), Some(q)) = (window_toggle, settings, quit) {
+                            let mut items: Vec<&dyn tauri::menu::IsMenuItem<tauri::Wry>> = vec![&w, &s, &q];
+                            let sep1 = tauri::menu::PredefinedMenuItem::separator(app).ok();
+                            let mut task_items: Vec<tauri::menu::MenuItem<tauri::Wry>> = Vec::new();
+                            
+                            for task in &tasks {
+                                let status_icon = match task.status.as_str() {
+                                    "running" => "🔄",
+                                    "armed" => "⏳",
+                                    "completed" => "✅",
+                                    "error" => "❌",
+                                    "cancelled" => "⏹️",
+                                    "registered" => "📋",
+                                    "active" => "👁️",
+                                    _ => "•",
+                                };
+                                let title = format!("{} {} - {}", status_icon, task.name, task.status);
+                                let id = format!("task_{}", task.id);
+                                if let Ok(item) = tauri::menu::MenuItem::with_id(app, &id, &title, true, None::<&str>) {
+                                    task_items.push(item);
+                                }
+                            }
+                            
+                            if !task_items.is_empty() {
+                                if let Some(ref sep) = sep1 {
+                                    items.push(sep);
+                                }
+                                for item in &task_items {
+                                    items.push(item);
+                                }
+                            }
+                            
+                            if let Ok(menu) = tauri::menu::Menu::with_items(app, &items) {
+                                if let Some(tray) = app.tray_by_id("main-tray") {
+                                    let _ = tray.set_menu(Some(menu));
+                                }
+                            }
+                        }
+                    }
+                }
+            });
 
             Box::leak(Box::new(tray));
 

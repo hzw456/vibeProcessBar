@@ -4,6 +4,11 @@ use tokio::spawn;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tracing::{debug, info, warn, error};
 
+lazy_static::lazy_static! {
+    /// Global shared state for HTTP server, accessible by tray menu
+    static ref SHARED_STATE: Arc<SharedState> = Arc::new(SharedState::new());
+}
+
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Task {
     pub id: String,
@@ -218,20 +223,28 @@ async fn handle_connection(
                 let existing = tasks.iter_mut().find(|t| t.id == req.task_id);
                 
                 if let Some(task) = existing {
-                   task.name = req.name;
-                   task.ide = req.ide;
-                   task.window_title = req.window_title;
-                   task.status = "armed".to_string();
-                   if let Some(path) = req.project_path {
-                       task.project_path = Some(path);
+                   // Don't change running tasks to armed - they should only become completed
+                   if task.status == "running" {
+                       info!(task_id = %req.task_id, "Ignoring armed request for running task");
+                       // Just update metadata, don't change status
+                       if let Some(file) = req.active_file {
+                           task.active_file = Some(file);
+                       }
+                       // Don't change status, keep running
+                   } else {
+                       task.name = req.name;
+                       task.ide = req.ide;
+                       task.window_title = req.window_title;
+                       task.status = "armed".to_string();
+                       if let Some(path) = req.project_path {
+                           task.project_path = Some(path);
+                       }
+                       if let Some(file) = req.active_file {
+                           task.active_file = Some(file);
+                       }
+                       // Don't reset progress/tokens/start_time - preserve them for continuing tasks
+                       task.end_time = None;
                    }
-                   if let Some(file) = req.active_file {
-                       task.active_file = Some(file);
-                   }
-                   task.progress = 0;
-                   task.tokens = 0;
-                   task.start_time = 0;
-                   task.end_time = None;
                 } else {
                    let task = Task {
                         id: req.task_id.clone(),
@@ -436,7 +449,7 @@ fn extract_body(request: &str) -> String {
 }
 
 pub async fn start_server(port: u16) -> Result<(), Box<dyn std::error::Error>> {
-    let state = Arc::new(SharedState::new());
+    let state = SHARED_STATE.clone();
     let listener = tokio::net::TcpListener::bind(format!("127.0.0.1:{}", port)).await?;
     info!(port = %port, "HTTP server listening on 127.0.0.1:{}", port);
 
@@ -462,6 +475,7 @@ pub fn start_server_background(port: u16) {
     });
 }
 
+/// Get the global shared state for use by tray menu
 pub fn get_state() -> Arc<SharedState> {
-    Arc::new(SharedState::new())
+    SHARED_STATE.clone()
 }
