@@ -213,86 +213,228 @@ fn activate_ide(ide: &str, window_title: Option<&str>, project_path: Option<&str
         let script = match ide.to_lowercase().as_str() {
             // VSCode-based AI IDEs (forks with extension support)
             "cursor" => {
-                if let Some(title) = window_title {
+                let workspace_search = window_title.unwrap_or("");
+                let file_search = active_file.unwrap_or("");
+                
+                if !workspace_search.is_empty() || !file_search.is_empty() {
                     format!(
                         r#"
-                        tell application "Cursor"
-                            activate
-                            delay 0.5
-                            tell application "System Events" to keystroke "{}"
+                        tell application "System Events"
+                            set workspaceTerm to "{}"
+                            set fileTerm to "{}"
+                            set foundWindow to false
+                            -- Cursor uses process name "Cursor"
+                            repeat with p in (every application process whose name is "Cursor")
+                                try
+                                    set appPath to POSIX path of (application file of p)
+                                    if appPath contains "Cursor" then
+                                        -- First try workspace (window_title)
+                                        if workspaceTerm is not "" then
+                                            repeat with w in (every window of p)
+                                                set winTitle to title of w
+                                                if winTitle contains workspaceTerm then
+                                                    set frontmost of p to true
+                                                    perform action "AXRaise" of w
+                                                    set foundWindow to true
+                                                    exit repeat
+                                                end if
+                                            end repeat
+                                        end if
+                                        -- If workspace not found, try active_file
+                                        if not foundWindow and fileTerm is not "" then
+                                            repeat with w in (every window of p)
+                                                set winTitle to title of w
+                                                if winTitle contains fileTerm then
+                                                    set frontmost of p to true
+                                                    perform action "AXRaise" of w
+                                                    set foundWindow to true
+                                                    exit repeat
+                                                end if
+                                            end repeat
+                                        end if
+                                        if foundWindow then exit repeat
+                                    end if
+                                end try
+                            end repeat
                         end tell
+                        if not foundWindow then
+                            tell application "Cursor" to activate
+                        end if
                     "#,
-                        title
+                        workspace_search, file_search
                     )
                 } else {
                     r#"
-                    tell application "Cursor"
-                        activate
-                        delay 0.3
-                    end tell
+                    tell application "Cursor" to activate
                     "#.to_string()
                 }
             }
             "windsurf" | "codeium" | "codeium editor" => {
-                if let Some(title) = window_title {
+                let workspace_search = window_title.unwrap_or("");
+                let file_search = active_file.unwrap_or("");
+                
+                if !workspace_search.is_empty() || !file_search.is_empty() {
                     format!(
                         r#"
-                        tell application "Windsurf"
-                            activate
-                            delay 0.5
-                            tell application "System Events" to keystroke "{}"
+                        tell application "System Events"
+                            set workspaceTerm to "{}"
+                            set fileTerm to "{}"
+                            set foundWindow to false
+                            repeat with p in (every application process whose name is "Electron")
+                                try
+                                    set appPath to POSIX path of (application file of p)
+                                    if appPath contains "Windsurf" then
+                                        -- First try workspace (window_title)
+                                        if workspaceTerm is not "" then
+                                            repeat with w in (every window of p)
+                                                set winTitle to title of w
+                                                if winTitle contains workspaceTerm then
+                                                    set frontmost of p to true
+                                                    perform action "AXRaise" of w
+                                                    set foundWindow to true
+                                                    exit repeat
+                                                end if
+                                            end repeat
+                                        end if
+                                        -- If workspace not found, try active_file
+                                        if not foundWindow and fileTerm is not "" then
+                                            repeat with w in (every window of p)
+                                                set winTitle to title of w
+                                                if winTitle contains fileTerm then
+                                                    set frontmost of p to true
+                                                    perform action "AXRaise" of w
+                                                    set foundWindow to true
+                                                    exit repeat
+                                                end if
+                                            end repeat
+                                        end if
+                                        if foundWindow then exit repeat
+                                    end if
+                                end try
+                            end repeat
                         end tell
+                        if not foundWindow then
+                            tell application "Windsurf" to activate
+                        end if
                     "#,
-                        title
+                        workspace_search, file_search
                     )
                 } else {
                     r#"
-                    tell application "Windsurf"
-                        activate
-                        delay 0.3
-                    end tell
+                    tell application "Windsurf" to activate
                     "#.to_string()
                 }
             }
             "trae" => {
-                if let Some(title) = window_title {
+                // Matching priority: IDE -> workspace (window_title) -> active_file
+                let workspace_search = window_title.unwrap_or("");
+                let file_search = active_file.unwrap_or("");
+                
+                if !workspace_search.is_empty() || !file_search.is_empty() {
                     format!(
                         r#"
-                        tell application "Trae"
-                            activate
-                            delay 0.5
-                            tell application "System Events" to keystroke "{}"
+                        tell application "System Events"
+                            set workspaceTerm to "{}"
+                            set fileTerm to "{}"
+                            set foundWindow to false
+                            repeat with p in (every application process whose name is "Electron")
+                                try
+                                    set appPath to POSIX path of (application file of p)
+                                    if appPath contains "Trae" then
+                                        -- First try workspace (window_title)
+                                        if workspaceTerm is not "" then
+                                            repeat with w in (every window of p)
+                                                set winTitle to title of w
+                                                if winTitle contains workspaceTerm then
+                                                    set frontmost of p to true
+                                                    perform action "AXRaise" of w
+                                                    set foundWindow to true
+                                                    exit repeat
+                                                end if
+                                            end repeat
+                                        end if
+                                        -- If workspace not found, try active_file
+                                        if not foundWindow and fileTerm is not "" then
+                                            repeat with w in (every window of p)
+                                                set winTitle to title of w
+                                                if winTitle contains fileTerm then
+                                                    set frontmost of p to true
+                                                    perform action "AXRaise" of w
+                                                    set foundWindow to true
+                                                    exit repeat
+                                                end if
+                                            end repeat
+                                        end if
+                                        if foundWindow then exit repeat
+                                    end if
+                                end try
+                            end repeat
                         end tell
+                        if not foundWindow then
+                            tell application "Trae" to activate
+                        end if
                     "#,
-                        title
+                        workspace_search, file_search
                     )
                 } else {
                     r#"
-                    tell application "Trae"
-                        activate
-                        delay 0.3
-                    end tell
+                    tell application "Trae" to activate
                     "#.to_string()
                 }
             }
             "void" | "void editor" | "void-editor" => {
-                if let Some(title) = window_title {
+                let workspace_search = window_title.unwrap_or("");
+                let file_search = active_file.unwrap_or("");
+                
+                if !workspace_search.is_empty() || !file_search.is_empty() {
                     format!(
                         r#"
-                        tell application "Void"
-                            activate
-                            delay 0.5
-                            tell application "System Events" to keystroke "{}"
+                        tell application "System Events"
+                            set workspaceTerm to "{}"
+                            set fileTerm to "{}"
+                            set foundWindow to false
+                            repeat with p in (every application process whose name is "Electron")
+                                try
+                                    set appPath to POSIX path of (application file of p)
+                                    if appPath contains "Void" then
+                                        -- First try workspace (window_title)
+                                        if workspaceTerm is not "" then
+                                            repeat with w in (every window of p)
+                                                set winTitle to title of w
+                                                if winTitle contains workspaceTerm then
+                                                    set frontmost of p to true
+                                                    perform action "AXRaise" of w
+                                                    set foundWindow to true
+                                                    exit repeat
+                                                end if
+                                            end repeat
+                                        end if
+                                        -- If workspace not found, try active_file
+                                        if not foundWindow and fileTerm is not "" then
+                                            repeat with w in (every window of p)
+                                                set winTitle to title of w
+                                                if winTitle contains fileTerm then
+                                                    set frontmost of p to true
+                                                    perform action "AXRaise" of w
+                                                    set foundWindow to true
+                                                    exit repeat
+                                                end if
+                                            end repeat
+                                        end if
+                                        if foundWindow then exit repeat
+                                    end if
+                                end try
+                            end repeat
                         end tell
+                        if not foundWindow then
+                            tell application "Void" to activate
+                        end if
                     "#,
-                        title
+                        workspace_search, file_search
                     )
                 } else {
                     r#"
-                    tell application "Void"
-                        activate
-                        delay 0.3
-                    end tell
+                    tell application "Void" to activate
                     "#.to_string()
                 }
             }
@@ -447,25 +589,12 @@ fn activate_ide(ide: &str, window_title: Option<&str>, project_path: Option<&str
                 }
             }
             "claude" | "claude-code" => {
-                if let Some(title) = window_title {
-                    format!(
-                        r#"
-                        tell application "Claude"
-                            activate
-                            delay 0.5
-                            tell application "System Events" to keystroke "{}"
-                        end tell
-                    "#,
-                        title
-                    )
-                } else {
-                    r#"
-                    tell application "Claude"
-                        activate
-                        delay 0.3
-                    end tell
-                    "#.to_string()
-                }
+                r#"
+                tell application "Claude"
+                    activate
+                    delay 0.3
+                end tell
+                "#.to_string()
             }
             "vscode" | "visual studio code" => {
                 // Matching priority: IDE -> workspace (window_title) -> active_file
