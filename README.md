@@ -41,6 +41,14 @@ Start development server:
 npm run tauri dev
 ```
 
+## Testing
+
+Run unit tests with Vitest:
+
+```bash
+npm test
+```
+
 ## Build
 
 Build for current platform:

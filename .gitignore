@@ -18,3 +18,9 @@ src-tauri/_resources/
 src-tauri/._*
 *.icns
 !.gitignore
+
+# Common
+.env
+.env.*
+coverage/
+test-results/

@@ -62,6 +62,8 @@ const IDE_BUNDLES: &[(&str, &str)] = &[
     ("com.google.antigravity", "antigravity"),
     ("com.codeium.windsurf", "windsurf"),
     ("com.trae.app", "trae"),
+    ("com.tencent.codebuddy", "codebuddy"),
+    ("com.tencent.codebuddycn", "codebuddycn"),
 ];
 
 #[derive(serde::Serialize, Clone, Debug)]
@@ -158,6 +160,10 @@ async fn get_ide_windows() -> Result<Vec<IdeWindow>, String> {
                         "windsurf"
                     } else if app_path.contains("Trae") {
                         "trae"
+                    } else if app_path.contains("CodeBuddyCN") || app_path.contains("codebuddycn") {
+                        "codebuddycn"
+                    } else if app_path.contains("CodeBuddy") || app_path.contains("codebuddy") {
+                        "codebuddy"
                     } else {
                         "vscode"
                     };
@@ -210,7 +216,7 @@ fn activate_ide(ide: &str, window_title: Option<&str>, project_path: Option<&str
     info!("activate_ide called with ide={}, window_title={:?}, project_path={:?}, active_file={:?}", ide, window_title, project_path, active_file);
     #[cfg(target_os = "macos")]
     {
-        let script = match ide.to_lowercase().as_str() {
+        let script = match ide.trim().to_lowercase().as_str() {
             // VSCode-based AI IDEs (forks with extension support)
             "cursor" => {
                 let workspace_search = window_title.unwrap_or("");
@@ -463,12 +469,116 @@ fn activate_ide(ide: &str, window_title: Option<&str>, project_path: Option<&str
                 "#.to_string()
             }
             "codebuddy" | "code buddy" | "tencent codebuddy" => {
-                r#"
-                tell application "CodeBuddy"
-                    activate
-                    delay 0.3
-                end tell
-                "#.to_string()
+                let workspace_search = window_title.unwrap_or("");
+                let file_search = active_file.unwrap_or("");
+                
+                if !workspace_search.is_empty() || !file_search.is_empty() {
+                    format!(
+                        r#"
+                        tell application "System Events"
+                            set workspaceTerm to "{}"
+                            set fileTerm to "{}"
+                            set foundWindow to false
+                            repeat with p in (every application process whose name is "Electron")
+                                try
+                                    set appPath to POSIX path of (application file of p)
+                                    if appPath contains "CodeBuddy" and appPath does not contain "CodeBuddy CN" then
+                                        -- First try workspace (window_title)
+                                        if workspaceTerm is not "" then
+                                            repeat with w in (every window of p)
+                                                set winTitle to title of w
+                                                if winTitle contains workspaceTerm then
+                                                    set frontmost of p to true
+                                                    perform action "AXRaise" of w
+                                                    set foundWindow to true
+                                                    exit repeat
+                                                end if
+                                            end repeat
+                                        end if
+                                        -- If workspace not found, try active_file
+                                        if not foundWindow and fileTerm is not "" then
+                                            repeat with w in (every window of p)
+                                                set winTitle to title of w
+                                                if winTitle contains fileTerm then
+                                                    set frontmost of p to true
+                                                    perform action "AXRaise" of w
+                                                    set foundWindow to true
+                                                    exit repeat
+                                                end if
+                                            end repeat
+                                        end if
+                                        if foundWindow then exit repeat
+                                    end if
+                                end try
+                            end repeat
+                        end tell
+                        if not foundWindow then
+                            tell application "CodeBuddy" to activate
+                        end if
+                    "#,
+                        workspace_search, file_search
+                    )
+                } else {
+                    r#"
+                    tell application "CodeBuddy" to activate
+                    "#.to_string()
+                }
+            }
+            "codebuddycn" | "codebuddy cn" | "tencent codebuddycn" => {
+                let workspace_search = window_title.unwrap_or("");
+                let file_search = active_file.unwrap_or("");
+                
+                if !workspace_search.is_empty() || !file_search.is_empty() {
+                    format!(
+                        r#"
+                        tell application "System Events"
+                            set workspaceTerm to "{}"
+                            set fileTerm to "{}"
+                            set foundWindow to false
+                            repeat with p in (every application process whose name is "Electron")
+                                try
+                                    set appPath to POSIX path of (application file of p)
+                                    if appPath contains "CodeBuddy CN" then
+                                        -- First try workspace (window_title)
+                                        if workspaceTerm is not "" then
+                                            repeat with w in (every window of p)
+                                                set winTitle to title of w
+                                                if winTitle contains workspaceTerm then
+                                                    set frontmost of p to true
+                                                    perform action "AXRaise" of w
+                                                    set foundWindow to true
+                                                    exit repeat
+                                                end if
+                                            end repeat
+                                        end if
+                                        -- If workspace not found, try active_file
+                                        if not foundWindow and fileTerm is not "" then
+                                            repeat with w in (every window of p)
+                                                set winTitle to title of w
+                                                if winTitle contains fileTerm then
+                                                    set frontmost of p to true
+                                                    perform action "AXRaise" of w
+                                                    set foundWindow to true
+                                                    exit repeat
+                                                end if
+                                            end repeat
+                                        end if
+                                        if foundWindow then exit repeat
+                                    end if
+                                end try
+                            end repeat
+                        end tell
+                        if not foundWindow then
+                            tell application "CodeBuddy CN" to activate
+                        end if
+                    "#,
+                        workspace_search, file_search
+                    )
+                } else {
+                    r#"
+                    tell application "CodeBuddy CN" to activate
+                    "#.to_string()
+                }
             }
             "kilocode" | "kilo-code" | "kilo" => {
                 r#"
@@ -681,6 +791,7 @@ fn activate_ide(ide: &str, window_title: Option<&str>, project_path: Option<&str
             "blueberryai" | "blueberry ai" | "blueberry" => "BlueberryAI.exe",
             "aide" | "codestoryai" | "codestory ai" => "Aide.exe",
             "codebuddy" | "code buddy" | "tencent codebuddy" => "CodeBuddy.exe",
+            "codebuddycn" | "codebuddy cn" | "tencent codebuddycn" => "CodeBuddy CN.exe",
             "kilocode" | "kilo-code" | "kilo" => "Kilo Code.exe",
             "kiro" => "Kiro.exe",
             "antigravity" => "Antigravity.exe",
@@ -723,6 +834,7 @@ fn activate_ide(ide: &str, window_title: Option<&str>, project_path: Option<&str
             "blueberryai" | "blueberry ai" | "blueberry" => "BlueberryAI",
             "aide" | "codestoryai" | "codestory ai" => "Aide",
             "codebuddy" | "code buddy" | "tencent codebuddy" => "CodeBuddy",
+            "codebuddycn" | "codebuddy cn" | "tencent codebuddycn" => "CodeBuddy CN",
             "kilocode" | "kilo-code" | "kilo" => "Kilo Code",
             "kiro" => "Kiro",
             "antigravity" => "Antigravity",
@@ -1113,8 +1225,8 @@ fn main() {
             let settings_item = MenuItem::with_id(&app_handle, "settings", settings_text, true, None::<&str>)?;
             let quit_item = MenuItem::with_id(&app_handle, "quit", quit_text, true, None::<&str>)?;
 
-            let icon_bytes = include_bytes!("../icons/32x32.png");
-            let img = image::load_from_memory(icon_bytes).expect("Failed to load icon");
+            let icon_bytes = include_bytes!("../icons/tray.png");
+            let img = image::load_from_memory(icon_bytes).expect("Failed to load tray icon");
             let rgba = img.to_rgba8();
             let (width, height) = rgba.dimensions();
             let icon = tauri::image::Image::new_owned(rgba.into_raw(), width, height);

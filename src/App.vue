@@ -315,8 +315,9 @@ watch([displayTasks, isCollapsed, isCollapseTransition], async () => {
   if (isCollapseTransition.value) return;
 
   const taskCount = displayTasks.value.length;
-  const taskHeight = 36;
-  const padding = 20;
+  const taskHeight = 36;  // Row height (8px padding * 2 + ~20px content)
+  const rowGap = 6;       // Gap between rows (.multi-task-list gap)
+  const padding = 10;     // Match CSS padding (10px top + bottom)
 
   let newHeight = padding;
   if (taskCount === 0) {
@@ -324,7 +325,8 @@ watch([displayTasks, isCollapsed, isCollapseTransition], async () => {
   } else if (taskCount === 1) {
     newHeight = 70;
   } else {
-    newHeight = padding + taskCount * taskHeight;
+    // Multi-task: padding + (rows * height) + ((rows-1) * gap)
+    newHeight = padding + (taskCount * taskHeight) + ((taskCount - 1) * rowGap);
   }
 
   const width = isCollapsed.value ? 120 : 280;
