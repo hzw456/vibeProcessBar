@@ -5,7 +5,8 @@ import './StatusText.css';
 
 interface Props {
   name: string;
-  status: 'idle' | 'running' | 'completed' | 'error' | 'armed' | 'active' | 'registered';
+  status: 'armed' | 'running' | 'completed' | 'idle';
+  isFocused?: boolean;
   tokens?: number;
   ide?: string;
   elapsedTime?: string;
@@ -15,6 +16,7 @@ interface Props {
 const props = withDefaults(defineProps<Props>(), {
   tokens: 0,
   showIcon: true,
+  isFocused: false,
 });
 
 const emit = defineEmits<{
@@ -24,14 +26,13 @@ const emit = defineEmits<{
 const { t } = useI18n();
 
 const statusIcon = computed(() => {
+  // Focused window shows eye icon
+  if (props.isFocused) return '◈';
   switch (props.status) {
     case 'idle': return '○';
     case 'armed': return '◎';
-    case 'active': return '◈';
-    case 'registered': return '◇';
     case 'running': return '◉';
     case 'completed': return '✓';
-    case 'error': return '✕';
     default: return '○';
   }
 });
@@ -40,14 +41,11 @@ const statusText = computed(() => {
   switch (props.status) {
     case 'idle': return t('status.idle');
     case 'armed': return props.name || t('status.armed');
-    case 'active': return props.name || t('status.active');
-    case 'registered': return props.name || t('status.registered', 'Waiting');
     case 'running': return props.name || t('status.running');
     case 'completed':
       return props.elapsedTime
         ? t('status.completedWithTime', { taskName: props.name, elapsedTime: props.elapsedTime })
         : props.name || t('status.completed');
-    case 'error': return t('status.error');
     default: return t('status.idle');
   }
 });

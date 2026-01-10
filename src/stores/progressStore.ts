@@ -21,7 +21,8 @@ export interface ProgressTask {
   name: string;
   progress: number;
   tokens: number;
-  status: 'idle' | 'running' | 'completed' | 'error' | 'armed' | 'active' | 'registered';
+  status: 'armed' | 'running' | 'completed' | 'idle';  // simplified states
+  isFocused?: boolean;  // window has focus
   startTime: number;
   endTime?: number;
   adapter?: string;
@@ -112,7 +113,8 @@ export const useProgressStore = defineStore('progress', () => {
       name,
       progress: 0,
       tokens: 0,
-      status: 'idle',
+      status: 'armed',
+      isFocused: false,
       startTime: Date.now(),
       adapter,
       ide,
@@ -152,7 +154,7 @@ export const useProgressStore = defineStore('progress', () => {
     const task = tasks.value.find(t => t.id === id);
     if (task) {
       task.status = status;
-      if (status === 'completed' || status === 'error') {
+      if (status === 'completed') {
         task.endTime = Date.now();
       }
     }
@@ -175,7 +177,8 @@ export const useProgressStore = defineStore('progress', () => {
     if (task) {
       task.progress = 0;
       task.tokens = 0;
-      task.status = 'idle';
+      task.status = 'armed';
+      task.isFocused = false;
       task.startTime = Date.now();
       task.endTime = undefined;
     }
@@ -282,6 +285,7 @@ export const useProgressStore = defineStore('progress', () => {
             progress: apiTask.progress,
             tokens: apiTask.tokens,
             status: apiTask.status as ProgressTask['status'],
+            isFocused: apiTask.is_focused || false,
             startTime: apiTask.start_time,
             endTime: apiTask.end_time,
             ide: apiTask.ide,

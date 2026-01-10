@@ -98,7 +98,7 @@ const allDisplayItems = computed(() => {
 
 const displayTasks = computed(() =>
   allDisplayItems.value.filter(t =>
-    ['completed', 'running', 'idle', 'armed', 'active', 'registered'].includes(t.status)
+    ['completed', 'running', 'armed', 'idle'].includes(t.status)
   )
 );
 
@@ -228,9 +228,9 @@ async function handleMouseDown(event: MouseEvent) {
 
 // Get time string for task
 function getTimeStr(task: ProgressTask): string {
+  // Focused window shows eye icon
+  if (task.isFocused) return '👁';
   if (task.status === 'armed') return '⏳';
-  if (task.status === 'active') return '👁';
-  if (task.status === 'registered') return '◇';
   if (task.status === 'completed' && task.startTime > 0) {
     const elapsed = (task.endTime || Date.now()) - task.startTime;
     const minutes = Math.floor(elapsed / 60000);
@@ -246,23 +246,23 @@ function getTimeStr(task: ProgressTask): string {
   return '';
 }
 
-// Get status icon
-function getStatusIcon(status: string): string {
-  switch (status) {
+// Get status icon - checks isFocused first, then status
+function getStatusIcon(task: ProgressTask): string {
+  // Focused window shows eye icon regardless of status
+  if (task.isFocused) return '◈';
+  switch (task.status) {
     case 'running': return '◉';
     case 'completed': return '✓';
     case 'armed': return '◎';
-    case 'active': return '◈';
-    case 'registered': return '◇';
     default: return '○';
   }
 }
 
-// Track active tasks and detect completions
+// Track running/focused tasks and detect completions
 watch(() => store.tasks, (newTasks) => {
-  // Track active/running tasks
+  // Track focused/running tasks
   newTasks.forEach(task => {
-    if (task.status === 'active' || task.status === 'running') {
+    if (task.isFocused || task.status === 'running') {
       seenActiveTasks.value = new Set([...seenActiveTasks.value, task.id]);
     }
   });
@@ -371,16 +371,16 @@ onUnmounted(() => {
           { completed: task.status === 'completed' && !clickedCompletedTasks.has(task.id) },
           { 'completed-clicked': clickedCompletedTasks.has(task.id) },
           { armed: task.status === 'armed' },
-          { 'active-state': task.status === 'active' }
+          { 'focused-state': task.isFocused }
         ]"
         @click="handleTaskClick(task)"
         @dblclick="handleTaskDoubleClick(task)"
       >
         <span :class="['mini-status', `status-${task.status}`]">
-          {{ getStatusIcon(task.status) }}
+          {{ getStatusIcon(task) }}
         </span>
         <span class="task-name-mini">{{ task.name }}</span>
-        <span :class="['task-time-mini', { 'completed-time': task.status === 'completed', 'armed-time': task.status === 'armed', 'active-time': task.status === 'active' }]">
+        <span :class="['task-time-mini', { 'completed-time': task.status === 'completed', 'armed-time': task.status === 'armed', 'focused-time': task.isFocused }]">
           {{ task.status === 'completed' ? `✓ ${getTimeStr(task)}` : getTimeStr(task) }}
         </span>
         <span v-if="task.ide" class="ide-badge-mini">{{ task.ide }}</span>
@@ -397,6 +397,7 @@ onUnmounted(() => {
         v-else-if="currentTask"
         :status="currentTask.status"
         :name="currentTask.name"
+        :is-focused="currentTask.isFocused"
         :elapsed-time="getTimeStr(currentTask)"
         :show-icon="true"
       />

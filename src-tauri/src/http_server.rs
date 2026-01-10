@@ -16,13 +16,15 @@ pub struct Task {
     pub name: String,
     pub progress: u32,
     pub tokens: u64,
-    pub status: String,
+    pub status: String,  // registered, armed, running, completed
+    pub is_focused: bool,  // 窗口是否有焦点
     pub ide: String,
     pub window_title: String,
     pub start_time: u64,
     pub end_time: Option<u64>,
     pub project_path: Option<String>,
     pub active_file: Option<String>,
+    pub source: String,  // "plugin" or "mcp" - 上报来源
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -151,7 +153,8 @@ async fn handle_connection(
                    task.name = req.name;
                    task.ide = req.ide;
                    task.window_title = req.window_title;
-                   task.status = "registered".to_string();
+                   task.status = "armed".to_string();  // registered -> armed immediately
+                   task.is_focused = false;
                    if let Some(path) = req.project_path {
                        task.project_path = Some(path);
                    }
@@ -169,13 +172,15 @@ async fn handle_connection(
                         name: req.name,
                         progress: 0,
                         tokens: 0,
-                        status: "registered".to_string(),
+                        status: "armed".to_string(),  // registered -> armed immediately
+                        is_focused: false,
                         ide: req.ide,
                         window_title: req.window_title,
                         start_time: 0,
                         end_time: None,
                         project_path: req.project_path,
                         active_file: req.active_file,
+                        source: "plugin".to_string(),
                     };
                     tasks.push(task);
                 }
@@ -236,6 +241,7 @@ async fn handle_connection(
                        task.ide = req.ide;
                        task.window_title = req.window_title;
                        task.status = "armed".to_string();
+                       task.is_focused = false;  // Lost focus
                        if let Some(path) = req.project_path {
                            task.project_path = Some(path);
                        }
@@ -253,12 +259,14 @@ async fn handle_connection(
                         progress: 0,
                         tokens: 0,
                         status: "armed".to_string(),
+                        is_focused: false,
                         ide: req.ide,
                         window_title: req.window_title,
                         start_time: 0,
                         end_time: None,
                         project_path: req.project_path,
                         active_file: req.active_file,
+                        source: "plugin".to_string(),
                     };
                     tasks.push(task);
                 }
@@ -294,12 +302,14 @@ async fn handle_connection(
                         progress: 0,
                         tokens: 0,
                         status: "running".to_string(),
+                        is_focused: false,
                         ide: req.ide,
                         window_title: req.window_title,
                         start_time: chrono::Utc::now().timestamp_millis() as u64,
                         end_time: None,
                         project_path: req.project_path,
                         active_file: req.active_file,
+                        source: "plugin".to_string(),
                     };
                     tasks.push(task);
                 }
@@ -393,13 +403,13 @@ async fn handle_connection(
             Err(e) => format_response(400, &format!(r#"{{"error":"Invalid request: {}"}}"#, e))
         }
     } else if request.starts_with("POST /api/task/active") {
-        // ACTIVE state - window has focus, task is visible but not running
+        // ACTIVE/FOCUS state - window has focus, only update is_focused flag
         match serde_json::from_str::<CancelRequest>(&body) {
             Ok(req) => {
                 let mut tasks = state.tasks.lock().unwrap();
                 let found = tasks.iter_mut().find(|t| t.id == req.task_id);
                 if let Some(task) = found {
-                    task.status = "active".to_string();
+                    task.is_focused = true;  // Only set focus, don't change status
                     format_response(200, r#"{"status":"ok"}"#)
                 } else {
                     format_response(404, r#"{"error":"Task not found"}"#)
@@ -415,6 +425,9 @@ async fn handle_connection(
     } else if request.starts_with("OPTIONS") {
         // Handle CORS preflight
         format_cors_response()
+    } else if request.starts_with("POST /mcp") {
+        // MCP JSON-RPC handler
+        handle_mcp_request(&body, state)
     } else {
         format_response(404, r#"{"error":"Not found"}"#)
     };
@@ -446,6 +459,193 @@ fn extract_body(request: &str) -> String {
     } else {
         String::new()
     }
+}
+
+/// MCP JSON-RPC request structure
+#[derive(Deserialize, Debug)]
+struct McpRequest {
+    jsonrpc: String,
+    id: Option<serde_json::Value>,
+    method: String,
+    params: Option<serde_json::Value>,
+}
+
+/// Handle MCP JSON-RPC requests
+fn handle_mcp_request(body: &str, state: &Arc<SharedState>) -> String {
+    let req: McpRequest = match serde_json::from_str(body) {
+        Ok(r) => r,
+        Err(e) => {
+            return format_response(400, &serde_json::json!({
+                "jsonrpc": "2.0",
+                "error": {"code": -32700, "message": format!("Parse error: {}", e)},
+                "id": null
+            }).to_string());
+        }
+    };
+
+    let result = match req.method.as_str() {
+        "initialize" => {
+            // MCP initialize response
+            serde_json::json!({
+                "protocolVersion": "2024-11-05",
+                "capabilities": {
+                    "tools": {}
+                },
+                "serverInfo": {
+                    "name": "vibe-process-bar",
+                    "version": env!("CARGO_PKG_VERSION")
+                },
+                "instructions": r#"Vibe Process Bar - AI任务状态追踪器。
+
+使用方法：
+1. 任务开始时：调用 update_task_status(task_id, "running")
+2. 任务完成时：调用 update_task_status(task_id, "completed")  
+3. 任务出错时：调用 update_task_status(task_id, "error")
+
+task_id 格式为 "{ide}_{workspace名}"，例如 "antigravity_myproject"。
+可以先调用 list_tasks 获取当前任务列表及其 task_id。
+
+状态值：running(进行中), completed(已完成), error(出错), cancelled(已取消)"#
+            })
+        }
+        "notifications/initialized" => {
+            // Client initialized notification - no response needed for notifications
+            return format_response(200, &serde_json::json!({
+                "jsonrpc": "2.0",
+                "result": {},
+                "id": req.id
+            }).to_string());
+        }
+        "tools/list" => {
+            // Return available tools
+            serde_json::json!({
+                "tools": [
+                    {
+                        "name": "list_tasks",
+                        "description": "Get all IDE windows/tasks with their UUID, IDE name, workspace name, active file, and status",
+                        "inputSchema": {
+                            "type": "object",
+                            "properties": {},
+                            "required": []
+                        }
+                    },
+                    {
+                        "name": "update_task_status",
+                        "description": "Update a task's status. Valid statuses: running, completed, error, cancelled, armed, active",
+                        "inputSchema": {
+                            "type": "object",
+                            "properties": {
+                                "task_id": {
+                                    "type": "string",
+                                    "description": "The task ID to update"
+                                },
+                                "status": {
+                                    "type": "string",
+                                    "description": "New status: running, completed, error, cancelled, armed, or active"
+                                }
+                            },
+                            "required": ["task_id", "status"]
+                        }
+                    }
+                ]
+            })
+        }
+        "tools/call" => {
+            // Call a tool
+            let params = req.params.unwrap_or(serde_json::json!({}));
+            let tool_name = params.get("name").and_then(|v| v.as_str()).unwrap_or("");
+            let arguments = params.get("arguments").cloned().unwrap_or(serde_json::json!({}));
+            
+            match tool_name {
+                "list_tasks" => {
+                    let tasks = state.tasks.lock().unwrap();
+                    let task_list: Vec<serde_json::Value> = tasks.iter().map(|t| {
+                        serde_json::json!({
+                            "id": t.id,
+                            "ide": t.ide,
+                            "window_title": t.window_title,
+                            "active_file": t.active_file,
+                            "status": t.status,
+                            "progress": t.progress,
+                            "tokens": t.tokens,
+                            "source": t.source
+                        })
+                    }).collect();
+                    
+                    info!("MCP list_tasks: returning {} tasks", task_list.len());
+                    serde_json::json!({
+                        "content": [{
+                            "type": "text",
+                            "text": serde_json::to_string_pretty(&task_list).unwrap_or("[]".to_string())
+                        }]
+                    })
+                }
+                "update_task_status" => {
+                    let task_id = arguments.get("task_id").and_then(|v| v.as_str()).unwrap_or("");
+                    let status = arguments.get("status").and_then(|v| v.as_str()).unwrap_or("");
+                    
+                    let valid_statuses = ["running", "completed", "error", "cancelled", "armed", "active", "registered"];
+                    if !valid_statuses.contains(&status) {
+                        return format_response(200, &serde_json::json!({
+                            "jsonrpc": "2.0",
+                            "error": {"code": -32602, "message": format!("Invalid status '{}'. Valid: {:?}", status, valid_statuses)},
+                            "id": req.id
+                        }).to_string());
+                    }
+                    
+                    let mut tasks = state.tasks.lock().unwrap();
+                    if let Some(task) = tasks.iter_mut().find(|t| t.id == task_id) {
+                        let old_status = task.status.clone();
+                        task.status = status.to_string();
+                        task.source = "mcp".to_string();  // 标记为MCP上报
+                        
+                        if status == "running" && task.start_time == 0 {
+                            task.start_time = chrono::Utc::now().timestamp_millis() as u64;
+                        } else if status == "completed" || status == "error" || status == "cancelled" {
+                            task.end_time = Some(chrono::Utc::now().timestamp_millis() as u64);
+                            if status == "completed" {
+                                task.progress = 100;
+                            }
+                        }
+                        
+                        info!("MCP update_task_status: {} {} -> {}", task_id, old_status, status);
+                        serde_json::json!({
+                            "content": [{
+                                "type": "text",
+                                "text": format!("Task {} status updated: {} -> {}", task_id, old_status, status)
+                            }]
+                        })
+                    } else {
+                        return format_response(200, &serde_json::json!({
+                            "jsonrpc": "2.0",
+                            "error": {"code": -32602, "message": format!("Task not found: {}", task_id)},
+                            "id": req.id
+                        }).to_string());
+                    }
+                }
+                _ => {
+                    return format_response(200, &serde_json::json!({
+                        "jsonrpc": "2.0",
+                        "error": {"code": -32601, "message": format!("Unknown tool: {}", tool_name)},
+                        "id": req.id
+                    }).to_string());
+                }
+            }
+        }
+        _ => {
+            return format_response(200, &serde_json::json!({
+                "jsonrpc": "2.0",
+                "error": {"code": -32601, "message": format!("Method not found: {}", req.method)},
+                "id": req.id
+            }).to_string());
+        }
+    };
+
+    format_response(200, &serde_json::json!({
+        "jsonrpc": "2.0",
+        "result": result,
+        "id": req.id
+    }).to_string())
 }
 
 pub async fn start_server(port: u16) -> Result<(), Box<dyn std::error::Error>> {

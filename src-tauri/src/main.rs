@@ -321,26 +321,26 @@ fn activate_ide(ide: &str, window_title: Option<&str>, project_path: Option<&str
                 "#.to_string()
             }
             "kiro" => {
-                // Build AppleScript with fallback: try active_file first, then window_title
-                let primary_search = active_file.unwrap_or("");
-                let fallback_search = window_title.unwrap_or("");
+                // Matching priority: IDE -> workspace (window_title) -> active_file
+                let workspace_search = window_title.unwrap_or("");
+                let file_search = active_file.unwrap_or("");
                 
-                if !primary_search.is_empty() || !fallback_search.is_empty() {
+                if !workspace_search.is_empty() || !file_search.is_empty() {
                     format!(
                         r#"
                         tell application "System Events"
-                            set primaryTerm to "{}"
-                            set fallbackTerm to "{}"
+                            set workspaceTerm to "{}"
+                            set fileTerm to "{}"
                             set foundWindow to false
                             repeat with p in (every application process whose name is "Electron")
                                 try
                                     set appPath to POSIX path of (application file of p)
                                     if appPath contains "Kiro" then
-                                        -- First try primary search term (active_file)
-                                        if primaryTerm is not "" then
+                                        -- First try workspace (window_title)
+                                        if workspaceTerm is not "" then
                                             repeat with w in (every window of p)
                                                 set winTitle to title of w
-                                                if winTitle contains primaryTerm then
+                                                if winTitle contains workspaceTerm then
                                                     set frontmost of p to true
                                                     perform action "AXRaise" of w
                                                     set foundWindow to true
@@ -348,11 +348,11 @@ fn activate_ide(ide: &str, window_title: Option<&str>, project_path: Option<&str
                                                 end if
                                             end repeat
                                         end if
-                                        -- If not found, try fallback search term (window_title)
-                                        if not foundWindow and fallbackTerm is not "" then
+                                        -- If workspace not found, try active_file
+                                        if not foundWindow and fileTerm is not "" then
                                             repeat with w in (every window of p)
                                                 set winTitle to title of w
-                                                if winTitle contains fallbackTerm then
+                                                if winTitle contains fileTerm then
                                                     set frontmost of p to true
                                                     perform action "AXRaise" of w
                                                     set foundWindow to true
@@ -367,7 +367,7 @@ fn activate_ide(ide: &str, window_title: Option<&str>, project_path: Option<&str
                         end tell
                         tell application "Kiro" to activate
                     "#,
-                        primary_search, fallback_search
+                        workspace_search, file_search
                     )
                 } else {
                     r#"
@@ -376,26 +376,26 @@ fn activate_ide(ide: &str, window_title: Option<&str>, project_path: Option<&str
                 }
             }
             "antigravity" => {
-                // Build AppleScript with fallback: try active_file first, then window_title
-                let primary_search = active_file.unwrap_or("");
-                let fallback_search = window_title.unwrap_or("");
+                // Matching priority: IDE -> workspace (window_title) -> active_file
+                let workspace_search = window_title.unwrap_or("");
+                let file_search = active_file.unwrap_or("");
                 
-                if !primary_search.is_empty() || !fallback_search.is_empty() {
+                if !workspace_search.is_empty() || !file_search.is_empty() {
                     format!(
                         r#"
                         tell application "System Events"
-                            set primaryTerm to "{}"
-                            set fallbackTerm to "{}"
+                            set workspaceTerm to "{}"
+                            set fileTerm to "{}"
                             set foundWindow to false
                             repeat with p in (every application process whose name is "Electron")
                                 try
                                     set appPath to POSIX path of (application file of p)
                                     if appPath contains "Antigravity" then
-                                        -- First try primary search term (active_file)
-                                        if primaryTerm is not "" then
+                                        -- First try workspace (window_title)
+                                        if workspaceTerm is not "" then
                                             repeat with w in (every window of p)
                                                 set winTitle to title of w
-                                                if winTitle contains primaryTerm then
+                                                if winTitle contains workspaceTerm then
                                                     set frontmost of p to true
                                                     perform action "AXRaise" of w
                                                     set foundWindow to true
@@ -403,11 +403,11 @@ fn activate_ide(ide: &str, window_title: Option<&str>, project_path: Option<&str
                                                 end if
                                             end repeat
                                         end if
-                                        -- If not found, try fallback search term (window_title)
-                                        if not foundWindow and fallbackTerm is not "" then
+                                        -- If workspace not found, try active_file
+                                        if not foundWindow and fileTerm is not "" then
                                             repeat with w in (every window of p)
                                                 set winTitle to title of w
-                                                if winTitle contains fallbackTerm then
+                                                if winTitle contains fileTerm then
                                                     set frontmost of p to true
                                                     perform action "AXRaise" of w
                                                     set foundWindow to true
@@ -422,7 +422,7 @@ fn activate_ide(ide: &str, window_title: Option<&str>, project_path: Option<&str
                         end tell
                         tell application "Antigravity" to activate
                     "#,
-                        primary_search, fallback_search
+                        workspace_search, file_search
                     )
                 } else {
                     r#"
@@ -452,27 +452,45 @@ fn activate_ide(ide: &str, window_title: Option<&str>, project_path: Option<&str
                 }
             }
             "vscode" | "visual studio code" => {
-                // Prefer matching by active_file if provided, fallback to window_title
-                let search_term = active_file.or(window_title);
-                if let Some(search) = search_term {
+                // Matching priority: IDE -> workspace (window_title) -> active_file
+                let workspace_search = window_title.unwrap_or("");
+                let file_search = active_file.unwrap_or("");
+                
+                if !workspace_search.is_empty() || !file_search.is_empty() {
                     format!(
                         r#"
                         tell application "System Events"
-                            set searchTerm to "{}"
+                            set workspaceTerm to "{}"
+                            set fileTerm to "{}"
                             set foundWindow to false
                             repeat with p in (every application process whose name is "Electron")
                                 try
                                     set appPath to POSIX path of (application file of p)
                                     if appPath contains "Visual Studio Code" then
-                                        repeat with w in (every window of p)
-                                            set winTitle to title of w
-                                            if winTitle contains searchTerm then
-                                                set frontmost of p to true
-                                                perform action "AXRaise" of w
-                                                set foundWindow to true
-                                                exit repeat
-                                            end if
-                                        end repeat
+                                        -- First try workspace (window_title)
+                                        if workspaceTerm is not "" then
+                                            repeat with w in (every window of p)
+                                                set winTitle to title of w
+                                                if winTitle contains workspaceTerm then
+                                                    set frontmost of p to true
+                                                    perform action "AXRaise" of w
+                                                    set foundWindow to true
+                                                    exit repeat
+                                                end if
+                                            end repeat
+                                        end if
+                                        -- If workspace not found, try active_file
+                                        if not foundWindow and fileTerm is not "" then
+                                            repeat with w in (every window of p)
+                                                set winTitle to title of w
+                                                if winTitle contains fileTerm then
+                                                    set frontmost of p to true
+                                                    perform action "AXRaise" of w
+                                                    set foundWindow to true
+                                                    exit repeat
+                                                end if
+                                            end repeat
+                                        end if
                                         if foundWindow then exit repeat
                                     end if
                                 end try
@@ -480,7 +498,7 @@ fn activate_ide(ide: &str, window_title: Option<&str>, project_path: Option<&str
                         end tell
                         tell application "Visual Studio Code" to activate
                     "#,
-                        search
+                        workspace_search, file_search
                     )
                 } else {
                     r#"
