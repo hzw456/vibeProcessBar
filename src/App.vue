@@ -64,9 +64,19 @@ const allDisplayItems = computed(() => {
   const items = [...store.tasks];
   
   ideWindows.value.forEach(win => {
+    // Extract project name from window title (format: "filename — ProjectName" or just "ProjectName")
+    const winTitleParts = win.window_title.split(' — ');
+    const projectName = winTitleParts.length > 1 ? winTitleParts[winTitleParts.length - 1] : win.window_title;
+    
     const existingTask = store.tasks.find(t =>
       t.ide === win.ide &&
-      (t.windowTitle === win.window_title || win.window_title.includes(t.windowTitle || ''))
+      (
+        t.windowTitle === win.window_title ||
+        t.windowTitle === projectName ||
+        win.window_title.includes(t.windowTitle || '') ||
+        projectName.includes(t.windowTitle || '') ||
+        (t.windowTitle || '').includes(projectName)
+      )
     );
     if (!existingTask) {
       const virtualTask: ProgressTask = {
@@ -228,8 +238,7 @@ async function handleMouseDown(event: MouseEvent) {
 
 // Get time string for task
 function getTimeStr(task: ProgressTask): string {
-  // Focused window shows eye icon
-  if (task.isFocused) return '👁';
+  // Focused state does NOT affect time display - only the icon changes
   if (task.status === 'armed') return '⏳';
   if (task.status === 'completed' && task.startTime > 0) {
     const elapsed = (task.endTime || Date.now()) - task.startTime;
@@ -246,16 +255,29 @@ function getTimeStr(task: ProgressTask): string {
   return '';
 }
 
-// Get status icon - checks isFocused first, then status
+// Get status icon - focused state shows eye icon, otherwise based on status
 function getStatusIcon(task: ProgressTask): string {
-  // Focused window shows eye icon regardless of status
-  if (task.isFocused) return '◈';
+  // Focused window shows eye icon (only icon changes, not other styles)
+  if (task.isFocused) return '👁';
   switch (task.status) {
     case 'running': return '◉';
     case 'completed': return '✓';
     case 'armed': return '◎';
     default: return '○';
   }
+}
+
+// Get display name without IDE prefix (uses backend-provided displayName or fallback)
+function getDisplayName(task: ProgressTask): string {
+  // Use displayName from backend if available
+  if (task.displayName) {
+    return task.displayName;
+  }
+  // Fallback: remove IDE prefix locally
+  if (task.ide && task.name.startsWith(`${task.ide} - `)) {
+    return task.name.substring(task.ide.length + 3);
+  }
+  return task.name;
 }
 
 // Track running/focused tasks and detect completions
@@ -267,17 +289,21 @@ watch(() => store.tasks, (newTasks) => {
     }
   });
 
-  // Detect completions
+  // Note: completed + focused -> armed transition is now handled by backend
+  // in the /api/task/active endpoint when the extension sends heartbeat
+
+  // Detect completions - show completion notification for background tasks
   newTasks.forEach(task => {
     const prevTask = prevTasks.value.find(t => t.id === task.id);
     if (prevTask && prevTask.status !== 'completed' && task.status === 'completed') {
+      // Show completion notification only for background tasks (not seen active)
       if (!seenActiveTasks.value.has(task.id)) {
         completedTask.value = task.id;
         setTimeout(() => { completedTask.value = null; }, 3000);
       }
-      if (seenActiveTasks.value.has(task.id)) {
-        clickedCompletedTasks.value = new Set([...clickedCompletedTasks.value, task.id]);
-      }
+      // Note: Do NOT add to clickedCompletedTasks here
+      // Green border should always show for completed tasks
+      // clickedCompletedTasks is only updated on handleTaskDoubleClick
     }
   });
 
@@ -379,11 +405,19 @@ onUnmounted(() => {
         <span :class="['mini-status', `status-${task.status}`]">
           {{ getStatusIcon(task) }}
         </span>
-        <span class="task-name-mini">{{ task.name }}</span>
-        <span :class="['task-time-mini', { 'completed-time': task.status === 'completed', 'armed-time': task.status === 'armed', 'focused-time': task.isFocused }]">
-          {{ task.status === 'completed' ? `✓ ${getTimeStr(task)}` : getTimeStr(task) }}
-        </span>
-        <span v-if="task.ide" class="ide-badge-mini">{{ task.ide }}</span>
+        <!-- Collapsed: show status + IDE badge -->
+        <template v-if="isCollapsed">
+          <span v-if="task.ide" class="ide-badge-mini">{{ task.ide }}</span>
+          <span v-else class="task-ide-collapsed" :title="task.name">{{ task.name }}</span>
+        </template>
+        <!-- Expanded: show task name without IDE prefix -->
+        <template v-else>
+          <span class="task-name-mini">{{ getDisplayName(task) }}</span>
+          <span :class="['task-time-mini', { 'completed-time': task.status === 'completed', 'armed-time': task.status === 'armed' }]">
+            {{ task.status === 'completed' ? `✓ ${getTimeStr(task)}` : getTimeStr(task) }}
+          </span>
+          <span v-if="task.ide" class="ide-badge-mini">{{ task.ide }}</span>
+        </template>
       </div>
     </div>
 
@@ -393,6 +427,15 @@ onUnmounted(() => {
         <span class="app-icon">{{ t('app.icon') }}</span>
         <span class="app-title">{{ t('app.title') }}</span>
       </div>
+      <!-- Collapsed: show status + IDE badge -->
+      <div v-else-if="isCollapsed && currentTask" class="collapsed-single-task">
+        <span :class="['mini-status', `status-${currentTask.status}`]">
+          {{ getStatusIcon(currentTask) }}
+        </span>
+        <span v-if="currentTask.ide" class="ide-badge-mini">{{ currentTask.ide }}</span>
+        <span v-else class="task-ide-collapsed" :title="currentTask.name">{{ currentTask.name }}</span>
+      </div>
+      <!-- Expanded: show full status text -->
       <StatusText
         v-else-if="currentTask"
         :status="currentTask.status"

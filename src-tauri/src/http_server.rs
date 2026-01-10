@@ -12,8 +12,10 @@ lazy_static::lazy_static! {
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Task {
     pub id: String,
-    pub window_id: Option<String>,  // UUID 用于精确匹配窗口
+    
     pub name: String,
+    #[serde(default, skip_deserializing)]
+    pub display_name: String,  // 显示名称 (去掉 IDE 前缀)
     pub progress: u32,
     pub tokens: u64,
     pub status: String,  // registered, armed, running, completed
@@ -24,13 +26,15 @@ pub struct Task {
     pub end_time: Option<u64>,
     pub project_path: Option<String>,
     pub active_file: Option<String>,
-    pub source: String,  // "plugin" or "mcp" - 上报来源
+    pub source: String,  // "hook", "mcp", or "plugin" - 上报来源 (priority: hook > mcp > plugin)
+    #[serde(default)]
+    pub last_heartbeat: u64,  // 最后心跳时间戳 (毫秒)
 }
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct RegisterTaskRequest {
     pub task_id: String,
-    pub window_id: Option<String>,
+    
     pub name: String,
     pub ide: String,
     pub window_title: String,
@@ -41,7 +45,7 @@ pub struct RegisterTaskRequest {
 #[derive(Serialize, Deserialize, Debug)]
 pub struct UpdateTaskRequest {
     pub task_id: String,
-    pub window_id: Option<String>,
+    
     pub name: Option<String>,
     pub ide: Option<String>,
     pub window_title: Option<String>,
@@ -52,7 +56,7 @@ pub struct UpdateTaskRequest {
 #[derive(Serialize, Deserialize, Debug)]
 pub struct StartTaskRequest {
     pub task_id: String,
-    pub window_id: Option<String>,
+    
     pub name: String,
     pub ide: String,
     pub window_title: String,
@@ -76,7 +80,7 @@ pub struct TokenRequest {
 #[derive(Serialize, Deserialize, Debug)]
 pub struct CompleteRequest {
     pub task_id: String,
-    pub window_id: Option<String>,
+    
     pub total_tokens: Option<u64>,
 }
 
@@ -89,13 +93,25 @@ pub struct ErrorRequest {
 #[derive(Serialize, Deserialize, Debug)]
 pub struct CancelRequest {
     pub task_id: String,
-    pub window_id: Option<String>,
+    
     pub status: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct ResetRequest {
     pub task_id: Option<String>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct ActiveNotificationRequest {
+    pub task_id: String,
+    
+    pub name: String,
+    pub ide: String,
+    pub window_title: String,
+    pub project_path: Option<String>,
+    pub active_file: Option<String>,
+    pub status: Option<String>,  // Extension sends this extra field
 }
 
 pub struct SharedState {
@@ -109,6 +125,43 @@ impl SharedState {
             tasks: Mutex::new(Vec::new()),
             current_task_id: Mutex::new(None),
         }
+    }
+}
+
+/// Source priority: hook (highest) > mcp > plugin (lowest)
+fn get_source_priority(source: &str) -> u8 {
+    match source {
+        "hook" => 3,
+        "mcp" => 2,
+        "plugin" => 1,
+        _ => 0,
+    }
+}
+
+/// Check if the new source can update the task (only if higher or equal priority)
+fn can_update_source(current_source: &str, new_source: &str) -> bool {
+    get_source_priority(new_source) >= get_source_priority(current_source)
+}
+
+/// Sort tasks by source priority (highest first), then by id for stability
+fn sort_tasks_by_priority(tasks: &mut Vec<Task>) {
+    tasks.sort_by(|a, b| {
+        let priority_cmp = get_source_priority(&b.source).cmp(&get_source_priority(&a.source));
+        if priority_cmp == std::cmp::Ordering::Equal {
+            a.id.cmp(&b.id)
+        } else {
+            priority_cmp
+        }
+    });
+}
+
+/// Calculate display name by removing IDE prefix (e.g., "Cursor - project" -> "project")
+fn get_display_name(name: &str, ide: &str) -> String {
+    let prefix = format!("{} - ", ide);
+    if name.starts_with(&prefix) {
+        name[prefix.len()..].to_string()
+    } else {
+        name.to_string()
     }
 }
 
@@ -130,15 +183,39 @@ async fn handle_connection(
     debug!(body = %body_summary, "Request body");
 
     let response = if request.starts_with("GET /api/status") {
-        let tasks = state.tasks.lock().unwrap();
+        let now = chrono::Utc::now().timestamp_millis() as u64;
+        const HEARTBEAT_TIMEOUT_MS: u64 = 15000;  // 15 seconds
+        
+        // Clean up stale tasks (no heartbeat for 15 seconds)
+        {
+            let mut tasks = state.tasks.lock().unwrap();
+            let before_count = tasks.len();
+            tasks.retain(|t| {
+                // Keep tasks with recent heartbeat or that haven't been registered yet (last_heartbeat == 0 means just created)
+                let age = if t.last_heartbeat > 0 { now.saturating_sub(t.last_heartbeat) } else { 0 };
+                age < HEARTBEAT_TIMEOUT_MS
+            });
+            let removed = before_count - tasks.len();
+            if removed > 0 {
+                info!("Cleaned up {} stale tasks (no heartbeat for {}ms)", removed, HEARTBEAT_TIMEOUT_MS);
+            }
+        }
+        
+        let mut tasks_vec = state.tasks.lock().unwrap().clone();
+        // Sort tasks by source priority (hook > mcp > plugin)
+        sort_tasks_by_priority(&mut tasks_vec);
+        // Calculate display_name for each task
+        for task in &mut tasks_vec {
+            task.display_name = get_display_name(&task.name, &task.ide);
+        }
         let current_task_id = state.current_task_id.lock().unwrap();
         let current_task = current_task_id.as_ref()
-            .and_then(|id| tasks.iter().find(|t| t.id == *id))
+            .and_then(|id| tasks_vec.iter().find(|t| t.id == *id))
             .cloned();
         let resp = serde_json::json!({
             "currentTask": current_task,
-            "tasks": *tasks,
-            "taskCount": tasks.len()
+            "tasks": tasks_vec,
+            "taskCount": tasks_vec.len()
         });
         format_response(200, &resp.to_string())
     } else if request.starts_with("POST /api/task/register") {
@@ -150,26 +227,39 @@ async fn handle_connection(
                 let existing = tasks.iter_mut().find(|t| t.id == req.task_id);
                 
                 if let Some(task) = existing {
-                   task.name = req.name;
-                   task.ide = req.ide;
-                   task.window_title = req.window_title;
-                   task.status = "armed".to_string();  // registered -> armed immediately
-                   task.is_focused = false;
-                   if let Some(path) = req.project_path {
-                       task.project_path = Some(path);
+                   // Always update heartbeat when receiving register notification
+                   task.last_heartbeat = chrono::Utc::now().timestamp_millis() as u64;
+                   
+                   // Check source priority - only update if plugin has >= priority
+                   if !can_update_source(&task.source, "plugin") {
+                       info!(task_id = %req.task_id, current_source = %task.source, "Ignoring plugin register - lower priority than current source");
+                       format_response(200, r#"{"status":"ignored","reason":"lower_priority_source"}"#)
+                   } else {
+                       task.name = req.name;
+                       task.ide = req.ide;
+                       task.window_title = req.window_title;
+                       task.status = "armed".to_string();  // registered -> armed immediately
+                       task.is_focused = false;
+                       if let Some(path) = req.project_path {
+                           task.project_path = Some(path);
+                       }
+                       if let Some(file) = req.active_file {
+                           task.active_file = Some(file);
+                       }
+                       task.progress = 0;
+                       task.tokens = 0;
+                       task.start_time = 0;
+                       task.end_time = None;
+                       drop(tasks);  // Release lock before setting current_task_id
+                       *state.current_task_id.lock().unwrap() = Some(req.task_id);
+                       format_response(200, r#"{"status":"ok"}"#)
                    }
-                   if let Some(file) = req.active_file {
-                       task.active_file = Some(file);
-                   }
-                   task.progress = 0;
-                   task.tokens = 0;
-                   task.start_time = 0;
-                   task.end_time = None;
                 } else {
                    let task = Task {
                         id: req.task_id.clone(),
-                        window_id: req.window_id.clone(),
+                        
                         name: req.name,
+                        display_name: String::new(),  // Computed on API response
                         progress: 0,
                         tokens: 0,
                         status: "armed".to_string(),  // registered -> armed immediately
@@ -181,11 +271,13 @@ async fn handle_connection(
                         project_path: req.project_path,
                         active_file: req.active_file,
                         source: "plugin".to_string(),
+                        last_heartbeat: chrono::Utc::now().timestamp_millis() as u64,
                     };
                     tasks.push(task);
+                    drop(tasks);  // Release lock before setting current_task_id
+                    *state.current_task_id.lock().unwrap() = Some(req.task_id);
+                    format_response(200, r#"{"status":"ok"}"#)
                 }
-                *state.current_task_id.lock().unwrap() = Some(req.task_id);
-                format_response(200, r#"{"status":"ok"}"#)
             }
             Err(e) => format_response(400, &format!(r#"{{"error":"Invalid request: {}"}}"#, e))
         }
@@ -228,34 +320,47 @@ async fn handle_connection(
                 let existing = tasks.iter_mut().find(|t| t.id == req.task_id);
                 
                 if let Some(task) = existing {
-                   // Don't change running tasks to armed - they should only become completed
-                   if task.status == "running" {
-                       info!(task_id = %req.task_id, "Ignoring armed request for running task");
-                       // Just update metadata, don't change status
-                       if let Some(file) = req.active_file {
-                           task.active_file = Some(file);
-                       }
-                       // Don't change status, keep running
+                   // Always update heartbeat when receiving armed notification
+                   task.last_heartbeat = chrono::Utc::now().timestamp_millis() as u64;
+                   
+                   // Check source priority - only update if plugin has >= priority
+                   if !can_update_source(&task.source, "plugin") {
+                       info!(task_id = %req.task_id, current_source = %task.source, "Ignoring plugin armed - lower priority than current source");
+                       format_response(200, r#"{"status":"ignored","reason":"lower_priority_source"}"#)
                    } else {
-                       task.name = req.name;
-                       task.ide = req.ide;
-                       task.window_title = req.window_title;
-                       task.status = "armed".to_string();
-                       task.is_focused = false;  // Lost focus
-                       if let Some(path) = req.project_path {
-                           task.project_path = Some(path);
+                       // Don't change running tasks to armed - they should only become completed
+                       if task.status == "running" {
+                           info!(task_id = %req.task_id, "Ignoring armed request for running task");
+                           // Just update metadata, don't change status
+                           if let Some(file) = req.active_file {
+                               task.active_file = Some(file);
+                           }
+                           // Don't change status, keep running
+                       } else {
+                           task.name = req.name;
+                           task.ide = req.ide;
+                           task.window_title = req.window_title;
+                           task.status = "armed".to_string();
+                           task.is_focused = false;  // Lost focus
+                           if let Some(path) = req.project_path {
+                               task.project_path = Some(path);
+                           }
+                           if let Some(file) = req.active_file {
+                               task.active_file = Some(file);
+                           }
+                           // Don't reset progress/tokens/start_time - preserve them for continuing tasks
+                           task.end_time = None;
                        }
-                       if let Some(file) = req.active_file {
-                           task.active_file = Some(file);
-                       }
-                       // Don't reset progress/tokens/start_time - preserve them for continuing tasks
-                       task.end_time = None;
+                       drop(tasks);
+                       *state.current_task_id.lock().unwrap() = Some(req.task_id);
+                       format_response(200, r#"{"status":"ok"}"#)
                    }
                 } else {
                    let task = Task {
                         id: req.task_id.clone(),
-                        window_id: req.window_id.clone(),
+                        
                         name: req.name,
+                        display_name: String::new(),  // Computed on API response
                         progress: 0,
                         tokens: 0,
                         status: "armed".to_string(),
@@ -267,11 +372,13 @@ async fn handle_connection(
                         project_path: req.project_path,
                         active_file: req.active_file,
                         source: "plugin".to_string(),
+                        last_heartbeat: chrono::Utc::now().timestamp_millis() as u64,
                     };
                     tasks.push(task);
+                    drop(tasks);
+                    *state.current_task_id.lock().unwrap() = Some(req.task_id);
+                    format_response(200, r#"{"status":"ok"}"#)
                 }
-                *state.current_task_id.lock().unwrap() = Some(req.task_id);
-                format_response(200, r#"{"status":"ok"}"#)
             }
             Err(e) => format_response(400, &format!(r#"{{"error":"Invalid request: {}"}}"#, e))
         }
@@ -283,22 +390,32 @@ async fn handle_connection(
                 // Check if task exists and is in registered/armed state
                 let existing = tasks.iter_mut().find(|t| t.id == req.task_id);
                 if let Some(task) = existing {
-                    // Update existing task to running
-                    task.status = "running".to_string();
-                    task.start_time = chrono::Utc::now().timestamp_millis() as u64;
-                    task.name = req.name;
-                    if let Some(path) = req.project_path {
-                        task.project_path = Some(path);
-                    }
-                    if let Some(file) = req.active_file {
-                        task.active_file = Some(file);
+                    // Check source priority - only update if plugin has >= priority
+                    if !can_update_source(&task.source, "plugin") {
+                        info!(task_id = %req.task_id, current_source = %task.source, "Ignoring plugin start - lower priority than current source");
+                        format_response(200, r#"{"status":"ignored","reason":"lower_priority_source"}"#)
+                    } else {
+                        // Update existing task to running
+                        task.status = "running".to_string();
+                        task.start_time = chrono::Utc::now().timestamp_millis() as u64;
+                        task.name = req.name;
+                        if let Some(path) = req.project_path {
+                            task.project_path = Some(path);
+                        }
+                        if let Some(file) = req.active_file {
+                            task.active_file = Some(file);
+                        }
+                        drop(tasks);
+                        *state.current_task_id.lock().unwrap() = Some(req.task_id);
+                        format_response(200, r#"{"status":"ok"}"#)
                     }
                 } else {
                     // Create new running task
                     let task = Task {
                         id: req.task_id.clone(),
-                        window_id: req.window_id.clone(),
+                        
                         name: req.name,
+                        display_name: String::new(),  // Computed on API response
                         progress: 0,
                         tokens: 0,
                         status: "running".to_string(),
@@ -310,11 +427,13 @@ async fn handle_connection(
                         project_path: req.project_path,
                         active_file: req.active_file,
                         source: "plugin".to_string(),
+                        last_heartbeat: chrono::Utc::now().timestamp_millis() as u64,
                     };
                     tasks.push(task);
+                    drop(tasks);
+                    *state.current_task_id.lock().unwrap() = Some(req.task_id);
+                    format_response(200, r#"{"status":"ok"}"#)
                 }
-                *state.current_task_id.lock().unwrap() = Some(req.task_id);
-                format_response(200, r#"{"status":"ok"}"#)
             }
             Err(e) => format_response(400, &format!(r#"{{"error":"Invalid request: {}"}}"#, e))
         }
@@ -403,16 +522,74 @@ async fn handle_connection(
             Err(e) => format_response(400, &format!(r#"{{"error":"Invalid request: {}"}}"#, e))
         }
     } else if request.starts_with("POST /api/task/active") {
-        // ACTIVE/FOCUS state - window has focus, only update is_focused flag
-        match serde_json::from_str::<CancelRequest>(&body) {
+        // ACTIVE/FOCUS state - window has focus
+        // Use ActiveNotificationRequest which includes the optional status field the extension sends
+        match serde_json::from_str::<ActiveNotificationRequest>(&body) {
             Ok(req) => {
                 let mut tasks = state.tasks.lock().unwrap();
-                let found = tasks.iter_mut().find(|t| t.id == req.task_id);
-                if let Some(task) = found {
-                    task.is_focused = true;  // Only set focus, don't change status
+                let existing = tasks.iter_mut().find(|t| t.id == req.task_id);
+                
+                if let Some(task) = existing {
+                    // Always update heartbeat and is_focused when receiving active heartbeat
+                    task.last_heartbeat = chrono::Utc::now().timestamp_millis() as u64;
+                    task.is_focused = true;
+                    
+                    // Auto-transition: completed -> armed when window gains focus
+                    // This should happen regardless of source priority since it's user action
+                    if task.status == "completed" {
+                        info!(task_id = %req.task_id, "Auto-transitioning completed task to armed (window focused)");
+                        task.status = "armed".to_string();
+                        task.source = "plugin".to_string(); // Reset source after user interaction
+                        task.progress = 0;
+                        task.start_time = 0;
+                        task.end_time = None;
+                    }
+                    
+                    // Check source priority - only update metadata if plugin has >= priority
+                    // But is_focused and completed->armed transition always happen
+                    if can_update_source(&task.source, "plugin") {
+                        // Update metadata as well since we have it
+                        task.name = req.name;
+                        task.ide = req.ide;
+                        task.window_title = req.window_title;
+                        if let Some(path) = req.project_path {
+                            task.project_path = Some(path);
+                        }
+                        if let Some(file) = req.active_file {
+                            task.active_file = Some(file);
+                        }
+                    }
+                    
+                    // Log active heartbeat for debugging visibility
+                    info!(task_id = %req.task_id, status = %task.status, "Task active heartbeat processed");
+                    drop(tasks);
+                    *state.current_task_id.lock().unwrap() = Some(req.task_id);
                     format_response(200, r#"{"status":"ok"}"#)
                 } else {
-                    format_response(404, r#"{"error":"Task not found"}"#)
+                    // Task not found - register it automatically
+                    info!(task_id = %req.task_id, name = %req.name, "Task auto-registered via active heartbeat");
+                    let task = Task {
+                        id: req.task_id.clone(),
+                        
+                        name: req.name,
+                        display_name: String::new(),  // Computed on API response
+                        progress: 0,
+                        tokens: 0,
+                        status: "armed".to_string(), // Default to armed (monitoring)
+                        is_focused: true,            // It is currently focused
+                        ide: req.ide,
+                        window_title: req.window_title,
+                        start_time: 0,
+                        end_time: None,
+                        project_path: req.project_path,
+                        active_file: req.active_file,
+                        source: "plugin".to_string(),
+                        last_heartbeat: chrono::Utc::now().timestamp_millis() as u64,
+                    };
+                    tasks.push(task);
+                    drop(tasks);
+                    *state.current_task_id.lock().unwrap() = Some(req.task_id);
+                    format_response(200, r#"{"status":"ok"}"#)
                 }
             }
             Err(e) => format_response(400, &format!(r#"{{"error":"Invalid request: {}"}}"#, e))
@@ -495,17 +672,26 @@ fn handle_mcp_request(body: &str, state: &Arc<SharedState>) -> String {
                     "name": "vibe-process-bar",
                     "version": env!("CARGO_PKG_VERSION")
                 },
-                "instructions": r#"Vibe Process Bar - AI任务状态追踪器。
+                "instructions": r#"Vibe Process Bar - AI Task Status Tracker.
 
-使用方法：
-1. 任务开始时：调用 update_task_status(task_id, "running")
-2. 任务完成时：调用 update_task_status(task_id, "completed")  
-3. 任务出错时：调用 update_task_status(task_id, "error")
+Usage:
+1. Call `list_tasks` first to get the current list of tasks.
+2. Find the target task by matching `ide`, `project_path` (or `window_title`), and `active_file`.
+   - `task_id` format is usually "{ide}_{project_name}".
+3. Updates are prioritized by source: hook > mcp > plugin.
+   - You are the "mcp" source. You can override "plugin" updates, but "hook" updates will override yours.
 
-task_id 格式为 "{ide}_{workspace名}"，例如 "antigravity_myproject"。
-可以先调用 list_tasks 获取当前任务列表及其 task_id。
+To update status:
+- Call `update_task_status(task_id, status)`
 
-状态值：running(进行中), completed(已完成), error(出错), cancelled(已取消)"#
+Status values:
+- `armed`: Task is registered and monitoring (e.g. window focused).
+- `running`: Task is actively processing (AI generating).
+- `completed`: Task finished successfully.
+- `error`: Task failed.
+- `cancelled`: Task was cancelled.
+- `active`: Window has focus (usually sent by plugin).
+- `registered`: Initial state."#
             })
         }
         "notifications/initialized" => {
@@ -522,7 +708,7 @@ task_id 格式为 "{ide}_{workspace名}"，例如 "antigravity_myproject"。
                 "tools": [
                     {
                         "name": "list_tasks",
-                        "description": "Get all IDE windows/tasks with their UUID, IDE name, workspace name, active file, and status",
+                        "description": "Get all IDE windows/tasks with their UUID, IDE name, project path, active file, and status",
                         "inputSchema": {
                             "type": "object",
                             "properties": {},
@@ -531,7 +717,7 @@ task_id 格式为 "{ide}_{workspace名}"，例如 "antigravity_myproject"。
                     },
                     {
                         "name": "update_task_status",
-                        "description": "Update a task's status. Valid statuses: running, completed, error, cancelled, armed, active",
+                        "description": "Update a task's status. Priority: hook > mcp > plugin. Valid statuses: running, completed, error, cancelled, armed, active, registered",
                         "inputSchema": {
                             "type": "object",
                             "properties": {
@@ -558,12 +744,15 @@ task_id 格式为 "{ide}_{workspace名}"，例如 "antigravity_myproject"。
             
             match tool_name {
                 "list_tasks" => {
-                    let tasks = state.tasks.lock().unwrap();
-                    let task_list: Vec<serde_json::Value> = tasks.iter().map(|t| {
+                    let mut tasks_vec = state.tasks.lock().unwrap().clone();
+                    // Sort by source priority (hook > mcp > plugin)
+                    sort_tasks_by_priority(&mut tasks_vec);
+                    let task_list: Vec<serde_json::Value> = tasks_vec.iter().map(|t| {
                         serde_json::json!({
                             "id": t.id,
                             "ide": t.ide,
                             "window_title": t.window_title,
+                            "project_path": t.project_path,
                             "active_file": t.active_file,
                             "status": t.status,
                             "progress": t.progress,
@@ -595,6 +784,20 @@ task_id 格式为 "{ide}_{workspace名}"，例如 "antigravity_myproject"。
                     
                     let mut tasks = state.tasks.lock().unwrap();
                     if let Some(task) = tasks.iter_mut().find(|t| t.id == task_id) {
+                        // Check source priority - MCP can only update if >= current priority
+                        if !can_update_source(&task.source, "mcp") {
+                            info!("MCP update_task_status: {} - ignoring, current source {} has higher priority", task_id, task.source);
+                            return format_response(200, &serde_json::json!({
+                                "jsonrpc": "2.0",
+                                "result": {
+                                    "content": [{
+                                        "type": "text",
+                                        "text": format!("Ignored: task {} has higher priority source '{}'", task_id, task.source)
+                                    }]
+                                },
+                                "id": req.id
+                            }).to_string());
+                        }
                         let old_status = task.status.clone();
                         task.status = status.to_string();
                         task.source = "mcp".to_string();  // 标记为MCP上报

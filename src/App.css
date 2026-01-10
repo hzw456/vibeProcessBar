@@ -33,7 +33,8 @@
 }
 
 .resize-handle {
-  display: none; /* Disabled - window size is managed automatically */
+  display: none;
+  /* Disabled - window size is managed automatically */
 }
 
 .context-menu {
@@ -117,8 +118,15 @@
 }
 
 @keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.5; }
+
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.5;
+  }
 }
 
 .task-name {
@@ -230,7 +238,7 @@
 
 .task-row.completed {
   background: linear-gradient(135deg, rgba(34, 197, 94, 0.25), rgba(34, 197, 94, 0.1));
-  border: 1px solid rgba(34, 197, 94, 0.5);
+  border: 2px solid rgba(34, 197, 94, 0.8);
   border-left: 3px solid #22c55e;
   padding: 8px 10px;
   animation: completed-glow 2s ease-in-out infinite;
@@ -255,9 +263,12 @@
 }
 
 @keyframes completed-glow {
-  0%, 100% {
+
+  0%,
+  100% {
     box-shadow: 0 0 6px rgba(34, 197, 94, 0.3);
   }
+
   50% {
     box-shadow: 0 0 12px rgba(34, 197, 94, 0.5);
   }
@@ -308,7 +319,9 @@
   max-width: 130px;
 }
 
-.task-progress-mini, .task-time-mini, .task-status-mini {
+.task-progress-mini,
+.task-time-mini,
+.task-status-mini {
   font-size: 11px;
   color: var(--text-secondary);
   font-weight: 500;
@@ -329,6 +342,17 @@
   text-transform: uppercase;
   letter-spacing: 0.3px;
   font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 70px;
+  flex-shrink: 0;
+}
+
+/* Collapsed state uses wider badge */
+.collapsed .ide-badge-mini,
+.collapsed-single-task .ide-badge-mini {
+  max-width: 60px;
 }
 
 /* Completed notification banner */
@@ -355,6 +379,7 @@
     opacity: 0;
     transform: translateX(-50%) translateY(-10px);
   }
+
   to {
     opacity: 1;
     transform: translateX(-50%) translateY(0);
@@ -362,9 +387,12 @@
 }
 
 @keyframes pulse-glow {
-  0%, 100% {
+
+  0%,
+  100% {
     box-shadow: 0 4px 12px rgba(34, 197, 94, 0.4);
   }
+
   50% {
     box-shadow: 0 4px 20px rgba(34, 197, 94, 0.6);
   }
@@ -495,6 +523,27 @@
   text-overflow: ellipsis;
 }
 
+/* Collapsed task IDE name display */
+.task-ide-collapsed {
+  flex: 1;
+  font-size: 11px;
+  color: var(--text-color);
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 65px;
+}
+
+/* Single task collapsed view */
+.collapsed-single-task {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  -webkit-app-region: no-drag;
+}
+
 /* Collapse/Expand button on left - same position for both states */
 .collapse-btn {
   position: absolute;
@@ -555,11 +604,14 @@
 }
 
 @keyframes armed-pulse {
-  0%, 100% { 
+
+  0%,
+  100% {
     opacity: 0.7;
     transform: scale(1);
   }
-  50% { 
+
+  50% {
     opacity: 1;
     transform: scale(1.1);
   }
@@ -592,10 +644,13 @@
 }
 
 @keyframes armed-dot-pulse {
-  0%, 100% { 
+
+  0%,
+  100% {
     box-shadow: 0 0 4px rgba(251, 191, 36, 0.4);
   }
-  50% { 
+
+  50% {
     box-shadow: 0 0 10px rgba(251, 191, 36, 0.8);
   }
 }
@@ -621,8 +676,15 @@
 }
 
 @keyframes active-pulse {
-  0%, 100% { opacity: 0.7; }
-  50% { opacity: 1; }
+
+  0%,
+  100% {
+    opacity: 0.7;
+  }
+
+  50% {
+    opacity: 1;
+  }
 }
 
 .task-time-mini.active-time {

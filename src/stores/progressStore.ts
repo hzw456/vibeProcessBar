@@ -19,6 +19,7 @@ async function safeInvoke<T>(cmd: string, args?: Record<string, unknown>): Promi
 export interface ProgressTask {
   id: string;
   name: string;
+  displayName?: string;  // 显示名称 (去掉 IDE 前缀)
   progress: number;
   tokens: number;
   status: 'armed' | 'running' | 'completed' | 'idle';  // simplified states
@@ -282,6 +283,7 @@ export const useProgressStore = defineStore('progress', () => {
           const apiTasks: ProgressTask[] = data.tasks.map((apiTask: any) => ({
             id: apiTask.id,
             name: apiTask.name,
+            displayName: apiTask.display_name || apiTask.name,
             progress: apiTask.progress,
             tokens: apiTask.tokens,
             status: apiTask.status as ProgressTask['status'],

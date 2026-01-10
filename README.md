@@ -151,6 +151,16 @@ curl -X POST http://127.0.0.1:31415/mcp \
   -d '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"update_task_status","arguments":{"task_id":"antigravity_myproject","status":"completed"}}}'
 ```
 
+## Rules for Status Reporting (Best Practices)
+
+To ensure the best user experience with the Vibe Process Bar, follow these rules when implementing status reporting in your AI agent or extension:
+
+1.  **Start and End**: Always report `running` at the very beginning of a non-trivial task and `completed` (or `error`) at the end. This provides visual feedback to the user that work is in progress.
+2.  **Use Correct Task ID**: Use `list_tasks` to discover available tasks. The ID is usually `{ide}_{workspace_name}`. Match the current workspace to the correct task ID.
+3.  **Error Handling**: If an exception occurs or the task cannot be completed, explicitly report `error`. Do not leave the bar in a `running` state indefinitely.
+4.  **Granularity**: Only report high-level task status. Avoid reporting every small sub-step (like individual file edits) unless it represents a significant phase change that the user should be aware of. Rapid-fire status updates can be distracting.
+5.  **State Consistency**: If you are unsure of the state, `list_tasks` can be used to query the current status before updating.
+
 ## License
 
 MIT

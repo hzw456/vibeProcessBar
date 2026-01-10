@@ -85,12 +85,28 @@ async fn get_ide_windows() -> Result<Vec<IdeWindow>, String> {
     {
         let mut all_windows = Vec::new();
         
-        // Use a single AppleScript to iterate all Electron processes and get their windows
-        // Format: appPath|||pid|||winName1|||winName2\n
+        // Use a single AppleScript to iterate all IDE processes and get their windows
+        // Note: Most VSCode-based IDEs use "Electron" as process name, but Cursor uses "Cursor"
+        // Format: appPath:::pid:::winName1|||winName2\n
         let script = r#"
             set output to ""
             tell application "System Events"
+                -- Scan Electron processes (VS Code, Kiro, Antigravity, Windsurf, Trae, etc.)
                 repeat with p in (every application process whose name is "Electron")
+                    try
+                        set pId to unix id of p
+                        set appFile to application file of p
+                        set appPath to POSIX path of appFile
+                        set winNames to name of every window of p
+                        set AppleScript's text item delimiters to "|||"
+                        set winNamesStr to winNames as text
+                        if winNamesStr is not "" then
+                            set output to output & appPath & ":::" & pId & ":::" & winNamesStr & "\n"
+                        end if
+                    end try
+                end repeat
+                -- Scan Cursor process (Cursor uses "Cursor" as process name, not "Electron")
+                repeat with p in (every application process whose name is "Cursor")
                     try
                         set pId to unix id of p
                         set appFile to application file of p
