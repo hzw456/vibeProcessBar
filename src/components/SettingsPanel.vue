@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import { ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useProgressStore } from '../stores/progressStore';
 import LanguageSelector from './LanguageSelector.vue';
 import './SettingsPanel.css';
+import { ref } from 'vue';
 
 interface Props {
   isStandalone?: boolean;
@@ -22,71 +22,9 @@ const store = useProgressStore();
 
 type TabType = 'general' | 'appearance' | 'notifications' | 'tasks' | 'shortcuts';
 const activeTab = ref<TabType>('general');
-const showImportExport = ref(false);
 
 const themes = ['dark', 'light', 'purple', 'ocean', 'forest', 'midnight'] as const;
 
-function handleExportConfig() {
-  const config = {
-    settings: {
-      theme: store.settings.theme,
-      opacity: store.settings.opacity,
-      alwaysOnTop: store.settings.alwaysOnTop,
-      notifications: store.settings.notifications,
-      sound: store.settings.sound,
-      soundVolume: store.settings.soundVolume,
-      httpPort: store.settings.httpPort,
-      customColors: store.settings.customColors,
-      reminderThreshold: store.settings.reminderThreshold,
-      doNotDisturb: store.settings.doNotDisturb,
-      doNotDisturbStart: store.settings.doNotDisturbStart,
-      doNotDisturbEnd: store.settings.doNotDisturbEnd,
-    },
-    history: store.history.slice(0, 20),
-    exportedAt: new Date().toISOString(),
-  };
-
-  const blob = new Blob([JSON.stringify(config, null, 2)], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = 'vibe-progress-config.json';
-  a.click();
-  URL.revokeObjectURL(url);
-  showImportExport.value = false;
-}
-
-function handleImportConfig(event: Event) {
-  const input = event.target as HTMLInputElement;
-  const file = input.files?.[0];
-  if (!file) return;
-
-  const reader = new FileReader();
-  reader.onload = (e) => {
-    try {
-      const config = JSON.parse(e.target?.result as string);
-      if (config.settings) {
-        if (config.settings.theme) store.setTheme(config.settings.theme);
-        if (config.settings.fontSize) store.setFontSize(config.settings.fontSize);
-        if (config.settings.opacity) store.setOpacity(config.settings.opacity);
-        if (config.settings.alwaysOnTop !== undefined) store.setAlwaysOnTop(config.settings.alwaysOnTop);
-        if (config.settings.notifications !== undefined) store.setNotifications(config.settings.notifications);
-        if (config.settings.sound !== undefined) store.setSound(config.settings.sound);
-        if (config.settings.soundVolume) store.setSoundVolume(config.settings.soundVolume);
-        if (config.settings.httpPort) store.setHttpPort(config.settings.httpPort);
-        if (config.settings.customColors) store.setCustomColors(config.settings.customColors);
-        if (config.settings.reminderThreshold) store.setReminderThreshold(config.settings.reminderThreshold);
-        if (config.settings.doNotDisturb !== undefined) store.setDoNotDisturb(config.settings.doNotDisturb);
-        if (config.settings.doNotDisturbStart) store.setDoNotDisturbStart(config.settings.doNotDisturbStart);
-        if (config.settings.doNotDisturbEnd) store.setDoNotDisturbEnd(config.settings.doNotDisturbEnd);
-      }
-      showImportExport.value = false;
-    } catch {
-      alert('Failed to import configuration. Please check the file format.');
-    }
-  };
-  reader.readAsText(file);
-}
 
 function handleResetDefaults() {
   store.setLanguage('en');
@@ -98,6 +36,7 @@ function handleResetDefaults() {
   store.setNotifications(true);
   store.setSound(true);
   store.setSoundVolume(0.7);
+  store.setHttpHost('127.0.0.1');
   store.setHttpPort(31415);
   store.setCustomColors({ primaryColor: '', backgroundColor: '', textColor: '' });
   store.setReminderThreshold(100);
@@ -151,14 +90,12 @@ function handleResetDefaults() {
           <input type="checkbox" :checked="store.settings.autoStart" @change="store.setAutoStart(($event.target as HTMLInputElement).checked)" />
         </div>
         <div class="setting-item">
-          <label>{{ t('settings.general.httpPort') }}</label>
-          <input type="number" :value="store.settings.httpPort" @change="store.setHttpPort(parseInt(($event.target as HTMLInputElement).value))" min="1024" max="65535" class="port-input" />
+          <label>{{ t('settings.general.httpHost') }}</label>
+          <input type="text" :value="store.settings.httpHost" @change="store.setHttpHost(($event.target as HTMLInputElement).value)" class="host-input" placeholder="127.0.0.1" />
         </div>
         <div class="setting-item">
-          <label>{{ t('settings.general.importExport') }}</label>
-          <button class="action-btn small" @click="showImportExport = true">
-            {{ t('settings.general.manage') }}
-          </button>
+          <label>{{ t('settings.general.httpPort') }}</label>
+          <input type="number" :value="store.settings.httpPort" @change="store.setHttpPort(parseInt(($event.target as HTMLInputElement).value))" min="1024" max="65535" class="port-input" />
         </div>
       </div>
 
@@ -270,24 +207,7 @@ function handleResetDefaults() {
       </div>
     </div>
 
-    <!-- Import/Export Modal -->
-    <div v-if="showImportExport" class="import-export-modal">
-      <div class="modal-content">
-        <h3>{{ t('settings.importExport.title') }}</h3>
-        <div class="modal-actions">
-          <button class="action-btn" @click="handleExportConfig">
-            {{ t('settings.importExport.exportConfig') }}
-          </button>
-          <label class="action-btn">
-            {{ t('settings.importExport.importConfig') }}
-            <input type="file" accept=".json" @change="handleImportConfig" style="display: none" />
-          </label>
-          <button class="action-btn secondary" @click="showImportExport = false">
-            {{ t('settings.importExport.cancel') }}
-          </button>
-        </div>
-      </div>
-    </div>
+
 
     <!-- Footer -->
     <div class="settings-footer">

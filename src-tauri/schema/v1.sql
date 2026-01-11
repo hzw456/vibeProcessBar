@@ -15,6 +15,7 @@ CREATE TABLE IF NOT EXISTS settings (
     notifications INTEGER DEFAULT 1,
     sound INTEGER DEFAULT 1,
     sound_volume REAL DEFAULT 0.7,
+    http_host TEXT DEFAULT '127.0.0.1',
     http_port INTEGER DEFAULT 31415,
     custom_colors TEXT DEFAULT '{}',
     reminder_threshold INTEGER DEFAULT 100,

@@ -33,7 +33,7 @@ export interface ProgressTask {
   activeFile?: string;
 }
 
-interface AppSettings {
+export interface AppSettings {
   language: SupportedLanguage;
   theme: 'dark' | 'light' | 'purple' | 'ocean' | 'forest' | 'midnight';
   fontSize: number;
@@ -43,6 +43,7 @@ interface AppSettings {
   notifications: boolean;
   sound: boolean;
   soundVolume: number;
+  httpHost: string;
   httpPort: number;
   customColors: {
     primaryColor: string;
@@ -66,6 +67,7 @@ const defaultSettings: AppSettings = {
   notifications: true,
   sound: true,
   soundVolume: 0.7,
+  httpHost: '127.0.0.1',
   httpPort: 31415,
   customColors: {
     primaryColor: '',
@@ -230,6 +232,10 @@ export const useProgressStore = defineStore('progress', () => {
     updateSettingAndSync('soundVolume', Math.min(1, Math.max(0, value)));
   }
 
+  function setHttpHost(value: string) {
+    updateSettingAndSync('httpHost', value);
+  }
+
   function setHttpPort(value: number) {
     updateSettingAndSync('httpPort', Math.max(1024, Math.min(65535, value)));
   }
@@ -351,6 +357,7 @@ export const useProgressStore = defineStore('progress', () => {
     setNotifications,
     setSound,
     setSoundVolume,
+    setHttpHost,
     setHttpPort,
     setCustomColors,
     setReminderThreshold,

@@ -37,6 +37,12 @@ impl DatabaseState {
             tracing::error!("Failed to apply schema: {}", e);
         }
 
+        // Migration: Add http_host column if it doesn't exist
+        let _ = conn.execute(
+            "ALTER TABLE settings ADD COLUMN http_host TEXT DEFAULT '127.0.0.1'",
+            [],
+        );
+
         info!("Database initialized at: {:?}", path);
 
         Self {
@@ -74,26 +80,74 @@ impl DatabaseState {
 
         let conn = self.get_connection();
 
-        let theme = settings.get("theme").and_then(|v| v.as_str()).unwrap_or("dark");
-        let opacity = settings.get("opacity").and_then(|v| v.as_f64()).unwrap_or(0.85);
-        let font_size = settings.get("fontSize").and_then(|v| v.as_i64()).unwrap_or(14);
-        let always_on_top = settings.get("alwaysOnTop").and_then(|v| v.as_bool()).unwrap_or(true);
-        let auto_start = settings.get("autoStart").and_then(|v| v.as_bool()).unwrap_or(false);
-        let notifications = settings.get("notifications").and_then(|v| v.as_bool()).unwrap_or(true);
-        let sound = settings.get("sound").and_then(|v| v.as_bool()).unwrap_or(true);
-        let sound_volume = settings.get("soundVolume").and_then(|v| v.as_f64()).unwrap_or(0.7);
-        let http_port = settings.get("httpPort").and_then(|v| v.as_u64()).unwrap_or(31415) as u16;
+        let theme = settings
+            .get("theme")
+            .and_then(|v| v.as_str())
+            .unwrap_or("dark");
+        let opacity = settings
+            .get("opacity")
+            .and_then(|v| v.as_f64())
+            .unwrap_or(0.85);
+        let font_size = settings
+            .get("fontSize")
+            .and_then(|v| v.as_i64())
+            .unwrap_or(14);
+        let always_on_top = settings
+            .get("alwaysOnTop")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(true);
+        let auto_start = settings
+            .get("autoStart")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false);
+        let notifications = settings
+            .get("notifications")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(true);
+        let sound = settings
+            .get("sound")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(true);
+        let sound_volume = settings
+            .get("soundVolume")
+            .and_then(|v| v.as_f64())
+            .unwrap_or(0.7);
+        let http_port = settings
+            .get("httpPort")
+            .and_then(|v| v.as_u64())
+            .unwrap_or(31415) as u16;
         let custom_colors = serde_json::to_string(
-            &settings.get("customColors").unwrap_or(&serde_json::json!({})),
-        ).unwrap_or_else(|_| "{}".to_string());
-        let reminder_threshold = settings.get("reminderThreshold").and_then(|v| v.as_i64()).unwrap_or(100);
-        let do_not_disturb = settings.get("doNotDisturb").and_then(|v| v.as_bool()).unwrap_or(false);
-        let do_not_disturb_start = settings.get("doNotDisturbStart")
-            .and_then(|v| v.as_str()).unwrap_or("22:00").to_string();
-        let do_not_disturb_end = settings.get("doNotDisturbEnd")
-            .and_then(|v| v.as_str()).unwrap_or("08:00").to_string();
-        let window_visible = settings.get("windowVisible").and_then(|v| v.as_bool()).unwrap_or(true);
-        let language = settings.get("language").and_then(|v| v.as_str()).unwrap_or("en");
+            &settings
+                .get("customColors")
+                .unwrap_or(&serde_json::json!({})),
+        )
+        .unwrap_or_else(|_| "{}".to_string());
+        let reminder_threshold = settings
+            .get("reminderThreshold")
+            .and_then(|v| v.as_i64())
+            .unwrap_or(100);
+        let do_not_disturb = settings
+            .get("doNotDisturb")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false);
+        let do_not_disturb_start = settings
+            .get("doNotDisturbStart")
+            .and_then(|v| v.as_str())
+            .unwrap_or("22:00")
+            .to_string();
+        let do_not_disturb_end = settings
+            .get("doNotDisturbEnd")
+            .and_then(|v| v.as_str())
+            .unwrap_or("08:00")
+            .to_string();
+        let window_visible = settings
+            .get("windowVisible")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(true);
+        let language = settings
+            .get("language")
+            .and_then(|v| v.as_str())
+            .unwrap_or("en");
 
         if let Err(e) = conn.execute(
             "INSERT OR REPLACE INTO settings (

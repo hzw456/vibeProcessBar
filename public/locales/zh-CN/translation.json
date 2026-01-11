@@ -37,15 +37,15 @@
       "shortcuts": "快捷键"
     },
     "general": {
+      "language": "语言",
       "autoStart": "登录时自动启动",
       "alwaysOnTop": "始终置顶",
-      "httpPort": "HTTP API 端口",
-      "configManagement": "导出/导入配置",
-      "manage": "管理"
+      "httpHost": "HTTP 监听地址",
+      "httpPort": "HTTP API 端口"
     },
     "appearance": {
       "theme": "主题",
-      "themeOptions": {
+      "themes": {
         "dark": "深色 (默认)",
         "light": "浅色",
         "purple": "紫色",
@@ -55,8 +55,7 @@
       },
       "fontSize": "字体大小: {{size}}px",
       "opacity": "透明度: {{percentage}}%",
-      "customPrimaryColor": "自定义主色",
-      "customBackground": "自定义背景",
+      "primaryColor": "自定义主色",
       "resetColors": "重置自定义颜色",
       "reset": "重置"
     },
@@ -82,12 +81,6 @@
       "drag": "移动窗口",
       "scroll": "调整进度",
       "clickStatus": "激活 IDE 窗口"
-    },
-    "importExport": {
-      "title": "导入/导出配置",
-      "exportConfig": "导出配置",
-      "importConfig": "导入配置",
-      "cancel": "取消"
     },
     "footer": {
       "version": "Vibe 进度条 v{{version}}",

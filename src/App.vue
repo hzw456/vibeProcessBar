@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
-import { useProgressStore, type ProgressTask } from './stores/progressStore';
+import { useProgressStore, type ProgressTask, type AppSettings } from './stores/progressStore';
 import StatusText from './components/StatusText.vue';
 import SettingsPanel from './components/SettingsPanel.vue';
 import { debug, error } from './utils/logger';
@@ -312,6 +312,8 @@ watch(() => store.tasks, (newTasks) => {
 
 // Dynamic window resize
 watch([displayTasks, isCollapsed, isCollapseTransition], async () => {
+  // Skip resizing for settings window
+  if (isSettingsWindow.value) return;
   if (isCollapseTransition.value) return;
 
   const taskCount = displayTasks.value.length;
@@ -338,27 +340,43 @@ watch([displayTasks, isCollapsed, isCollapseTransition], async () => {
   }
 });
 
-// Intervals
-let syncInterval: number;
-let scanInterval: number;
-let forceUpdateInterval: number;
+  // Intervals
+  let syncInterval: number;
+  let scanInterval: number;
+  let forceUpdateInterval: number;
+  let unlistenSettings: (() => void) | undefined;
 
-onMounted(async () => {
-  // Initial scan
-  await scanIdeWindows();
-  await store.syncFromHttpApi();
+  onMounted(async () => {
+    // Setup settings listener
+    if (isTauri) {
+      try {
+        const { listen } = await import('@tauri-apps/api/event');
+        unlistenSettings = await listen<AppSettings>('settings-changed', (event) => {
+          debug('Settings changed event received', event.payload);
+          store.setSettings(event.payload);
+        });
+      } catch (e) {
+        error('Failed to setup settings listener', { error: String(e) });
+      }
+    }
 
-  // Set up intervals
-  syncInterval = window.setInterval(() => store.syncFromHttpApi(), 1000);
-  scanInterval = window.setInterval(scanIdeWindows, 5000);
-  forceUpdateInterval = window.setInterval(() => {}, 1000); // Force update for time
-});
+    // Initial scan
+    await scanIdeWindows();
+    await store.loadSettings();
+    await store.syncFromHttpApi();
 
-onUnmounted(() => {
-  clearInterval(syncInterval);
-  clearInterval(scanInterval);
-  clearInterval(forceUpdateInterval);
-});
+    // Set up intervals
+    syncInterval = window.setInterval(() => store.syncFromHttpApi(), 1000);
+    scanInterval = window.setInterval(scanIdeWindows, 5000);
+    forceUpdateInterval = window.setInterval(() => {}, 1000); // Force update for time
+  });
+
+  onUnmounted(() => {
+    clearInterval(syncInterval);
+    clearInterval(scanInterval);
+    clearInterval(forceUpdateInterval);
+    if (unlistenSettings) unlistenSettings();
+  });
 </script>
 
 <template>

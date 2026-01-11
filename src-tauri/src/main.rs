@@ -1,31 +1,35 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-use tauri::{Manager, Runtime, WindowEvent, Emitter};
-use tauri::menu::MenuItem;
-use tauri::tray::TrayIconBuilder;
 use serde_json::json;
 use std::process::Command;
+use tauri::menu::MenuItem;
+use tauri::tray::TrayIconBuilder;
+use tauri::{Emitter, Manager, Runtime, WindowEvent};
 use tracing::info;
 
-mod window_manager;
+mod db;
 mod http_server;
 mod settings;
-mod db;
+mod window_manager;
 
-use settings::{AppSettings, SettingsState};
 use db::DatabaseState;
+use settings::{AppSettings, SettingsState};
 
 #[tauri::command]
-async fn activate_window<R: Runtime>(window: tauri::Window<R>, window_id: String) -> Result<(), String> {
+async fn activate_window<R: Runtime>(
+    window: tauri::Window<R>,
+    window_id: String,
+) -> Result<(), String> {
     window_manager::activate_window(window, window_id).await
 }
 
 #[tauri::command]
 async fn get_translated_string<R: Runtime>(
     window: tauri::Window<R>,
-    key: String
+    key: String,
 ) -> Result<String, String> {
-    window.emit("get-translated-string", key.clone())
+    window
+        .emit("get-translated-string", key.clone())
         .map_err(|e| e.to_string())?;
     Ok(key)
 }
@@ -86,7 +90,7 @@ async fn get_ide_windows() -> Result<Vec<IdeWindow>, String> {
     #[cfg(target_os = "macos")]
     {
         let mut all_windows = Vec::new();
-        
+
         // Use a single AppleScript to iterate all IDE processes and get their windows
         // Note: Most VSCode-based IDEs use "Electron" as process name, but Cursor uses "Cursor"
         // Format: appPath:::pid:::winName1|||winName2\n
@@ -124,31 +128,29 @@ async fn get_ide_windows() -> Result<Vec<IdeWindow>, String> {
             end tell
             return output
         "#;
-        
-        let output = Command::new("osascript")
-            .args(&["-e", script])
-            .output();
-        
+
+        let output = Command::new("osascript").args(&["-e", script]).output();
+
         if let Ok(result) = output {
             if result.status.success() {
                 let stdout = String::from_utf8_lossy(&result.stdout);
-                
+
                 for line in stdout.lines() {
                     let line = line.trim();
                     if line.is_empty() {
                         continue;
                     }
-                    
+
                     // Format: appPath:::pid:::winName1|||winName2|||...
                     let parts: Vec<&str> = line.splitn(3, ":::").collect();
                     if parts.len() != 3 {
                         continue;
                     }
-                    
+
                     let app_path = parts[0];
                     let pid = parts[1];
                     let win_names_str = parts[2];
-                    
+
                     // Determine IDE type from app path
                     let ide = if app_path.contains("Antigravity") {
                         "antigravity"
@@ -167,7 +169,7 @@ async fn get_ide_windows() -> Result<Vec<IdeWindow>, String> {
                     } else {
                         "vscode"
                     };
-                    
+
                     // Split window names by |||
                     let win_names: Vec<&str> = win_names_str.split("|||").collect();
                     for (idx, win_title) in win_names.iter().enumerate() {
@@ -184,17 +186,17 @@ async fn get_ide_windows() -> Result<Vec<IdeWindow>, String> {
                 }
             }
         }
-        
+
         info!("Scanned {} IDE windows", all_windows.len());
-        
+
         // Update global state for tray menu
         if let Ok(mut windows) = SCANNED_WINDOWS.lock() {
             *windows = all_windows.clone();
         }
-        
+
         Ok(all_windows)
     }
-    
+
     #[cfg(not(target_os = "macos"))]
     {
         Ok(Vec::new())
@@ -207,13 +209,26 @@ async fn activate_ide_window<R: Runtime>(
     ide: String,
     window_title: Option<String>,
     project_path: Option<String>,
-    active_file: Option<String>
+    active_file: Option<String>,
 ) -> Result<(), String> {
-    activate_ide(&ide, window_title.as_deref(), project_path.as_deref(), active_file.as_deref())
+    activate_ide(
+        &ide,
+        window_title.as_deref(),
+        project_path.as_deref(),
+        active_file.as_deref(),
+    )
 }
 
-fn activate_ide(ide: &str, window_title: Option<&str>, project_path: Option<&str>, active_file: Option<&str>) -> Result<(), String> {
-    info!("activate_ide called with ide={}, window_title={:?}, project_path={:?}, active_file={:?}", ide, window_title, project_path, active_file);
+fn activate_ide(
+    ide: &str,
+    window_title: Option<&str>,
+    project_path: Option<&str>,
+    active_file: Option<&str>,
+) -> Result<(), String> {
+    info!(
+        "activate_ide called with ide={}, window_title={:?}, project_path={:?}, active_file={:?}",
+        ide, window_title, project_path, active_file
+    );
     #[cfg(target_os = "macos")]
     {
         let script = match ide.trim().to_lowercase().as_str() {
@@ -221,7 +236,7 @@ fn activate_ide(ide: &str, window_title: Option<&str>, project_path: Option<&str
             "cursor" => {
                 let workspace_search = window_title.unwrap_or("");
                 let file_search = active_file.unwrap_or("");
-                
+
                 if !workspace_search.is_empty() || !file_search.is_empty() {
                     format!(
                         r#"
@@ -272,13 +287,14 @@ fn activate_ide(ide: &str, window_title: Option<&str>, project_path: Option<&str
                 } else {
                     r#"
                     tell application "Cursor" to activate
-                    "#.to_string()
+                    "#
+                    .to_string()
                 }
             }
             "windsurf" | "codeium" | "codeium editor" => {
                 let workspace_search = window_title.unwrap_or("");
                 let file_search = active_file.unwrap_or("");
-                
+
                 if !workspace_search.is_empty() || !file_search.is_empty() {
                     format!(
                         r#"
@@ -328,14 +344,15 @@ fn activate_ide(ide: &str, window_title: Option<&str>, project_path: Option<&str
                 } else {
                     r#"
                     tell application "Windsurf" to activate
-                    "#.to_string()
+                    "#
+                    .to_string()
                 }
             }
             "trae" => {
                 // Matching priority: IDE -> workspace (window_title) -> active_file
                 let workspace_search = window_title.unwrap_or("");
                 let file_search = active_file.unwrap_or("");
-                
+
                 if !workspace_search.is_empty() || !file_search.is_empty() {
                     format!(
                         r#"
@@ -385,13 +402,14 @@ fn activate_ide(ide: &str, window_title: Option<&str>, project_path: Option<&str
                 } else {
                     r#"
                     tell application "Trae" to activate
-                    "#.to_string()
+                    "#
+                    .to_string()
                 }
             }
             "void" | "void editor" | "void-editor" => {
                 let workspace_search = window_title.unwrap_or("");
                 let file_search = active_file.unwrap_or("");
-                
+
                 if !workspace_search.is_empty() || !file_search.is_empty() {
                     format!(
                         r#"
@@ -441,37 +459,35 @@ fn activate_ide(ide: &str, window_title: Option<&str>, project_path: Option<&str
                 } else {
                     r#"
                     tell application "Void" to activate
-                    "#.to_string()
+                    "#
+                    .to_string()
                 }
             }
-            "pearai" | "pear-ai" | "pear ai" => {
-                r#"
+            "pearai" | "pear-ai" | "pear ai" => r#"
                 tell application "PearAI"
                     activate
                     delay 0.3
                 end tell
-                "#.to_string()
-            }
-            "blueberryai" | "blueberry ai" | "blueberry" => {
-                r#"
+                "#
+            .to_string(),
+            "blueberryai" | "blueberry ai" | "blueberry" => r#"
                 tell application "BlueberryAI"
                     activate
                     delay 0.3
                 end tell
-                "#.to_string()
-            }
-            "aide" | "codestoryai" | "codestory ai" => {
-                r#"
+                "#
+            .to_string(),
+            "aide" | "codestoryai" | "codestory ai" => r#"
                 tell application "Aide"
                     activate
                     delay 0.3
                 end tell
-                "#.to_string()
-            }
+                "#
+            .to_string(),
             "codebuddy" | "code buddy" | "tencent codebuddy" => {
                 let workspace_search = window_title.unwrap_or("");
                 let file_search = active_file.unwrap_or("");
-                
+
                 if !workspace_search.is_empty() || !file_search.is_empty() {
                     format!(
                         r#"
@@ -521,13 +537,14 @@ fn activate_ide(ide: &str, window_title: Option<&str>, project_path: Option<&str
                 } else {
                     r#"
                     tell application "CodeBuddy" to activate
-                    "#.to_string()
+                    "#
+                    .to_string()
                 }
             }
             "codebuddycn" | "codebuddy cn" | "tencent codebuddycn" => {
                 let workspace_search = window_title.unwrap_or("");
                 let file_search = active_file.unwrap_or("");
-                
+
                 if !workspace_search.is_empty() || !file_search.is_empty() {
                     format!(
                         r#"
@@ -577,22 +594,22 @@ fn activate_ide(ide: &str, window_title: Option<&str>, project_path: Option<&str
                 } else {
                     r#"
                     tell application "CodeBuddy CN" to activate
-                    "#.to_string()
+                    "#
+                    .to_string()
                 }
             }
-            "kilocode" | "kilo-code" | "kilo" => {
-                r#"
+            "kilocode" | "kilo-code" | "kilo" => r#"
                 tell application "Kilo Code"
                     activate
                     delay 0.3
                 end tell
-                "#.to_string()
-            }
+                "#
+            .to_string(),
             "kiro" => {
                 // Matching priority: IDE -> workspace (window_title) -> active_file
                 let workspace_search = window_title.unwrap_or("");
                 let file_search = active_file.unwrap_or("");
-                
+
                 if !workspace_search.is_empty() || !file_search.is_empty() {
                     format!(
                         r#"
@@ -640,14 +657,15 @@ fn activate_ide(ide: &str, window_title: Option<&str>, project_path: Option<&str
                 } else {
                     r#"
                     tell application "Kiro" to activate
-                    "#.to_string()
+                    "#
+                    .to_string()
                 }
             }
             "antigravity" => {
                 // Matching priority: IDE -> workspace (window_title) -> active_file
                 let workspace_search = window_title.unwrap_or("");
                 let file_search = active_file.unwrap_or("");
-                
+
                 if !workspace_search.is_empty() || !file_search.is_empty() {
                     format!(
                         r#"
@@ -695,22 +713,22 @@ fn activate_ide(ide: &str, window_title: Option<&str>, project_path: Option<&str
                 } else {
                     r#"
                     tell application "Antigravity" to activate
-                    "#.to_string()
+                    "#
+                    .to_string()
                 }
             }
-            "claude" | "claude-code" => {
-                r#"
+            "claude" | "claude-code" => r#"
                 tell application "Claude"
                     activate
                     delay 0.3
                 end tell
-                "#.to_string()
-            }
+                "#
+            .to_string(),
             "vscode" | "visual studio code" => {
                 // Matching priority: IDE -> workspace (window_title) -> active_file
                 let workspace_search = window_title.unwrap_or("");
                 let file_search = active_file.unwrap_or("");
-                
+
                 if !workspace_search.is_empty() || !file_search.is_empty() {
                     format!(
                         r#"
@@ -758,7 +776,8 @@ fn activate_ide(ide: &str, window_title: Option<&str>, project_path: Option<&str
                 } else {
                     r#"
                     tell application "Visual Studio Code" to activate
-                    "#.to_string()
+                    "#
+                    .to_string()
                 }
             }
             _ => {
@@ -882,12 +901,10 @@ fn set_window_always_on_top(window: tauri::Window, on_top: bool) {
 }
 
 #[tauri::command]
-fn set_window_opacity(_window: tauri::Window, _opacity: f64) {
-}
+fn set_window_opacity(_window: tauri::Window, _opacity: f64) {}
 
 #[tauri::command]
-fn set_window_transparency(_window: tauri::Window, _transparent: bool) {
-}
+fn set_window_transparency(_window: tauri::Window, _transparent: bool) {}
 
 #[tauri::command]
 fn show_window(window: tauri::Window) {
@@ -902,33 +919,47 @@ fn hide_window(window: tauri::Window) {
 
 #[tauri::command]
 fn get_window_position(window: tauri::Window) -> (f64, f64) {
-    window.inner_position().map(|p| (p.x as f64, p.y as f64)).unwrap_or((0.0, 0.0))
+    window
+        .inner_position()
+        .map(|p| (p.x as f64, p.y as f64))
+        .unwrap_or((0.0, 0.0))
 }
 
 #[tauri::command]
 fn set_window_position(window: tauri::Window, x: f64, y: f64) {
-    window.set_position(tauri::LogicalPosition::new(x, y)).unwrap();
+    window
+        .set_position(tauri::LogicalPosition::new(x, y))
+        .unwrap();
 }
 
 #[tauri::command]
 fn resize_window(window: tauri::Window, width: f64, height: f64) {
-    window.set_size(tauri::LogicalSize::new(width, height)).unwrap();
+    window
+        .set_size(tauri::LogicalSize::new(width, height))
+        .unwrap();
 }
 
 #[tauri::command]
 async fn toggle_window_always_on_top<R: Runtime>(window: tauri::Window<R>) -> Result<bool, String> {
     let current = window.is_always_on_top().map_err(|e| e.to_string())?;
     let new_value = !current;
-    window.set_always_on_top(new_value).map_err(|e| e.to_string())?;
+    window
+        .set_always_on_top(new_value)
+        .map_err(|e| e.to_string())?;
     Ok(new_value)
 }
 
 #[tauri::command]
-async fn get_all_windows<R: Runtime>(app: tauri::AppHandle<R>) -> Result<serde_json::Value, String> {
+async fn get_all_windows<R: Runtime>(
+    app: tauri::AppHandle<R>,
+) -> Result<serde_json::Value, String> {
     let windows = app.webview_windows();
     let mut result = Vec::new();
     for (label, win) in windows {
-        let position = win.inner_position().ok().map(|p| json!({"x": p.x, "y": p.y}));
+        let position = win
+            .inner_position()
+            .ok()
+            .map(|p| json!({"x": p.x, "y": p.y}));
         let size = win.inner_size().map_err(|e| e.to_string())?;
         result.push(json!({
             "label": label,
@@ -946,11 +977,8 @@ fn open_url(url: String) -> Result<(), String> {
 }
 
 #[tauri::command]
-async fn start_http_server<R: Runtime>(
-    _app: tauri::AppHandle<R>,
-    port: u16
-) -> Result<(), String> {
-    http_server::start_server_background(port);
+async fn start_http_server<R: Runtime>(_app: tauri::AppHandle<R>, port: u16) -> Result<(), String> {
+    http_server::start_server_background("127.0.0.1".to_string(), port);
     Ok(())
 }
 
@@ -958,7 +986,7 @@ async fn start_http_server<R: Runtime>(
 async fn trigger_notification<R: Runtime>(
     _window: tauri::Window<R>,
     _title: String,
-    _body: String
+    _body: String,
 ) -> Result<(), String> {
     Ok(())
 }
@@ -977,10 +1005,13 @@ async fn update_app_settings<R: Runtime>(
     app: tauri::AppHandle<R>,
     state: tauri::State<'_, settings::SettingsState>,
     db_state: tauri::State<'_, db::DatabaseState>,
-    new_settings: AppSettings
+    new_settings: AppSettings,
 ) -> Result<(), String> {
     {
-        let mut settings = state.settings.lock().map_err(|_| "Failed to lock settings mutex")?;
+        let mut settings = state
+            .settings
+            .lock()
+            .map_err(|_| "Failed to lock settings mutex")?;
         *settings = new_settings.clone();
     }
 
@@ -989,7 +1020,8 @@ async fn update_app_settings<R: Runtime>(
         state.save(&conn)?;
     }
 
-    app.emit("settings-changed", new_settings.clone()).map_err(|e| e.to_string())?;
+    app.emit("settings-changed", new_settings.clone())
+        .map_err(|e| e.to_string())?;
 
     Ok(())
 }
@@ -1011,17 +1043,24 @@ async fn set_window_visibility<R: Runtime>(
     visible: bool,
 ) -> Result<(), String> {
     {
-        let mut settings = state.settings.lock().map_err(|_| "Failed to lock settings mutex")?;
+        let mut settings = state
+            .settings
+            .lock()
+            .map_err(|_| "Failed to lock settings mutex")?;
         settings.window_visible = visible;
     }
 
     {
         let conn = db_state.get_connection();
-        let settings = state.settings.lock().map_err(|_| "Failed to lock settings mutex")?;
+        let settings = state
+            .settings
+            .lock()
+            .map_err(|_| "Failed to lock settings mutex")?;
         settings.save(&conn).map_err(|e| e.to_string())?;
     }
 
-    app.emit("window-visibility-changed", visible).map_err(|e| e.to_string())?;
+    app.emit("window-visibility-changed", visible)
+        .map_err(|e| e.to_string())?;
 
     Ok(())
 }
@@ -1036,7 +1075,9 @@ fn get_tray_translations(language: String) -> serde_json::Value {
             ("quit", "退出"),
             ("noTasks", "无任务"),
             ("tasks", "任务"),
-        ].into_iter().collect(),
+        ]
+        .into_iter()
+        .collect(),
         "zh-TW" => vec![
             ("showWindow", "☀ 顯示窗口"),
             ("hideWindow", "☾ 隱藏窗口"),
@@ -1044,7 +1085,9 @@ fn get_tray_translations(language: String) -> serde_json::Value {
             ("quit", "退出"),
             ("noTasks", "無任務"),
             ("tasks", "任務"),
-        ].into_iter().collect(),
+        ]
+        .into_iter()
+        .collect(),
         "de" => vec![
             ("showWindow", "☀ Fenster anzeigen"),
             ("hideWindow", "☾ Fenster ausblenden"),
@@ -1052,7 +1095,9 @@ fn get_tray_translations(language: String) -> serde_json::Value {
             ("quit", "Beenden"),
             ("noTasks", "Keine Aufgaben"),
             ("tasks", "Aufgaben"),
-        ].into_iter().collect(),
+        ]
+        .into_iter()
+        .collect(),
         "es" => vec![
             ("showWindow", "☀ Mostrar ventana"),
             ("hideWindow", "☾ Ocultar ventana"),
@@ -1060,7 +1105,9 @@ fn get_tray_translations(language: String) -> serde_json::Value {
             ("quit", "Salir"),
             ("noTasks", "Sin tareas"),
             ("tasks", "Tareas"),
-        ].into_iter().collect(),
+        ]
+        .into_iter()
+        .collect(),
         "fr" => vec![
             ("showWindow", "☀ Afficher la fenêtre"),
             ("hideWindow", "☾ Masquer la fenêtre"),
@@ -1068,7 +1115,9 @@ fn get_tray_translations(language: String) -> serde_json::Value {
             ("quit", "Quitter"),
             ("noTasks", "Aucune tâche"),
             ("tasks", "Tâches"),
-        ].into_iter().collect(),
+        ]
+        .into_iter()
+        .collect(),
         "ja" => vec![
             ("showWindow", "☀ ウィンドウを表示"),
             ("hideWindow", "☾ ウィンドウを非表示"),
@@ -1076,7 +1125,9 @@ fn get_tray_translations(language: String) -> serde_json::Value {
             ("quit", "終了"),
             ("noTasks", "タスクなし"),
             ("tasks", "タスク"),
-        ].into_iter().collect(),
+        ]
+        .into_iter()
+        .collect(),
         "ko" => vec![
             ("showWindow", "☀ 창 표시"),
             ("hideWindow", "☾ 창 숨기기"),
@@ -1084,7 +1135,9 @@ fn get_tray_translations(language: String) -> serde_json::Value {
             ("quit", "종료"),
             ("noTasks", "작업 없음"),
             ("tasks", "작업"),
-        ].into_iter().collect(),
+        ]
+        .into_iter()
+        .collect(),
         "pt" => vec![
             ("showWindow", "☀ Mostrar janela"),
             ("hideWindow", "☾ Ocultar janela"),
@@ -1092,7 +1145,9 @@ fn get_tray_translations(language: String) -> serde_json::Value {
             ("quit", "Sair"),
             ("noTasks", "Sem tarefas"),
             ("tasks", "Tarefas"),
-        ].into_iter().collect(),
+        ]
+        .into_iter()
+        .collect(),
         "ru" => vec![
             ("showWindow", "☀ Показать окно"),
             ("hideWindow", "☾ Скрыть окно"),
@@ -1100,7 +1155,9 @@ fn get_tray_translations(language: String) -> serde_json::Value {
             ("quit", "Выйти"),
             ("noTasks", "Нет задач"),
             ("tasks", "Задачи"),
-        ].into_iter().collect(),
+        ]
+        .into_iter()
+        .collect(),
         "ar" => vec![
             ("showWindow", "☀ إظهار النافذة"),
             ("hideWindow", "☾ إخفاء النافذة"),
@@ -1108,7 +1165,9 @@ fn get_tray_translations(language: String) -> serde_json::Value {
             ("quit", "خروج"),
             ("noTasks", "لا توجد مهام"),
             ("tasks", "المهام"),
-        ].into_iter().collect(),
+        ]
+        .into_iter()
+        .collect(),
         _ => vec![
             ("showWindow", "☀ Show Window"),
             ("hideWindow", "☾ Hide Window"),
@@ -1116,7 +1175,9 @@ fn get_tray_translations(language: String) -> serde_json::Value {
             ("quit", "Quit"),
             ("noTasks", "No tasks"),
             ("tasks", "Tasks"),
-        ].into_iter().collect(),
+        ]
+        .into_iter()
+        .collect(),
     };
 
     serde_json::to_value(translations).unwrap_or_default()
@@ -1165,7 +1226,7 @@ fn main() {
         ])
         .setup(|app| {
             let app_handle = app.app_handle().clone();
-            
+
             let db_state = DatabaseState::new(&app_handle);
             app.manage(db_state.clone());
 
@@ -1177,8 +1238,15 @@ fn main() {
 
             #[cfg(target_os = "macos")]
             {
-                use window_vibrancy::{apply_vibrancy, NSVisualEffectMaterial, NSVisualEffectState};
-                let _ = apply_vibrancy(&window, NSVisualEffectMaterial::HudWindow, Some(NSVisualEffectState::Active), Some(12.0));
+                use window_vibrancy::{
+                    apply_vibrancy, NSVisualEffectMaterial, NSVisualEffectState,
+                };
+                let _ = apply_vibrancy(
+                    &window,
+                    NSVisualEffectMaterial::HudWindow,
+                    Some(NSVisualEffectState::Active),
+                    Some(12.0),
+                );
             }
 
             #[cfg(target_os = "windows")]
@@ -1190,7 +1258,8 @@ fn main() {
             let db_state = app.state::<db::DatabaseState>();
             let json_path = {
                 let app_handle = app.app_handle();
-                app_handle.path()
+                app_handle
+                    .path()
                     .app_config_dir()
                     .expect("Failed to get app config dir")
                     .join("settings.json")
@@ -1200,29 +1269,40 @@ fn main() {
                 let _ = db_state.migrate_from_json(&json_path);
             }
 
-            http_server::start_server_background(31415);
-            info!(port = 31415, "HTTP server started on port 31415");
-
             let settings_state = app.state::<settings::SettingsState>();
             let current_settings = settings_state.get_settings();
+
+            http_server::start_server_background(current_settings.http_host.clone(), current_settings.http_port);
+            info!(host = %current_settings.http_host, port = %current_settings.http_port, "HTTP server started");
             let language = current_settings.language;
             let translations = get_tray_translations(language);
 
-            let show_window_text = translations.get("showWindow")
+            let show_window_text = translations
+                .get("showWindow")
                 .and_then(|v| v.as_str())
                 .unwrap_or("☀ Show Window");
-            let hide_window_text = translations.get("hideWindow")
+            let hide_window_text = translations
+                .get("hideWindow")
                 .and_then(|v| v.as_str())
                 .unwrap_or("☾ Hide Window");
-            let settings_text = translations.get("settings")
+            let settings_text = translations
+                .get("settings")
                 .and_then(|v| v.as_str())
                 .unwrap_or("Settings");
-            let quit_text = translations.get("quit")
+            let quit_text = translations
+                .get("quit")
                 .and_then(|v| v.as_str())
                 .unwrap_or("Quit");
 
-            let window_toggle_item = MenuItem::with_id(&app_handle, "toggle-window", hide_window_text, true, None::<&str>)?;
-            let settings_item = MenuItem::with_id(&app_handle, "settings", settings_text, true, None::<&str>)?;
+            let window_toggle_item = MenuItem::with_id(
+                &app_handle,
+                "toggle-window",
+                hide_window_text,
+                true,
+                None::<&str>,
+            )?;
+            let settings_item =
+                MenuItem::with_id(&app_handle, "settings", settings_text, true, None::<&str>)?;
             let quit_item = MenuItem::with_id(&app_handle, "quit", quit_text, true, None::<&str>)?;
 
             let icon_bytes = include_bytes!("../icons/tray.png");
@@ -1243,30 +1323,43 @@ fn main() {
                 };
                 let trans = get_tray_translations(lang);
                 let window_text = if is_visible {
-                    trans.get("hideWindow").and_then(|v| v.as_str()).unwrap_or("☾ Hide Window")
+                    trans
+                        .get("hideWindow")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("☾ Hide Window")
                 } else {
-                    trans.get("showWindow").and_then(|v| v.as_str()).unwrap_or("☀ Show Window")
+                    trans
+                        .get("showWindow")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("☀ Show Window")
                 };
-                let settings_text = trans.get("settings").and_then(|v| v.as_str()).unwrap_or("Settings");
+                let settings_text = trans
+                    .get("settings")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("Settings");
                 let quit_text = trans.get("quit").and_then(|v| v.as_str()).unwrap_or("Quit");
 
-                let window_toggle = MenuItem::with_id(app, "toggle-window", window_text, true, None::<&str>).ok();
-                let settings = MenuItem::with_id(app, "settings", settings_text, true, None::<&str>).ok();
+                let window_toggle =
+                    MenuItem::with_id(app, "toggle-window", window_text, true, None::<&str>).ok();
+                let settings =
+                    MenuItem::with_id(app, "settings", settings_text, true, None::<&str>).ok();
                 let quit = MenuItem::with_id(app, "quit", quit_text, true, None::<&str>).ok();
 
                 if let (Some(w), Some(s), Some(q)) = (window_toggle, settings, quit) {
                     // Get tasks from http_server state
-                    let tasks: Vec<http_server::Task> = http_server::get_state().tasks.lock()
+                    let tasks: Vec<http_server::Task> = http_server::get_state()
+                        .tasks
+                        .lock()
                         .map(|t| t.clone())
                         .unwrap_or_default();
-                    
+
                     // Build menu items
                     let mut items: Vec<&dyn tauri::menu::IsMenuItem<tauri::Wry>> = vec![&w, &s, &q];
-                    
+
                     // Add separator and tasks if any
                     let sep1 = tauri::menu::PredefinedMenuItem::separator(app).ok();
                     let mut task_items: Vec<MenuItem<tauri::Wry>> = Vec::new();
-                    
+
                     for task in &tasks {
                         // Status icon based on task status
                         let status_icon = match task.status.as_str() {
@@ -1285,7 +1378,7 @@ fn main() {
                             task_items.push(item);
                         }
                     }
-                    
+
                     // Add tasks section
                     if !task_items.is_empty() {
                         if let Some(ref sep) = sep1 {
@@ -1295,7 +1388,7 @@ fn main() {
                             items.push(item);
                         }
                     }
-                    
+
                     if let Ok(menu) = tauri::menu::Menu::with_items(app, &items) {
                         let _ = app.tray_by_id("main-tray").unwrap().set_menu(Some(menu));
                     }
@@ -1306,14 +1399,17 @@ fn main() {
                 .icon(icon)
                 .icon_as_template(false)
                 .tooltip("Vibe Process Bar")
-                .menu(&tauri::menu::Menu::with_items(&app_handle, &[&window_toggle_item, &settings_item, &quit_item])?)
+                .menu(&tauri::menu::Menu::with_items(
+                    &app_handle,
+                    &[&window_toggle_item, &settings_item, &quit_item],
+                )?)
                 .show_menu_on_left_click(true)
                 .on_menu_event(move |app, event| {
                     match event.id.as_ref() {
                         "toggle-window" => {
                             let db_state = app.state::<db::DatabaseState>();
                             let settings_state = app.state::<settings::SettingsState>();
-                            
+
                             let conn = db_state.get_connection();
                             let settings = AppSettings::load(&conn);
                             drop(conn);
@@ -1329,7 +1425,10 @@ fn main() {
                                 let conn = db_state.get_connection();
                                 let _ = settings_state.save(&conn);
                                 drop(conn);
-                                let _ = app.tray_by_id("main-tray").unwrap().set_tooltip(Some("Vibe Process Bar (Hidden)"));
+                                let _ = app
+                                    .tray_by_id("main-tray")
+                                    .unwrap()
+                                    .set_tooltip(Some("Vibe Process Bar (Hidden)"));
                                 rebuild_menu(app, false);
                             } else {
                                 let _ = window.show();
@@ -1339,7 +1438,10 @@ fn main() {
                                 let conn = db_state.get_connection();
                                 let _ = settings_state.save(&conn);
                                 drop(conn);
-                                let _ = app.tray_by_id("main-tray").unwrap().set_tooltip(Some("Vibe Process Bar"));
+                                let _ = app
+                                    .tray_by_id("main-tray")
+                                    .unwrap()
+                                    .set_tooltip(Some("Vibe Process Bar"));
                                 rebuild_menu(app, true);
                             }
                         }
@@ -1353,16 +1455,21 @@ fn main() {
                             // Handle task activation events
                             if other.starts_with("task_") {
                                 if let Some(task_id) = other.strip_prefix("task_") {
-                                    let tasks: Vec<http_server::Task> = http_server::get_state().tasks.lock()
+                                    let tasks: Vec<http_server::Task> = http_server::get_state()
+                                        .tasks
+                                        .lock()
                                         .map(|t| t.clone())
                                         .unwrap_or_default();
                                     if let Some(task) = tasks.iter().find(|t| t.id == task_id) {
-                                        info!("Activating task from tray: {} ({})", task.name, task.ide);
+                                        info!(
+                                            "Activating task from tray: {} ({})",
+                                            task.name, task.ide
+                                        );
                                         let _ = activate_ide(
                                             &task.ide,
                                             Some(&task.window_title),
                                             task.project_path.as_deref(),
-                                            task.active_file.as_deref()
+                                            task.active_file.as_deref(),
                                         );
                                     }
                                 }
@@ -1371,12 +1478,21 @@ fn main() {
                             else if other.starts_with("activate_win_") {
                                 if let Some(index_str) = other.strip_prefix("activate_win_") {
                                     if let Ok(index) = index_str.parse::<usize>() {
-                                        let windows: Vec<IdeWindow> = SCANNED_WINDOWS.lock()
+                                        let windows: Vec<IdeWindow> = SCANNED_WINDOWS
+                                            .lock()
                                             .map(|w| w.clone())
                                             .unwrap_or_default();
                                         if let Some(win) = windows.get(index) {
-                                            info!("Activating window from tray: {} ({})", win.window_title, win.ide);
-                                            let _ = activate_ide(&win.ide, Some(&win.window_title), None, None);
+                                            info!(
+                                                "Activating window from tray: {} ({})",
+                                                win.window_title, win.ide
+                                            );
+                                            let _ = activate_ide(
+                                                &win.ide,
+                                                Some(&win.window_title),
+                                                None,
+                                                None,
+                                            );
                                         }
                                     }
                                 }
@@ -1392,51 +1508,88 @@ fn main() {
             let app_handle_for_timer = app.app_handle().clone();
             std::thread::spawn(move || {
                 let mut last_task_snapshot: String = String::new();
-                
+
                 loop {
                     std::thread::sleep(std::time::Duration::from_millis(500));
-                    
+
                     // Get current tasks and create a snapshot for comparison
-                    let tasks: Vec<http_server::Task> = http_server::get_state().tasks.lock()
+                    let tasks: Vec<http_server::Task> = http_server::get_state()
+                        .tasks
+                        .lock()
                         .map(|t| t.clone())
                         .unwrap_or_default();
-                    
+
                     // Create a simple snapshot of task IDs and statuses
-                    let current_snapshot: String = tasks.iter()
+                    let current_snapshot: String = tasks
+                        .iter()
                         .map(|t| format!("{}:{}", t.id, t.status))
                         .collect::<Vec<_>>()
                         .join(",");
-                    
+
                     // Only rebuild menu if tasks have changed
                     if current_snapshot != last_task_snapshot {
                         last_task_snapshot = current_snapshot;
-                        
+
                         let app = &app_handle_for_timer;
                         let window = app.get_webview_window("main");
-                        let is_visible = window.map(|w| w.is_visible().unwrap_or(true)).unwrap_or(true);
-                        
+                        let is_visible = window
+                            .map(|w| w.is_visible().unwrap_or(true))
+                            .unwrap_or(true);
+
                         let lang = {
                             let state = app.state::<settings::SettingsState>();
                             state.get_settings().language
                         };
                         let trans = get_tray_translations(lang);
                         let window_text = if is_visible {
-                            trans.get("hideWindow").and_then(|v| v.as_str()).unwrap_or("☾ Hide Window")
+                            trans
+                                .get("hideWindow")
+                                .and_then(|v| v.as_str())
+                                .unwrap_or("☾ Hide Window")
                         } else {
-                            trans.get("showWindow").and_then(|v| v.as_str()).unwrap_or("☀ Show Window")
+                            trans
+                                .get("showWindow")
+                                .and_then(|v| v.as_str())
+                                .unwrap_or("☀ Show Window")
                         };
-                        let settings_text = trans.get("settings").and_then(|v| v.as_str()).unwrap_or("Settings");
-                        let quit_text = trans.get("quit").and_then(|v| v.as_str()).unwrap_or("Quit");
+                        let settings_text = trans
+                            .get("settings")
+                            .and_then(|v| v.as_str())
+                            .unwrap_or("Settings");
+                        let quit_text =
+                            trans.get("quit").and_then(|v| v.as_str()).unwrap_or("Quit");
 
-                        let window_toggle = tauri::menu::MenuItem::with_id(app, "toggle-window", window_text, true, None::<&str>).ok();
-                        let settings = tauri::menu::MenuItem::with_id(app, "settings", settings_text, true, None::<&str>).ok();
-                        let quit = tauri::menu::MenuItem::with_id(app, "quit", quit_text, true, None::<&str>).ok();
+                        let window_toggle = tauri::menu::MenuItem::with_id(
+                            app,
+                            "toggle-window",
+                            window_text,
+                            true,
+                            None::<&str>,
+                        )
+                        .ok();
+                        let settings = tauri::menu::MenuItem::with_id(
+                            app,
+                            "settings",
+                            settings_text,
+                            true,
+                            None::<&str>,
+                        )
+                        .ok();
+                        let quit = tauri::menu::MenuItem::with_id(
+                            app,
+                            "quit",
+                            quit_text,
+                            true,
+                            None::<&str>,
+                        )
+                        .ok();
 
                         if let (Some(w), Some(s), Some(q)) = (window_toggle, settings, quit) {
-                            let mut items: Vec<&dyn tauri::menu::IsMenuItem<tauri::Wry>> = vec![&w, &s, &q];
+                            let mut items: Vec<&dyn tauri::menu::IsMenuItem<tauri::Wry>> =
+                                vec![&w, &s, &q];
                             let sep1 = tauri::menu::PredefinedMenuItem::separator(app).ok();
                             let mut task_items: Vec<tauri::menu::MenuItem<tauri::Wry>> = Vec::new();
-                            
+
                             for task in &tasks {
                                 let status_icon = match task.status.as_str() {
                                     "running" => "🔄",
@@ -1448,13 +1601,20 @@ fn main() {
                                     "active" => "👁️",
                                     _ => "•",
                                 };
-                                let title = format!("{} {} - {}", status_icon, task.name, task.status);
+                                let title =
+                                    format!("{} {} - {}", status_icon, task.name, task.status);
                                 let id = format!("task_{}", task.id);
-                                if let Ok(item) = tauri::menu::MenuItem::with_id(app, &id, &title, true, None::<&str>) {
+                                if let Ok(item) = tauri::menu::MenuItem::with_id(
+                                    app,
+                                    &id,
+                                    &title,
+                                    true,
+                                    None::<&str>,
+                                ) {
                                     task_items.push(item);
                                 }
                             }
-                            
+
                             if !task_items.is_empty() {
                                 if let Some(ref sep) = sep1 {
                                     items.push(sep);
@@ -1463,7 +1623,7 @@ fn main() {
                                     items.push(item);
                                 }
                             }
-                            
+
                             if let Ok(menu) = tauri::menu::Menu::with_items(app, &items) {
                                 if let Some(tray) = app.tray_by_id("main-tray") {
                                     let _ = tray.set_menu(Some(menu));
@@ -1484,12 +1644,12 @@ fn main() {
                     api.prevent_close();
                     let db_state = app_handle_clone.state::<db::DatabaseState>();
                     let settings_state = app_handle_clone.state::<settings::SettingsState>();
-                    
+
                     let conn = db_state.get_connection();
                     let mut settings = settings_state.settings.lock().unwrap();
                     settings.window_visible = false;
                     let _ = settings_state.save(&conn);
-                    
+
                     window_clone.hide().unwrap();
                 }
             });

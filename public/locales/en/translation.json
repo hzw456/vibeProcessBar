@@ -37,15 +37,15 @@
       "shortcuts": "Shortcuts"
     },
     "general": {
+      "language": "Language",
       "autoStart": "Auto-start on login",
       "alwaysOnTop": "Always on top",
-      "httpPort": "HTTP API Port",
-      "configManagement": "Export/Import Config",
-      "manage": "Manage"
+      "httpHost": "HTTP Listen Address",
+      "httpPort": "HTTP API Port"
     },
     "appearance": {
       "theme": "Theme",
-      "themeOptions": {
+      "themes": {
         "dark": "Dark (Default)",
         "light": "Light",
         "purple": "Purple",
@@ -55,8 +55,7 @@
       },
       "fontSize": "Font Size: {{size}}px",
       "opacity": "Opacity: {{percentage}}%",
-      "customPrimaryColor": "Custom Primary Color",
-      "customBackground": "Custom Background",
+      "primaryColor": "Custom Primary Color",
       "resetColors": "Reset Custom Colors",
       "reset": "Reset"
     },
@@ -82,12 +81,6 @@
       "drag": "Move window",
       "scroll": "Adjust progress",
       "clickStatus": "Activate IDE window"
-    },
-    "importExport": {
-      "title": "Import/Export Configuration",
-      "exportConfig": "Export Config",
-      "importConfig": "Import Config",
-      "cancel": "Cancel"
     },
     "footer": {
       "version": "Vibe Progress Bar v{{version}}",

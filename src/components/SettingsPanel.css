@@ -163,6 +163,24 @@
   border-color: var(--primary-color);
 }
 
+.host-input,
+.port-input {
+  padding: 6px 12px;
+  border-radius: 6px;
+  border: 1px solid var(--border-color);
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text-color);
+  font-size: 13px;
+  width: 120px;
+  text-align: center;
+}
+
+.host-input:focus,
+.port-input:focus {
+  outline: none;
+  border-color: var(--primary-color);
+}
+
 .vscode-help {
   margin-top: 16px;
   padding: 12px;

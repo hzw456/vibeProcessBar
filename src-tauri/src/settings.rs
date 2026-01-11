@@ -1,8 +1,8 @@
+use rusqlite::Result as SqliteResult;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use std::sync::Mutex;
 use tauri::Manager;
-use rusqlite::Result as SqliteResult;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -33,6 +33,7 @@ pub struct AppSettings {
     pub notifications: bool,
     pub sound: bool,
     pub sound_volume: f64,
+    pub http_host: String,
     pub http_port: u16,
     pub custom_colors: CustomColors,
     pub reminder_threshold: i32,
@@ -54,6 +55,7 @@ impl Default for AppSettings {
             notifications: true,
             sound: true,
             sound_volume: 0.7,
+            http_host: "127.0.0.1".to_string(),
             http_port: 31415,
             custom_colors: CustomColors::default(),
             reminder_threshold: 100,
@@ -70,7 +72,7 @@ impl AppSettings {
     pub fn load(conn: &rusqlite::Connection) -> Self {
         let mut stmt = match conn.prepare_cached(
             "SELECT theme, opacity, font_size, always_on_top, auto_start,
-                    notifications, sound, sound_volume, http_port, custom_colors,
+                    notifications, sound, sound_volume, http_host, http_port, custom_colors,
                     reminder_threshold, do_not_disturb, do_not_disturb_start,
                     do_not_disturb_end, window_visible, language
              FROM settings WHERE id = 1",
@@ -89,17 +91,20 @@ impl AppSettings {
                 notifications: row.get::<_, i32>(5)? != 0,
                 sound: row.get::<_, i32>(6)? != 0,
                 sound_volume: row.get(7)?,
-                http_port: row.get::<_, i32>(8)? as u16,
+                http_host: row
+                    .get::<_, String>(8)
+                    .unwrap_or_else(|_| "127.0.0.1".to_string()),
+                http_port: row.get::<_, i32>(9)? as u16,
                 custom_colors: {
-                    let json_str: String = row.get(9)?;
+                    let json_str: String = row.get(10)?;
                     serde_json::from_str(&json_str).unwrap_or_default()
                 },
-                reminder_threshold: row.get::<_, i32>(10)?,
-                do_not_disturb: row.get::<_, i32>(11)? != 0,
-                do_not_disturb_start: row.get(12)?,
-                do_not_disturb_end: row.get(13)?,
-                window_visible: row.get::<_, i32>(14)? != 0,
-                language: row.get(15)?,
+                reminder_threshold: row.get::<_, i32>(11)?,
+                do_not_disturb: row.get::<_, i32>(12)? != 0,
+                do_not_disturb_start: row.get(13)?,
+                do_not_disturb_end: row.get(14)?,
+                window_visible: row.get::<_, i32>(15)? != 0,
+                language: row.get(16)?,
             })
         }) {
             Ok(settings) => settings,
@@ -108,34 +113,40 @@ impl AppSettings {
     }
 
     pub fn save(&self, conn: &rusqlite::Connection) -> SqliteResult<usize> {
-        let custom_colors_json = serde_json::to_string(&self.custom_colors)
-            .unwrap_or_else(|_| "{}".to_string());
+        let custom_colors_json =
+            serde_json::to_string(&self.custom_colors).unwrap_or_else(|_| "{}".to_string());
 
         conn.execute(
             "INSERT OR REPLACE INTO settings (
                 id, theme, opacity, font_size, always_on_top, auto_start,
-                notifications, sound, sound_volume, http_port, custom_colors,
+                notifications, sound, sound_volume, http_host, http_port, custom_colors,
                 reminder_threshold, do_not_disturb, do_not_disturb_start,
                 do_not_disturb_end, window_visible, language, updated_at
-            ) VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)",
-            (
-                &self.theme,
-                self.opacity,
-                self.font_size as f64,
-                self.always_on_top as i32,
-                self.auto_start as i32,
-                self.notifications as i32,
-                self.sound as i32,
-                self.sound_volume,
-                self.http_port as i32,
-                custom_colors_json,
-                self.reminder_threshold as i32,
-                self.do_not_disturb as i32,
-                &self.do_not_disturb_start,
-                &self.do_not_disturb_end,
-                self.window_visible as i32,
-                &self.language,
-            ),
+            ) VALUES (
+                1, :theme, :opacity, :font_size, :always_on_top, :auto_start,
+                :notifications, :sound, :sound_volume, :http_host, :http_port, :custom_colors,
+                :reminder_threshold, :do_not_disturb, :do_not_disturb_start,
+                :do_not_disturb_end, :window_visible, :language, CURRENT_TIMESTAMP
+            )",
+            rusqlite::named_params! {
+                ":theme": &self.theme,
+                ":opacity": self.opacity,
+                ":font_size": self.font_size as f64,
+                ":always_on_top": self.always_on_top as i32,
+                ":auto_start": self.auto_start as i32,
+                ":notifications": self.notifications as i32,
+                ":sound": self.sound as i32,
+                ":sound_volume": self.sound_volume,
+                ":http_host": &self.http_host,
+                ":http_port": self.http_port as i32,
+                ":custom_colors": custom_colors_json,
+                ":reminder_threshold": self.reminder_threshold as i32,
+                ":do_not_disturb": self.do_not_disturb as i32,
+                ":do_not_disturb_start": &self.do_not_disturb_start,
+                ":do_not_disturb_end": &self.do_not_disturb_end,
+                ":window_visible": self.window_visible as i32,
+                ":language": &self.language,
+            },
         )
     }
 }
@@ -162,7 +173,10 @@ impl SettingsState {
     }
 
     pub fn save(&self, conn: &rusqlite::Connection) -> Result<(), String> {
-        let settings = self.settings.lock().map_err(|_| "Failed to lock settings mutex")?;
+        let settings = self
+            .settings
+            .lock()
+            .map_err(|_| "Failed to lock settings mutex")?;
         settings.save(conn).map_err(|e| e.to_string())?;
         Ok(())
     }
