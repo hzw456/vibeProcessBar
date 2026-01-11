@@ -288,23 +288,24 @@ async fn report_task(
         // 更新焦点状态
         task.is_focused = req.is_focused;
 
-        // 检查来源优先级
+        // 窗口获得焦点时，completed -> armed 自动转换
+        // 注意：这个转换不受来源优先级限制，因为这是窗口状态驱动的
+        if req.is_focused && task.status == "completed" {
+            info!(task_id = %req.task_id, "Auto-transitioning completed task to armed (window focused)");
+            task.status = "armed".to_string();
+            // 不修改 source，保持原来的来源
+            task.progress = 0;
+            task.start_time = 0;
+            task.end_time = None;
+        }
+
+        // 检查来源优先级（仅用于窗口信息更新，不影响状态转换）
         if !can_update_source(&task.source, "plugin") {
             debug!(task_id = %req.task_id, "Report ignored - lower priority source");
             return (
                 StatusCode::OK,
                 Json(ApiResponse::ignored("lower_priority_source")),
             );
-        }
-
-        // 窗口获得焦点时，completed -> armed 自动转换
-        if req.is_focused && task.status == "completed" {
-            info!(task_id = %req.task_id, "Auto-transitioning completed task to armed (window focused)");
-            task.status = "armed".to_string();
-            // 注意：不修改 source，source 只由 update_state 控制
-            task.progress = 0;
-            task.start_time = 0;
-            task.end_time = None;
         }
 
         // 更新窗口信息
