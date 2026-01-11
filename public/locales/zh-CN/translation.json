@@ -10,7 +10,7 @@
     "running": "运行中...",
     "completed": "完成",
     "error": "错误",
-    "completedWithTime": "{{taskName}} - {{elapsedTime}}"
+    "completedWithTime": "{taskName} - {elapsedTime}"
   },
   "menu": {
     "title": "任务",
@@ -25,7 +25,7 @@
     "closeMenu": "关闭菜单"
   },
   "notification": {
-    "taskCompleted": "{{taskName}} 已完成！"
+    "taskCompleted": "{taskName} 已完成！"
   },
   "settings": {
     "title": "设置",
@@ -43,7 +43,8 @@
       "showWindow": "显示窗口",
       "hideWindow": "隐藏窗口",
       "httpHost": "HTTP 监听地址",
-      "httpPort": "HTTP API 端口"
+      "httpPort": "HTTP API 端口",
+      "blockPluginStatus": "屏蔽插件状态上报"
     },
     "appearance": {
       "theme": "主题",
@@ -55,8 +56,8 @@
         "forest": "森林",
         "midnight": "午夜"
       },
-      "fontSize": "字体大小: {{size}}px",
-      "opacity": "透明度: {{percentage}}%",
+      "fontSize": "字体大小: {size}px",
+      "opacity": "透明度: {percentage}%",
       "primaryColor": "自定义主色",
       "resetColors": "重置自定义颜色",
       "reset": "重置"
@@ -64,15 +65,16 @@
     "notifications": {
       "desktopNotifications": "桌面通知",
       "soundAlerts": "声音提醒",
-      "volume": "音量: {{percentage}}%",
-      "completionThreshold": "完成阈值: {{percentage}}%",
+      "volume": "音量: {percentage}%",
+      "completionThreshold": "完成阈值: {percentage}%",
       "doNotDisturb": "勿扰模式",
       "startTime": "开始时间",
-      "endTime": "结束时间"
+      "endTime": "结束时间",
+      "test": "测试"
     },
     "tasks": {
       "history": "任务历史",
-      "historyCount": "{{count}} 个任务",
+      "historyCount": "{count} 个任务",
       "clearHistory": "清除历史",
       "clear": "清除"
     },
@@ -85,13 +87,13 @@
       "clickStatus": "激活 IDE 窗口"
     },
     "footer": {
-      "version": "Vibe 进度条 v{{version}}",
+      "version": "Vibe 进度条 v{version}",
       "resetDefaults": "重置为默认"
     }
   },
   "time": {
-    "minutesSeconds": "{{minutes}}分{{seconds}}秒",
-    "seconds": "{{seconds}}秒",
+    "minutesSeconds": "{minutes}分{seconds}秒",
+    "seconds": "{seconds}秒",
     "waiting": "⏳",
     "active": "👁"
   },

@@ -63,6 +63,8 @@ export const i18n = createI18n({
   fallbackLocale: 'en',
   messages: {},
   globalInjection: true,
+  missingWarn: false,
+  fallbackWarn: false,
 });
 
 // Function to change language

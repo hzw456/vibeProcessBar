@@ -1,105 +1,140 @@
-# Vibe Coding Progress Bar
+# Vibe Process Bar
 
-A floating progress bar for AI-assisted coding, built with Tauri and React.
+<p align="center">
+  <img src="./src-tauri/icons/256x256.png" alt="Vibe Process Bar Logo" width="128" height="128">
+</p>
 
-## Prerequisites
+<p align="center">
+  <strong>Visualize AI Coding Agent's Workflow at a Glance</strong>
+</p>
 
-- **Rust** (1.70.0 or later): https://rustup.rs/
-- **Node.js** (18.0 or later): https://nodejs.org/
-- **pnpm** (recommended) or npm
+<p align="center">
+  A desktop floating progress bar designed for AI-assisted programming, visualizing AI Agent's working status in real-time.
+</p>
 
-## Installation
+<p align="center">
+  <img src="https://img.shields.io/badge/platform-macOS-blue" alt="Platform">
+  <img src="https://img.shields.io/badge/built%20with-Tauri%20%2B%20Vue-green" alt="Built with">
+  <img src="https://img.shields.io/badge/license-MIT-orange" alt="License">
+</p>
 
-1. Install Rust:
-   ```bash
-   curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
-   ```
+---
 
-2. Install Node.js (if not installed):
-   ```bash
-   # Using nvm (recommended)
-   nvm install 20
-   nvm use 20
-   
-   # Or download from https://nodejs.org/
-   ```
+## Why Vibe Process Bar?
 
-3. Install dependencies:
-   ```bash
-   npm install
-   ```
+When using AI coding assistants like Cursor, Kiro, or Claude, do you often face these issues?
 
-4. Install Tauri CLI:
-   ```bash
-   npm install -D @tauri/cli
-   ```
+- 🤔 **Unknown Status** — AI is thinking in the background while you wait blindly
+- ⏰ **Uncertain Completion** — Lose track of progress after switching windows
+- 🔄 **Multi-task Chaos** — Easy to get confused when running multiple AI tasks
 
-## Development
+**Vibe Process Bar** solves these problems! It is a lightweight floating window that continuously stays on top, keeping you informed of the AI's working status at all times.
 
-Start development server:
+---
+
+## ✨ Core Features
+
+### 🎯 Real-time Status Tracking
+
+| Status | Icon | Meaning |
+|:---:|:---:|:---|
+| **Armed** | ◎ | Standing by, ready to start |
+| **Running** | ◉ | AI is working, dynamic progress bar |
+| **Completed** | ✓ | Task completed |
+
+**Smart Focus Switching:**
+
+The progress bar automatically detects focus changes when you switch windows:
+
+- 👁 **Focus Gained** — Shows eye icon, and if task was completed, automatically resets to ◎ Armed status
+- 🔙 **Focus Lost** — Maintains current status, continuing to show AI's progress
+- ◉ **Task Running** — Always shows real-time progress regardless of window focus
+
+### 🖥️ Multi-IDE Support
+
+Supports mainstream AI coding tools:
+
+- **Cursor** — Automatic window scanning
+- **VS Code** — Official extension support
+- **Kiro** — Automatic window scanning
+- **Windsurf** — Automatic window scanning
+- **Antigravity** — Automatic window scanning
+- **Claude Desktop** — MCP protocol integration
+- **Trae** — Automatic window scanning
+- **CodeBuddy** — Automatic window scanning
+
+### 🎨 Elegant Floating Design
+
+- Translucent frosted glass effect, doesn't obstruct workspace
+- Draggable to any position
+- Double-click to quickly reset status
+- Always on top, always visible
+
+### 📊 Multi-task Management
+
+- Track multiple AI tasks simultaneously
+- Click to switch between different tasks
+- Independent display of progress and status for each task
+
+---
+
+## 🚀 Quick Start
+
+### Method 1: Download Pre-built Version (Recommended)
+
+Download from the [Releases](https://github.com/hzw456/vibeProcessBar/releases) page:
+
+| System | Download |
+|:---|:---|
+| macOS (Apple Silicon) | `VibeProcessBar_x.x.x_aarch64.dmg` |
+| macOS (Intel) | `VibeProcessBar_x.x.x_x64.dmg` |
+
+### Method 2: Build from Source
+
 ```bash
+# 1. Clone the repository
+git clone https://github.com/hzw456/vibeProcessBar.git
+cd vibeProcessBar
+
+# 2. Install dependencies
+npm install
+
+# 3. Run in development mode
 npm run tauri dev
-```
 
-## Testing
-
-Run unit tests with Vitest:
-
-```bash
-npm test
-```
-
-## Build
-
-Build for current platform:
-```bash
+# 4. Build for production
 npm run tauri build
 ```
 
-Build for all platforms:
+**System Requirements:**
+- macOS
+- Node.js 18+
+- Rust 1.70+
+- Tauri CLI (`npm install -D @tauri-apps/cli`)
+
+---
+
+## 🔌 Integration
+
+### 1️⃣ VS Code Extension (Easiest)
+
+If you use VS Code or VS Code-based editors:
+
 ```bash
-npm run tauri build -- --target universal-apple-darwin  # macOS
-npm run tauri build --target x86_64-unknown-linux-gnu   # Linux
-npm run tauri build --target x86_64-pc-windows-msvc     # Windows
+# Install VS Code Extension
+# Search "Vibe Process Bar" in VS Code Marketplace
 ```
 
-## Project Structure
+Or install from source: [vibeProcessBarVSCodeExt](https://github.com/hzw456/vibeProcessBarVSCodeExt)
 
-```
-vibeProcessBar/
-├── src/                    # React frontend
-│   ├── components/         # UI components
-│   ├── stores/             # Zustand state management
-│   ├── hooks/              # Custom React hooks
-│   ├── utils/              # Utility functions
-│   └── App.tsx             # Main app component
-├── src-tauri/              # Rust backend
-│   ├── src/main.rs         # Tauri entry point
-│   ├── tauri.conf.json     # Tauri configuration
-│   └── Cargo.toml          # Rust dependencies
-├── package.json
-├── vite.config.ts
-└── tsconfig.json
-```
+**Extension Features:**
+- ✅ Auto-detect window focus changes
+- ✅ Smart recognition of AI code generation activity
+- ✅ No configuration needed, works out of the box
 
-## Features
+### 2️⃣ MCP Protocol (For Claude Desktop / Cline)
 
-- Floating window with transparent background
-- Circular progress indicator
-- Drag to reposition
-- Double-click to reset
-- Zustand state management with persistence
-- Theme support
-- Window position persistence
-- **MCP (Model Context Protocol) support** for AI task status reporting
-
-## MCP Configuration
-
-Vibe Process Bar 提供 MCP 服务，让 AI 编程助手可以上报任务状态。
-
-### 配置方法
-
-在你的 AI 客户端的 MCP 配置文件中添加（如 `mcp_config.json`）：
+Add to your MCP configuration file:
 
 ```json
 {
@@ -111,64 +146,50 @@ Vibe Process Bar 提供 MCP 服务，让 AI 编程助手可以上报任务状态
 }
 ```
 
-### 可用工具
+AI Agents can call the `update_task_status` tool to report progress.
 
-| 工具 | 描述 |
-|------|------|
-| `list_tasks` | 获取所有任务列表（ID、IDE、workspace、状态等） |
-| `update_task_status` | 更新任务状态 |
+### 3️⃣ HTTP API (For Developers)
 
-### AI 使用指南
-
-MCP 服务会自动向 AI 发送以下使用说明：
-
-```
-1. 任务开始时：调用 update_task_status(task_id, "running")
-2. 任务完成时：调用 update_task_status(task_id, "completed")
-3. 任务出错时：调用 update_task_status(task_id, "error")
-
-task_id 格式为 "{ide}_{workspace名}"，例如 "antigravity_myproject"
-可以先调用 list_tasks 获取任务列表
-```
-
-### 状态值
-
-| 状态 | 说明 |
-|------|------|
-| `running` | 进行中 |
-| `completed` | 已完成 |
-| `error` | 出错 |
-| `cancelled` | 已取消 |
-| `armed` | 待命 |
-| `active` | 活跃 |
-
-### 示例请求
+Fully control the progress bar via HTTP API:
 
 ```bash
-# 初始化
-curl -X POST http://127.0.0.1:31415/mcp \
+# Start a task
+curl -X POST http://localhost:31415/api/task/start \
   -H "Content-Type: application/json" \
-  -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}'
+  -d '{"task_id": "my-task", "name": "Generating Code", "ide": "cursor"}'
 
-# 列出所有任务
-curl -X POST http://127.0.0.1:31415/mcp \
-  -d '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"list_tasks"}}'
+# Update progress
+curl -X POST http://localhost:31415/api/task/progress \
+  -H "Content-Type: application/json" \
+  -d '{"task_id": "my-task", "progress": 50}'
 
-# 更新任务状态
-curl -X POST http://127.0.0.1:31415/mcp \
-  -d '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"update_task_status","arguments":{"task_id":"antigravity_myproject","status":"completed"}}}'
+# Complete task
+curl -X POST http://localhost:31415/api/task/complete \
+  -H "Content-Type: application/json" \
+  -d '{"task_id": "my-task"}'
 ```
 
-## Rules for Status Reporting (Best Practices)
+For full API documentation, please refer to [API.md](./API.md).
 
-To ensure the best user experience with the Vibe Process Bar, follow these rules when implementing status reporting in your AI agent or extension:
+---
 
-1.  **Start and End**: Always report `running` at the very beginning of a non-trivial task and `completed` (or `error`) at the end. This provides visual feedback to the user that work is in progress.
-2.  **Use Correct Task ID**: Use `list_tasks` to discover available tasks. The ID is usually `{ide}_{workspace_name}`. Match the current workspace to the correct task ID.
-3.  **Error Handling**: If an exception occurs or the task cannot be completed, explicitly report `error`. Do not leave the bar in a `running` state indefinitely.
-4.  **Granularity**: Only report high-level task status. Avoid reporting every small sub-step (like individual file edits) unless it represents a significant phase change that the user should be aware of. Rapid-fire status updates can be distracting.
-5.  **State Consistency**: If you are unsure of the state, `list_tasks` can be used to query the current status before updating.
+## ⚙️ Settings
 
-## License
+Click the settings icon on the right side of the progress bar to configure:
 
-MIT
+- 🌐 **Language** — Support Chinese / English
+- 🎨 **Theme** — System / Dark / Light
+- 📍 **Position** — Remember window position
+- 🔔 **Notifications** — Alert when task completes
+
+---
+
+## 📄 License
+
+MIT License © 2024
+
+---
+
+<p align="center">
+  <strong>Make AI programming transparent, make waiting anxiety-free ✨</strong>
+</p>

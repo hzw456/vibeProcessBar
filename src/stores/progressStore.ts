@@ -76,12 +76,48 @@ export const useProgressStore = defineStore('progress', () => {
     tasks.value.find(t => t.id === currentTaskId.value) || null
   );
 
+  // 更新托盘菜单翻译
+  async function updateTrayTranslations(language: SupportedLanguage) {
+    try {
+      // 从翻译文件加载托盘翻译
+      const response = await fetch(`/locales/${language}/translation.json`);
+      if (response.ok) {
+        const messages = await response.json();
+        const tray = messages.tray || {};
+        await safeInvoke('update_tray_translations', {
+          translations: {
+            showWindow: tray.showWindow || '☀ Show Window',
+            hideWindow: tray.hideWindow || '☾ Hide Window',
+            settings: tray.settings || 'Settings',
+            quit: tray.quit || 'Quit',
+            noTasks: tray.noTasks || 'No tasks',
+            tasks: tray.tasks || 'Tasks',
+          }
+        });
+      }
+    } catch (err) {
+      error('Failed to update tray translations', { error: String(err) });
+    }
+  }
+
   // Actions
   async function loadSettings() {
     try {
       const loadedSettings = await safeInvoke<AppSettings>('get_app_settings');
       if (loadedSettings) {
+        const oldLanguage = settings.value.language;
         settings.value = loadedSettings;
+
+        // 应用加载的设置
+        setI18nLanguage(loadedSettings.language);
+        document.documentElement.setAttribute('data-theme', loadedSettings.theme);
+        document.documentElement.style.setProperty('--app-font-size', `${loadedSettings.fontSize}px`);
+        document.documentElement.style.setProperty('--app-opacity', loadedSettings.opacity.toString());
+
+        // 仅当语言改变时才更新托盘翻译，避免重复请求和闪烁
+        if (oldLanguage !== loadedSettings.language) {
+          updateTrayTranslations(loadedSettings.language);
+        }
       }
     } catch (err) {
       error('Failed to load settings', { error: String(err) });
@@ -90,6 +126,12 @@ export const useProgressStore = defineStore('progress', () => {
 
   function setSettings(newSettings: AppSettings) {
     settings.value = newSettings;
+
+    // 总是应用所有设置
+    setI18nLanguage(newSettings.language);
+    document.documentElement.setAttribute('data-theme', newSettings.theme);
+    document.documentElement.style.setProperty('--app-font-size', `${newSettings.fontSize}px`);
+    document.documentElement.style.setProperty('--app-opacity', newSettings.opacity.toString());
   }
 
   function addTask(name: string, adapter?: string, ide?: string, windowTitle?: string): string {
@@ -183,6 +225,8 @@ export const useProgressStore = defineStore('progress', () => {
     updateSettingAndSync('language', language);
     // Actually change the i18n locale
     setI18nLanguage(language);
+    // Update tray menu translations
+    updateTrayTranslations(language);
   }
 
   function setTheme(theme: AppSettings['theme']) {
@@ -201,6 +245,8 @@ export const useProgressStore = defineStore('progress', () => {
   function setOpacity(opacity: number) {
     const clampedOpacity = Math.min(1, Math.max(0.5, opacity));
     updateSettingAndSync('opacity', clampedOpacity);
+    // Apply opacity to document
+    document.documentElement.style.setProperty('--app-opacity', clampedOpacity.toString());
   }
 
   async function setAlwaysOnTop(value: boolean) {
@@ -312,6 +358,10 @@ export const useProgressStore = defineStore('progress', () => {
     }
   }
 
+  async function refreshSettings() {
+    await loadSettings();
+  }
+
   return {
     // State
     tasks,
@@ -322,6 +372,7 @@ export const useProgressStore = defineStore('progress', () => {
     currentTask,
     // Actions
     loadSettings,
+    refreshSettings,
     setSettings,
     addTask,
     removeTask,

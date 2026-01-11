@@ -10,7 +10,7 @@
     "running": "Running...",
     "completed": "Done",
     "error": "Error",
-    "completedWithTime": "{{taskName}} - {{elapsedTime}}"
+    "completedWithTime": "{taskName} - {elapsedTime}"
   },
   "menu": {
     "title": "Tasks",
@@ -25,7 +25,7 @@
     "closeMenu": "Close Menu"
   },
   "notification": {
-    "taskCompleted": "{{taskName}} Completed!"
+    "taskCompleted": "{taskName} Completed!"
   },
   "settings": {
     "title": "Settings",
@@ -43,7 +43,8 @@
       "showWindow": "Show Window",
       "hideWindow": "Hide Window",
       "httpHost": "HTTP Listen Address",
-      "httpPort": "HTTP API Port"
+      "httpPort": "HTTP API Port",
+      "blockPluginStatus": "Block plugin status reporting"
     },
     "appearance": {
       "theme": "Theme",
@@ -55,8 +56,8 @@
         "forest": "Forest",
         "midnight": "Midnight"
       },
-      "fontSize": "Font Size: {{size}}px",
-      "opacity": "Opacity: {{percentage}}%",
+      "fontSize": "Font Size: {size}px",
+      "opacity": "Opacity: {percentage}%",
       "primaryColor": "Custom Primary Color",
       "resetColors": "Reset Custom Colors",
       "reset": "Reset"
@@ -64,15 +65,16 @@
     "notifications": {
       "desktopNotifications": "Desktop notifications",
       "soundAlerts": "Sound alerts",
-      "volume": "Volume: {{percentage}}%",
-      "completionThreshold": "Completion threshold: {{percentage}}%",
+      "volume": "Volume: {percentage}%",
+      "completionThreshold": "Completion threshold: {percentage}%",
       "doNotDisturb": "Do Not Disturb",
       "startTime": "Start Time",
-      "endTime": "End Time"
+      "endTime": "End Time",
+      "test": "Test"
     },
     "tasks": {
       "history": "Task History",
-      "historyCount": "{{count}} tasks",
+      "historyCount": "{count} tasks",
       "clearHistory": "Clear History",
       "clear": "Clear"
     },
@@ -85,13 +87,13 @@
       "clickStatus": "Activate IDE window"
     },
     "footer": {
-      "version": "Vibe Progress Bar v{{version}}",
+      "version": "Vibe Progress Bar v{version}",
       "resetDefaults": "Reset to defaults"
     }
   },
   "time": {
-    "minutesSeconds": "{{minutes}}m {{seconds}}s",
-    "seconds": "{{seconds}}s",
+    "minutesSeconds": "{minutes}m {seconds}s",
+    "seconds": "{seconds}s",
     "waiting": "⏳",
     "active": "👁"
   },

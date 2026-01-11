@@ -5,6 +5,7 @@ import { useProgressStore, type ProgressTask, type AppSettings } from './stores/
 import StatusText from './components/StatusText.vue';
 import SettingsPanel from './components/SettingsPanel.vue';
 import { debug, error } from './utils/logger';
+import { playCompletionSound } from './utils/notifications';
 
 debug('App.vue loaded');
 
@@ -31,11 +32,16 @@ async function getWindow() {
 }
 
 // Check if this is the settings window
-const isSettingsWindow = ref(false);
-getCurrentWindowLabel().then(label => {
-  isSettingsWindow.value = label === 'settings';
-  debug('Window label', { label, isSettings: isSettingsWindow.value });
-});
+const isSettingsWindow = ref(window.location.search.includes('type=settings'));
+if (isTauri && !isSettingsWindow.value) {
+    // Double check with label for main window, just in case, but rely on query param primarily
+    getCurrentWindowLabel().then(label => {
+        if (label === 'settings') isSettingsWindow.value = true;
+        debug('Window label check', { label, isSettings: isSettingsWindow.value });
+    });
+} else {
+    debug('Window type detected from URL', { isSettings: isSettingsWindow.value });
+}
 
 interface IdeWindow {
   bundle_id: string;
@@ -58,6 +64,9 @@ const isCollapseTransition = ref(false);
 const ideWindows = ref<IdeWindow[]>([]);
 const prevTasks = ref<ProgressTask[]>([]);
 const isActivatingRef = ref(false);
+
+// Computed - 确保透明度响应式更新
+const windowOpacity = computed(() => store.settings.opacity);
 
 // Computed
 const allDisplayItems = computed(() => {
@@ -280,8 +289,15 @@ function getDisplayName(task: ProgressTask): string {
   return task.name;
 }
 
+// Watch settings changes and apply CSS variables
+// Note: Settings application is now handled by the store actions (setSettings, loadSettings, etc.)
+// We don't need a watcher here to avoid double application and conflicts
+
 // Track running/focused tasks and detect completions
 watch(() => store.tasks, (newTasks) => {
+  // If settings window, checking completions might not be critical, but keeping it is harmless
+  if (isSettingsWindow.value) return;
+
   // Track focused/running tasks
   newTasks.forEach(task => {
     if (task.isFocused || task.status === 'running') {
@@ -292,7 +308,7 @@ watch(() => store.tasks, (newTasks) => {
   // Note: completed + focused -> armed transition is now handled by backend
   // in the /api/task/active endpoint when the extension sends heartbeat
 
-  // Detect completions - show completion notification for background tasks
+  // Detect completions - show completion notification and play sound
   newTasks.forEach(task => {
     const prevTask = prevTasks.value.find(t => t.id === task.id);
     if (prevTask && prevTask.status !== 'completed' && task.status === 'completed') {
@@ -300,6 +316,10 @@ watch(() => store.tasks, (newTasks) => {
       if (!seenActiveTasks.value.has(task.id)) {
         completedTask.value = task.id;
         setTimeout(() => { completedTask.value = null; }, 3000);
+      }
+      // Play completion sound for all completed tasks if enabled
+      if (store.settings.sound) {
+        playCompletionSound(store.settings.soundVolume);
       }
       // Note: Do NOT add to clickedCompletedTasks here
       // Green border should always show for completed tasks
@@ -344,6 +364,7 @@ watch([displayTasks, isCollapsed, isCollapseTransition], async () => {
   let syncInterval: number;
   let scanInterval: number;
   let forceUpdateInterval: number;
+  let settingsPollInterval: number;
   let unlistenSettings: (() => void) | undefined;
 
   onMounted(async () => {
@@ -360,21 +381,32 @@ watch([displayTasks, isCollapsed, isCollapseTransition], async () => {
       }
     }
 
-    // Initial scan
-    await scanIdeWindows();
+    // Always load settings to apply theme
     await store.loadSettings();
-    await store.syncFromHttpApi();
 
-    // Set up intervals
-    syncInterval = window.setInterval(() => store.syncFromHttpApi(), 1000);
-    scanInterval = window.setInterval(scanIdeWindows, 5000);
-    forceUpdateInterval = window.setInterval(() => {}, 1000); // Force update for time
+    // The rest is only for Main Window
+    if (!isSettingsWindow.value) {
+        // Initial scan
+        await scanIdeWindows();
+        await store.syncFromHttpApi();
+
+        // Set up intervals
+        syncInterval = window.setInterval(() => store.syncFromHttpApi(), 1000);
+        scanInterval = window.setInterval(scanIdeWindows, 5000);
+        forceUpdateInterval = window.setInterval(() => {}, 1000); // Force update for time
+        
+        // Poll settings every 2 seconds to ensure sync across windows even if events are missed
+        settingsPollInterval = window.setInterval(() => {
+          store.refreshSettings();
+        }, 2000);
+    }
   });
 
   onUnmounted(() => {
-    clearInterval(syncInterval);
-    clearInterval(scanInterval);
-    clearInterval(forceUpdateInterval);
+    if (syncInterval) clearInterval(syncInterval);
+    if (scanInterval) clearInterval(scanInterval);
+    if (forceUpdateInterval) clearInterval(forceUpdateInterval);
+    if (settingsPollInterval) clearInterval(settingsPollInterval);
     if (unlistenSettings) unlistenSettings();
   });
 </script>
@@ -390,7 +422,7 @@ watch([displayTasks, isCollapsed, isCollapseTransition], async () => {
     v-else
     ref="containerRef"
     :class="['app-container', { collapsed: isCollapsed, 'multi-task': displayTasks.length > 1, 'has-completed': !!completedTask }]"
-    :style="{ opacity: store.settings.opacity }"
+    :style="{ opacity: windowOpacity }"
     @mousedown="handleMouseDown"
   >
     <!-- Collapse/Expand button -->

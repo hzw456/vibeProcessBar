@@ -43,7 +43,7 @@ fn open_settings_window<R: Runtime>(app: tauri::AppHandle<R>) -> Result<(), Stri
         let _ = tauri::WebviewWindowBuilder::new(
             &app,
             "settings",
-            tauri::WebviewUrl::App("index.html".into()),
+            tauri::WebviewUrl::App("index.html?type=settings".into()),
         )
         .title("Settings")
         .inner_size(800.0, 600.0)
@@ -1033,6 +1033,74 @@ async fn trigger_notification<R: Runtime>(
     Ok(())
 }
 
+/// 更新托盘菜单（语言改变时调用）
+fn update_tray_menu<R: Runtime>(app: &tauri::AppHandle<R>) {
+    let trans = get_tray_translations_internal();
+
+    let window = app.get_webview_window("main");
+    let is_visible = window
+        .map(|w| w.is_visible().unwrap_or(true))
+        .unwrap_or(true);
+
+    let window_text = if is_visible {
+        &trans.hide_window
+    } else {
+        &trans.show_window
+    };
+
+    let window_toggle =
+        tauri::menu::MenuItem::with_id(app, "toggle-window", window_text, true, None::<&str>).ok();
+    let settings_item =
+        tauri::menu::MenuItem::with_id(app, "settings", &trans.settings, true, None::<&str>).ok();
+    let quit_item = tauri::menu::MenuItem::with_id(app, "quit", &trans.quit, true, None::<&str>).ok();
+
+    if let (Some(w), Some(s), Some(q)) = (window_toggle, settings_item, quit_item) {
+        // Get tasks from http_server state
+        let tasks: Vec<http_server::Task> = http_server::get_state()
+            .tasks
+            .lock()
+            .map(|t| t.clone())
+            .unwrap_or_default();
+
+        let mut items: Vec<&dyn tauri::menu::IsMenuItem<R>> = vec![&w, &s, &q];
+        let sep1 = tauri::menu::PredefinedMenuItem::separator(app).ok();
+        let mut task_items: Vec<tauri::menu::MenuItem<R>> = Vec::new();
+
+        for task in &tasks {
+            let status_icon = match task.status.as_str() {
+                "running" => "🔄",
+                "armed" => "⏳",
+                "completed" => "✅",
+                "error" => "❌",
+                "cancelled" => "⏹️",
+                "registered" => "📋",
+                "active" => "👁️",
+                _ => "•",
+            };
+            let title = format!("{} {} - {}", status_icon, task.name, task.status);
+            let id = format!("task_{}", task.id);
+            if let Ok(item) = tauri::menu::MenuItem::with_id(app, &id, &title, true, None::<&str>) {
+                task_items.push(item);
+            }
+        }
+
+        if !task_items.is_empty() {
+            if let Some(ref sep) = sep1 {
+                items.push(sep);
+            }
+            for item in &task_items {
+                items.push(item);
+            }
+        }
+
+        if let Ok(menu) = tauri::menu::Menu::with_items(app, &items) {
+            if let Some(tray) = app.tray_by_id("main-tray") {
+                let _ = tray.set_menu(Some(menu));
+            }
+        }
+    }
+}
+
 #[tauri::command]
 async fn get_app_settings(
     state: tauri::State<'_, settings::SettingsState>,
@@ -1065,8 +1133,10 @@ async fn update_app_settings<R: Runtime>(
         state.save(&conn)?;
     }
 
-    app.emit("settings-changed", new_settings.clone())
-        .map_err(|e| e.to_string())?;
+    // 发送到所有窗口
+    for (_, window) in app.webview_windows() {
+        let _ = window.emit("settings-changed", new_settings.clone());
+    }
 
     Ok(())
 }
@@ -1110,122 +1180,58 @@ async fn set_window_visibility<R: Runtime>(
     Ok(())
 }
 
-#[tauri::command]
-fn get_tray_translations(language: String) -> serde_json::Value {
-    let translations: std::collections::HashMap<&str, &str> = match language.as_str() {
-        "zh-CN" => vec![
-            ("showWindow", "☀ 显示窗口"),
-            ("hideWindow", "☾ 隐藏窗口"),
-            ("settings", "设置"),
-            ("quit", "退出"),
-            ("noTasks", "无任务"),
-            ("tasks", "任务"),
-        ]
-        .into_iter()
-        .collect(),
-        "zh-TW" => vec![
-            ("showWindow", "☀ 顯示窗口"),
-            ("hideWindow", "☾ 隱藏窗口"),
-            ("settings", "設置"),
-            ("quit", "退出"),
-            ("noTasks", "無任務"),
-            ("tasks", "任務"),
-        ]
-        .into_iter()
-        .collect(),
-        "de" => vec![
-            ("showWindow", "☀ Fenster anzeigen"),
-            ("hideWindow", "☾ Fenster ausblenden"),
-            ("settings", "Einstellungen"),
-            ("quit", "Beenden"),
-            ("noTasks", "Keine Aufgaben"),
-            ("tasks", "Aufgaben"),
-        ]
-        .into_iter()
-        .collect(),
-        "es" => vec![
-            ("showWindow", "☀ Mostrar ventana"),
-            ("hideWindow", "☾ Ocultar ventana"),
-            ("settings", "Configuración"),
-            ("quit", "Salir"),
-            ("noTasks", "Sin tareas"),
-            ("tasks", "Tareas"),
-        ]
-        .into_iter()
-        .collect(),
-        "fr" => vec![
-            ("showWindow", "☀ Afficher la fenêtre"),
-            ("hideWindow", "☾ Masquer la fenêtre"),
-            ("settings", "Paramètres"),
-            ("quit", "Quitter"),
-            ("noTasks", "Aucune tâche"),
-            ("tasks", "Tâches"),
-        ]
-        .into_iter()
-        .collect(),
-        "ja" => vec![
-            ("showWindow", "☀ ウィンドウを表示"),
-            ("hideWindow", "☾ ウィンドウを非表示"),
-            ("settings", "設定"),
-            ("quit", "終了"),
-            ("noTasks", "タスクなし"),
-            ("tasks", "タスク"),
-        ]
-        .into_iter()
-        .collect(),
-        "ko" => vec![
-            ("showWindow", "☀ 창 표시"),
-            ("hideWindow", "☾ 창 숨기기"),
-            ("settings", "설정"),
-            ("quit", "종료"),
-            ("noTasks", "작업 없음"),
-            ("tasks", "작업"),
-        ]
-        .into_iter()
-        .collect(),
-        "pt" => vec![
-            ("showWindow", "☀ Mostrar janela"),
-            ("hideWindow", "☾ Ocultar janela"),
-            ("settings", "Configurações"),
-            ("quit", "Sair"),
-            ("noTasks", "Sem tarefas"),
-            ("tasks", "Tarefas"),
-        ]
-        .into_iter()
-        .collect(),
-        "ru" => vec![
-            ("showWindow", "☀ Показать окно"),
-            ("hideWindow", "☾ Скрыть окно"),
-            ("settings", "Настройки"),
-            ("quit", "Выйти"),
-            ("noTasks", "Нет задач"),
-            ("tasks", "Задачи"),
-        ]
-        .into_iter()
-        .collect(),
-        "ar" => vec![
-            ("showWindow", "☀ إظهار النافذة"),
-            ("hideWindow", "☾ إخفاء النافذة"),
-            ("settings", "الإعدادات"),
-            ("quit", "خروج"),
-            ("noTasks", "لا توجد مهام"),
-            ("tasks", "المهام"),
-        ]
-        .into_iter()
-        .collect(),
-        _ => vec![
-            ("showWindow", "☀ Show Window"),
-            ("hideWindow", "☾ Hide Window"),
-            ("settings", "Settings"),
-            ("quit", "Quit"),
-            ("noTasks", "No tasks"),
-            ("tasks", "Tasks"),
-        ]
-        .into_iter()
-        .collect(),
-    };
+#[derive(Debug, Clone, PartialEq, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TrayTranslations {
+    pub show_window: String,
+    pub hide_window: String,
+    pub settings: String,
+    pub quit: String,
+    pub no_tasks: String,
+    pub tasks: String,
+}
 
-    serde_json::to_value(translations).unwrap_or_default()
+// 全局存储托盘翻译
+lazy_static::lazy_static! {
+    static ref TRAY_TRANSLATIONS: std::sync::Mutex<TrayTranslations> = std::sync::Mutex::new(TrayTranslations {
+        show_window: "☀ Show Window".to_string(),
+        hide_window: "☾ Hide Window".to_string(),
+        settings: "Settings".to_string(),
+        quit: "Quit".to_string(),
+        no_tasks: "No tasks".to_string(),
+        tasks: "Tasks".to_string(),
+    });
+}
+
+fn get_tray_translations_internal() -> TrayTranslations {
+    TRAY_TRANSLATIONS.lock().map(|t| t.clone()).unwrap_or_else(|_| TrayTranslations {
+        show_window: "☀ Show Window".to_string(),
+        hide_window: "☾ Hide Window".to_string(),
+        settings: "Settings".to_string(),
+        quit: "Quit".to_string(),
+        no_tasks: "No tasks".to_string(),
+        tasks: "Tasks".to_string(),
+    })
+}
+
+#[tauri::command]
+async fn update_tray_translations<R: Runtime>(
+    app: tauri::AppHandle<R>,
+    translations: TrayTranslations,
+) -> Result<(), String> {
+    // 更新全局翻译
+    if let Ok(mut trans) = TRAY_TRANSLATIONS.lock() {
+        if *trans == translations {
+            // 如果翻译没有变化，不更新托盘菜单，避免闪烁
+            return Ok(());
+        }
+        *trans = translations;
+    }
+    
+    // 更新托盘菜单
+    update_tray_menu(&app);
+    
+    Ok(())
 }
 
 #[tauri::command]
@@ -1241,6 +1247,18 @@ fn main() {
 
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
+        .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
+            // When a second instance is launched, show and focus the main window
+            // Also show settings window if it exists
+            if let Some(main_window) = app.get_webview_window("main") {
+                let _ = main_window.show();
+                let _ = main_window.set_focus();
+            }
+            if let Some(settings_window) = app.get_webview_window("settings") {
+                let _ = settings_window.show();
+                let _ = settings_window.set_focus();
+            }
+        }))
         .invoke_handler(tauri::generate_handler![
             get_app_version,
             minimize_window,
@@ -1268,7 +1286,7 @@ fn main() {
             update_app_settings,
             get_window_visibility,
             set_window_visibility,
-            get_tray_translations,
+            update_tray_translations,
             get_current_language,
         ])
         .setup(|app| {
@@ -1324,126 +1342,34 @@ fn main() {
 
             http_server::start_server_background(current_settings.http_host.clone(), current_settings.http_port);
             info!(host = %current_settings.http_host, port = %current_settings.http_port, "HTTP server started");
-            let language = current_settings.language;
-            let translations = get_tray_translations(language);
-
-            let show_window_text = translations
-                .get("showWindow")
-                .and_then(|v| v.as_str())
-                .unwrap_or("☀ Show Window");
-            let hide_window_text = translations
-                .get("hideWindow")
-                .and_then(|v| v.as_str())
-                .unwrap_or("☾ Hide Window");
-            let settings_text = translations
-                .get("settings")
-                .and_then(|v| v.as_str())
-                .unwrap_or("Settings");
-            let quit_text = translations
-                .get("quit")
-                .and_then(|v| v.as_str())
-                .unwrap_or("Quit");
+            
+            // 使用默认英文翻译初始化托盘
+            let trans = get_tray_translations_internal();
 
             let window_toggle_item = MenuItem::with_id(
                 &app_handle,
                 "toggle-window",
-                hide_window_text,
+                &trans.hide_window,
                 true,
                 None::<&str>,
             )?;
             let settings_item =
-                MenuItem::with_id(&app_handle, "settings", settings_text, true, None::<&str>)?;
-            let quit_item = MenuItem::with_id(&app_handle, "quit", quit_text, true, None::<&str>)?;
+                MenuItem::with_id(&app_handle, "settings", &trans.settings, true, None::<&str>)?;
+            let quit_item = MenuItem::with_id(&app_handle, "quit", &trans.quit, true, None::<&str>)?;
 
             let icon_bytes = include_bytes!("../icons/tray.png");
             let img = image::load_from_memory(icon_bytes).expect("Failed to load tray icon");
             let rgba = img.to_rgba8();
             let (width, height) = rgba.dimensions();
-            let icon = tauri::image::Image::new_owned(rgba.into_raw(), width, height);
+            let raw_data: Vec<u8> = rgba.into_raw();
+            let icon = tauri::image::Image::new_owned(raw_data, width, height);
 
             info!("Creating system tray with icon {}x{}", width, height);
 
-            let app_handle_clone = app.app_handle().clone();
-            let translations_clone = translations.clone();
-
-            let rebuild_menu = move |app: &tauri::AppHandle, is_visible: bool| {
-                let lang = {
-                    let state = app.state::<settings::SettingsState>();
-                    state.get_settings().language
-                };
-                let trans = get_tray_translations(lang);
-                let window_text = if is_visible {
-                    trans
-                        .get("hideWindow")
-                        .and_then(|v| v.as_str())
-                        .unwrap_or("☾ Hide Window")
-                } else {
-                    trans
-                        .get("showWindow")
-                        .and_then(|v| v.as_str())
-                        .unwrap_or("☀ Show Window")
-                };
-                let settings_text = trans
-                    .get("settings")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("Settings");
-                let quit_text = trans.get("quit").and_then(|v| v.as_str()).unwrap_or("Quit");
-
-                let window_toggle =
-                    MenuItem::with_id(app, "toggle-window", window_text, true, None::<&str>).ok();
-                let settings =
-                    MenuItem::with_id(app, "settings", settings_text, true, None::<&str>).ok();
-                let quit = MenuItem::with_id(app, "quit", quit_text, true, None::<&str>).ok();
-
-                if let (Some(w), Some(s), Some(q)) = (window_toggle, settings, quit) {
-                    // Get tasks from http_server state
-                    let tasks: Vec<http_server::Task> = http_server::get_state()
-                        .tasks
-                        .lock()
-                        .map(|t| t.clone())
-                        .unwrap_or_default();
-
-                    // Build menu items
-                    let mut items: Vec<&dyn tauri::menu::IsMenuItem<tauri::Wry>> = vec![&w, &s, &q];
-
-                    // Add separator and tasks if any
-                    let sep1 = tauri::menu::PredefinedMenuItem::separator(app).ok();
-                    let mut task_items: Vec<MenuItem<tauri::Wry>> = Vec::new();
-
-                    for task in &tasks {
-                        // Status icon based on task status
-                        let status_icon = match task.status.as_str() {
-                            "running" => "🔄",
-                            "armed" => "⏳",
-                            "completed" => "✅",
-                            "error" => "❌",
-                            "cancelled" => "⏹️",
-                            "registered" => "📋",
-                            "active" => "👁️",
-                            _ => "•",
-                        };
-                        let title = format!("{} {} - {}", status_icon, task.name, task.status);
-                        let id = format!("task_{}", task.id);
-                        if let Ok(item) = MenuItem::with_id(app, &id, &title, true, None::<&str>) {
-                            task_items.push(item);
-                        }
-                    }
-
-                    // Add tasks section
-                    if !task_items.is_empty() {
-                        if let Some(ref sep) = sep1 {
-                            items.push(sep);
-                        }
-                        for item in &task_items {
-                            items.push(item);
-                        }
-                    }
-
-                    if let Ok(menu) = tauri::menu::Menu::with_items(app, &items) {
-                        let _ = app.tray_by_id("main-tray").unwrap().set_menu(Some(menu));
-                    }
-                }
-            };
+            // NOTE: rebuild_menu was removed because calling set_menu during on_menu_event
+            // causes use-after-free crashes. The menu item being clicked gets freed during rebuild.
+            // Menu text updates (like "Show Window" <-> "Hide Window") are not supported
+            // to avoid this crash. Only tooltip is updated.
 
             let tray = TrayIconBuilder::with_id("main-tray")
                 .icon(icon)
@@ -1461,7 +1387,7 @@ fn main() {
                             let settings_state = app.state::<settings::SettingsState>();
 
                             let conn = db_state.get_connection();
-                            let settings = AppSettings::load(&conn);
+                            let _settings = AppSettings::load(&conn);
                             drop(conn);
 
                             let window = app.get_webview_window("main").unwrap();
@@ -1479,7 +1405,8 @@ fn main() {
                                     .tray_by_id("main-tray")
                                     .unwrap()
                                     .set_tooltip(Some("Vibe Process Bar (Hidden)"));
-                                rebuild_menu(app, false);
+                                // NOTE: Don't call rebuild_menu here - it causes use-after-free crash
+                                // because the menu item being clicked gets freed during rebuild
                             } else {
                                 let _ = window.show();
                                 let mut settings = settings_state.settings.lock().unwrap();
@@ -1492,7 +1419,7 @@ fn main() {
                                     .tray_by_id("main-tray")
                                     .unwrap()
                                     .set_tooltip(Some("Vibe Process Bar"));
-                                rebuild_menu(app, true);
+                                // NOTE: Don't call rebuild_menu here - it causes use-after-free crash
                             }
                         }
                         "settings" => {
@@ -1554,135 +1481,9 @@ fn main() {
 
             info!("System tray created successfully with id: {:?}", tray.id());
 
-            // Periodically check and refresh tray menu only when tasks change
-            let app_handle_for_timer = app.app_handle().clone();
-            std::thread::spawn(move || {
-                let mut last_task_snapshot: String = String::new();
-
-                loop {
-                    std::thread::sleep(std::time::Duration::from_millis(500));
-
-                    // Get current tasks and create a snapshot for comparison
-                    let tasks: Vec<http_server::Task> = http_server::get_state()
-                        .tasks
-                        .lock()
-                        .map(|t| t.clone())
-                        .unwrap_or_default();
-
-                    // Create a simple snapshot of task IDs and statuses
-                    let current_snapshot: String = tasks
-                        .iter()
-                        .map(|t| format!("{}:{}", t.id, t.status))
-                        .collect::<Vec<_>>()
-                        .join(",");
-
-                    // Only rebuild menu if tasks have changed
-                    if current_snapshot != last_task_snapshot {
-                        last_task_snapshot = current_snapshot;
-
-                        let app = &app_handle_for_timer;
-                        let window = app.get_webview_window("main");
-                        let is_visible = window
-                            .map(|w| w.is_visible().unwrap_or(true))
-                            .unwrap_or(true);
-
-                        let lang = {
-                            let state = app.state::<settings::SettingsState>();
-                            state.get_settings().language
-                        };
-                        let trans = get_tray_translations(lang);
-                        let window_text = if is_visible {
-                            trans
-                                .get("hideWindow")
-                                .and_then(|v| v.as_str())
-                                .unwrap_or("☾ Hide Window")
-                        } else {
-                            trans
-                                .get("showWindow")
-                                .and_then(|v| v.as_str())
-                                .unwrap_or("☀ Show Window")
-                        };
-                        let settings_text = trans
-                            .get("settings")
-                            .and_then(|v| v.as_str())
-                            .unwrap_or("Settings");
-                        let quit_text =
-                            trans.get("quit").and_then(|v| v.as_str()).unwrap_or("Quit");
-
-                        let window_toggle = tauri::menu::MenuItem::with_id(
-                            app,
-                            "toggle-window",
-                            window_text,
-                            true,
-                            None::<&str>,
-                        )
-                        .ok();
-                        let settings = tauri::menu::MenuItem::with_id(
-                            app,
-                            "settings",
-                            settings_text,
-                            true,
-                            None::<&str>,
-                        )
-                        .ok();
-                        let quit = tauri::menu::MenuItem::with_id(
-                            app,
-                            "quit",
-                            quit_text,
-                            true,
-                            None::<&str>,
-                        )
-                        .ok();
-
-                        if let (Some(w), Some(s), Some(q)) = (window_toggle, settings, quit) {
-                            let mut items: Vec<&dyn tauri::menu::IsMenuItem<tauri::Wry>> =
-                                vec![&w, &s, &q];
-                            let sep1 = tauri::menu::PredefinedMenuItem::separator(app).ok();
-                            let mut task_items: Vec<tauri::menu::MenuItem<tauri::Wry>> = Vec::new();
-
-                            for task in &tasks {
-                                let status_icon = match task.status.as_str() {
-                                    "running" => "🔄",
-                                    "armed" => "⏳",
-                                    "completed" => "✅",
-                                    "error" => "❌",
-                                    "cancelled" => "⏹️",
-                                    "registered" => "📋",
-                                    "active" => "👁️",
-                                    _ => "•",
-                                };
-                                let title =
-                                    format!("{} {} - {}", status_icon, task.name, task.status);
-                                let id = format!("task_{}", task.id);
-                                if let Ok(item) = tauri::menu::MenuItem::with_id(
-                                    app,
-                                    &id,
-                                    &title,
-                                    true,
-                                    None::<&str>,
-                                ) {
-                                    task_items.push(item);
-                                }
-                            }
-
-                            if !task_items.is_empty() {
-                                if let Some(ref sep) = sep1 {
-                                    items.push(sep);
-                                }
-                                for item in &task_items {
-                                    items.push(item);
-                                }
-                            }
-
-                            if let Ok(menu) = tauri::menu::Menu::with_items(app, &items) {
-                                if let Some(tray) = app.tray_by_id("main-tray") {
-                                    let _ = tray.set_menu(Some(menu));
-                                }
-                            }
-                        }
-                    }
-                }
-            });
+            // NOTE: Removed background thread menu updates to prevent use-after-free crashes
+            // when user clicks on menu while it's being updated.
+            // Menu is now only updated when menu events are handled (toggle-window, etc.)
 
             Box::leak(Box::new(tray));
 
