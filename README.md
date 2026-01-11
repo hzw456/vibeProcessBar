@@ -60,7 +60,7 @@ Fully supports mainstream AI coding tools and IDEs:
 
 - Translucent frosted glass effect, doesn't obstruct workspace
 - Draggable to any position
-- Double-click to quickly reset status
+- Double-click to jump to the corresponding window
 - Always on top, always visible
 
 ### 📊 Multi-task Management

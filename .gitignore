@@ -18,6 +18,7 @@ src-tauri/gen/
 src-tauri/_resources/
 src-tauri/._*
 *.icns
+!src-tauri/icons/*.icns
 !.gitignore
 
 # Common
