@@ -1,7 +1,7 @@
 # Vibe Process Bar
 
 <p align="center">
-  <img src="./src-tauri/icons/256x256.png" alt="Vibe Process Bar Logo" width="128" height="128">
+  <img src="./src-tauri/icons/512x512.png" alt="Vibe Process Bar Logo" width="128" height="128">
 </p>
 
 <p align="center">
@@ -41,27 +41,20 @@ When using AI coding assistants like Cursor, Kiro, or Claude, do you often face 
 | **Armed** | ◎ | Standing by, ready to start |
 | **Running** | ◉ | AI is working, dynamic progress bar |
 | **Completed** | ✓ | Task completed |
-
-**Smart Focus Switching:**
-
-The progress bar automatically detects focus changes when you switch windows:
-
-- 👁 **Focus Gained** — Shows eye icon, and if task was completed, automatically resets to ◎ Armed status
-- 🔙 **Focus Lost** — Maintains current status, continuing to show AI's progress
-- ◉ **Task Running** — Always shows real-time progress regardless of window focus
+| **Focused** | 👁 | Window gained focus |
 
 ### 🖥️ Multi-IDE Support
 
-Supports mainstream AI coding tools:
+Fully supports mainstream AI coding tools and IDEs:
 
-- **Cursor** — Automatic window scanning
-- **VS Code** — Official extension support
-- **Kiro** — Automatic window scanning
-- **Windsurf** — Automatic window scanning
-- **Antigravity** — Automatic window scanning
-- **Claude Desktop** — MCP protocol integration
-- **Trae** — Automatic window scanning
-- **CodeBuddy** — Automatic window scanning
+- **VS Code** (including derivatives)
+    - Supports all major AI plugins: GitHub Copilot, Cline, RooCode, Claude Code, etc.
+- **Cursor** (Native Support)
+- **Kiro** (Native Support)
+- **Windsurf** (Native Support)
+- **Antigravity** (Native Support)
+- **Trae** (Native Support)
+- **CodeBuddy / CodeBuddy CN** (Native Support)
 
 ### 🎨 Elegant Floating Design
 
@@ -114,27 +107,24 @@ npm run tauri build
 
 ---
 
-## 🔌 Integration
+## 🔌 Core Principles & Integration
 
-### 1️⃣ VS Code Extension (Easiest)
+Vibe Process Bar provides three flexible status detection mechanisms, adapting to different usage scenarios:
 
-If you use VS Code or VS Code-based editors:
+### 1️⃣ Hook Detection (Recommended)
+Syncs status precisely via the IDE's own Hook mechanism.
+- **Principle**: Uses IDE callbacks (like `.kirohooks` start scripts, `.cursorrules`, etc.) to automatically notify Vibe Process Bar when tasks start and end.
+- **Supported Apps**: Cursor, Windsurf, Kiro, Trae, CodeBuddy, Antigravity.
+- **Features**: Triggered by official or native Hook interfaces, extremely accurate.
 
-```bash
-# Install VS Code Extension
-# Search "Vibe Process Bar" in VS Code Marketplace
-```
-
-Or install from source: [vibeProcessBarVSCodeExt](https://github.com/hzw456/vibeProcessBarVSCodeExt)
-
-**Extension Features:**
-- ✅ Auto-detect window focus changes
-- ✅ Smart recognition of AI code generation activity
-- ✅ No configuration needed, works out of the box
-
-### 2️⃣ MCP Protocol (For Claude Desktop / Cline)
-
-Add to your MCP configuration file:
+### 2️⃣ MCP Protocol (Recommended)
+Connects directly via the Model Context Protocol standard.
+- **Principle**: AI Agent actively connects to Vibe Process Bar Server via MCP Client.
+- **Tools Provided**:
+    - `list_tasks`: Get current active task list.
+    - `update_task_status`: Report task status (running, completed, error, etc.).
+- **Supported Apps**: Supports all plugins and tools compatible with MCP protocol (like Claude Desktop, Cline, RooCode, etc.).
+- **Configuration Example**:
 
 ```json
 {
@@ -146,30 +136,31 @@ Add to your MCP configuration file:
 }
 ```
 
-AI Agents can call the `update_task_status` tool to report progress.
+### 3️⃣ Plugin Reporting (Code Detection)
+Analyzes code change frequency via VS Code extension.
+- **Principle**: Monitors file modification speed and character changes to infer if AI is generating code.
+- **Supported Plugins**: GitHub Copilot, RooCode, Cline, Claude Code, and all other AI plugins running inside VS Code.
+> [!WARNING]
+> **Not recommended for precise tracking**
+> This method is a "guess" based on code modification behavior, which is less accurate than MCP or Hook methods. Only recommended as a supplement when MCP or Hook cannot be used.
 
-### 3️⃣ HTTP API (For Developers)
+---
 
-Fully control the progress bar via HTTP API:
+## 🛠️ Supported IDEs & Plugin List
 
-```bash
-# Start a task
-curl -X POST http://localhost:31415/api/task/start \
-  -H "Content-Type: application/json" \
-  -d '{"task_id": "my-task", "name": "Generating Code", "ide": "cursor"}'
+For the best experience, we recommend choosing the integration method that best fits your tool:
 
-# Update progress
-curl -X POST http://localhost:31415/api/task/progress \
-  -H "Content-Type: application/json" \
-  -d '{"task_id": "my-task", "progress": 50}'
+| Tool/IDE | Recommended Method | Optimization |
+|:---|:---|:---|
+| **Cursor** | ✅ Hook | Automatic support, no config needed |
+| **Windsurf** | ✅ Hook | Automatic support |
+| **Claude Desktop** | ✅ MCP | Add MCP Server to config |
+| **Cline** | ✅ MCP | Recommended, best experience |
+| **RooCode** | ✅ MCP | Recommended |
+| **GitHub Copilot** | ⚠️ Plugin Reporting | Requires [Vibe Process Bar Extension](https://github.com/hzw456/vibeProcessBarVSCodeExt) |
+| **VS Code** | 🔌 Plugin | Must install VS Code extension to detect internal AI activity |
 
-# Complete task
-curl -X POST http://localhost:31415/api/task/complete \
-  -H "Content-Type: application/json" \
-  -d '{"task_id": "my-task"}'
-```
-
-For full API documentation, please refer to [API.md](./API.md).
+**Note**: For AI assistants running in VS Code (like GitHub Copilot), you **must** install the Vibe Process Bar VS Code extension to enable status detection.
 
 ---
 
