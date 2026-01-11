@@ -2,6 +2,7 @@ import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
 import { debug, error } from '../utils/logger';
 import type { SupportedLanguage } from '../utils/i18n';
+import { setLanguage as setI18nLanguage } from '../utils/i18n';
 
 // Check if we're running in Tauri
 const isTauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
@@ -35,26 +36,17 @@ export interface ProgressTask {
 
 export interface AppSettings {
   language: SupportedLanguage;
-  theme: 'dark' | 'light' | 'purple' | 'ocean' | 'forest' | 'midnight';
+  theme: 'dark' | 'purple' | 'ocean' | 'forest' | 'midnight';
   fontSize: number;
   opacity: number;
   alwaysOnTop: boolean;
   autoStart: boolean;
-  notifications: boolean;
   sound: boolean;
   soundVolume: number;
   httpHost: string;
   httpPort: number;
-  customColors: {
-    primaryColor: string;
-    backgroundColor: string;
-    textColor: string;
-  };
-  reminderThreshold: number;
-  doNotDisturb: boolean;
-  doNotDisturbStart: string;
-  doNotDisturbEnd: string;
   windowVisible: boolean;
+  blockPluginStatus: boolean; // 屏蔽插件状态上报
 }
 
 const defaultSettings: AppSettings = {
@@ -64,21 +56,12 @@ const defaultSettings: AppSettings = {
   opacity: 0.85,
   alwaysOnTop: true,
   autoStart: false,
-  notifications: true,
   sound: true,
   soundVolume: 0.7,
   httpHost: '127.0.0.1',
   httpPort: 31415,
-  customColors: {
-    primaryColor: '',
-    backgroundColor: '',
-    textColor: '',
-  },
-  reminderThreshold: 100,
-  doNotDisturb: false,
-  doNotDisturbStart: '22:00',
-  doNotDisturbEnd: '08:00',
   windowVisible: true,
+  blockPluginStatus: true, // 默认开启屏蔽
 };
 
 export const useProgressStore = defineStore('progress', () => {
@@ -198,30 +181,46 @@ export const useProgressStore = defineStore('progress', () => {
 
   function setLanguage(language: SupportedLanguage) {
     updateSettingAndSync('language', language);
+    // Actually change the i18n locale
+    setI18nLanguage(language);
   }
 
   function setTheme(theme: AppSettings['theme']) {
     updateSettingAndSync('theme', theme);
+    // Apply theme to document
+    document.documentElement.setAttribute('data-theme', theme);
   }
 
   function setFontSize(fontSize: number) {
-    updateSettingAndSync('fontSize', Math.max(10, Math.min(24, fontSize)));
+    const clampedSize = Math.max(12, Math.min(18, fontSize));
+    updateSettingAndSync('fontSize', clampedSize);
+    // Apply font size to document
+    document.documentElement.style.setProperty('--app-font-size', `${clampedSize}px`);
   }
 
   function setOpacity(opacity: number) {
-    updateSettingAndSync('opacity', Math.min(1, Math.max(0.1, opacity)));
+    const clampedOpacity = Math.min(1, Math.max(0.5, opacity));
+    updateSettingAndSync('opacity', clampedOpacity);
   }
 
-  function setAlwaysOnTop(value: boolean) {
+  async function setAlwaysOnTop(value: boolean) {
     updateSettingAndSync('alwaysOnTop', value);
+    // Apply to window
+    try {
+      await safeInvoke('set_always_on_top', { alwaysOnTop: value });
+    } catch (err) {
+      error('Failed to set always on top', { error: String(err) });
+    }
   }
 
-  function setAutoStart(value: boolean) {
+  async function setAutoStart(value: boolean) {
     updateSettingAndSync('autoStart', value);
-  }
-
-  function setNotifications(value: boolean) {
-    updateSettingAndSync('notifications', value);
+    // Apply to system
+    try {
+      await safeInvoke('set_auto_start', { enabled: value });
+    } catch (err) {
+      error('Failed to set auto start', { error: String(err) });
+    }
   }
 
   function setSound(value: boolean) {
@@ -240,34 +239,18 @@ export const useProgressStore = defineStore('progress', () => {
     updateSettingAndSync('httpPort', Math.max(1024, Math.min(65535, value)));
   }
 
-  function setCustomColors(colors: Partial<AppSettings['customColors']>) {
-    settings.value.customColors = { ...settings.value.customColors, ...colors };
-    safeInvoke('update_app_settings', { newSettings: settings.value }).catch((err: unknown) =>
-      error('Failed to update settings', { error: String(err) })
-    );
+  function setBlockPluginStatus(value: boolean) {
+    updateSettingAndSync('blockPluginStatus', value);
   }
 
-  function setReminderThreshold(value: number) {
-    updateSettingAndSync('reminderThreshold', Math.min(100, Math.max(0, value)));
-  }
-
-  function setDoNotDisturb(value: boolean) {
-    updateSettingAndSync('doNotDisturb', value);
-  }
-
-  function setDoNotDisturbStart(value: string) {
-    updateSettingAndSync('doNotDisturbStart', value);
-  }
-
-  function setDoNotDisturbEnd(value: string) {
-    updateSettingAndSync('doNotDisturbEnd', value);
-  }
-
-  function setWindowVisible(value: boolean) {
+  async function setWindowVisible(value: boolean) {
     settings.value.windowVisible = value;
-    safeInvoke('set_window_visibility', { visible: value }).catch((err: unknown) =>
-      error('Failed to set window visibility', { error: String(err) })
-    );
+    try {
+      await safeInvoke('set_window_visibility', { visible: value });
+      await safeInvoke('update_app_settings', { newSettings: settings.value });
+    } catch (err) {
+      error('Failed to set window visibility', { error: String(err) });
+    }
   }
 
   function addToHistory(task: ProgressTask) {
@@ -354,16 +337,11 @@ export const useProgressStore = defineStore('progress', () => {
     setOpacity,
     setAlwaysOnTop,
     setAutoStart,
-    setNotifications,
     setSound,
     setSoundVolume,
     setHttpHost,
     setHttpPort,
-    setCustomColors,
-    setReminderThreshold,
-    setDoNotDisturb,
-    setDoNotDisturbStart,
-    setDoNotDisturbEnd,
+    setBlockPluginStatus,
     setWindowVisible,
     addToHistory,
     clearHistory,

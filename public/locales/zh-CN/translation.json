@@ -40,6 +40,8 @@
       "language": "语言",
       "autoStart": "登录时自动启动",
       "alwaysOnTop": "始终置顶",
+      "showWindow": "显示窗口",
+      "hideWindow": "隐藏窗口",
       "httpHost": "HTTP 监听地址",
       "httpPort": "HTTP API 端口"
     },

@@ -23,10 +23,18 @@ async function bootstrap() {
 
     // Apply theme from settings
     document.documentElement.setAttribute('data-theme', store.settings.theme);
+    
+    // Apply font size from settings
+    document.documentElement.style.setProperty('--app-font-size', `${store.settings.fontSize}px`);
 
     // Watch for theme changes
     watch(() => store.settings.theme, (newTheme) => {
         document.documentElement.setAttribute('data-theme', newTheme);
+    });
+    
+    // Watch for font size changes
+    watch(() => store.settings.fontSize, (newSize) => {
+        document.documentElement.style.setProperty('--app-font-size', `${newSize}px`);
     });
 
     // Initialize i18n with user's language preference

@@ -901,6 +901,48 @@ fn set_window_always_on_top(window: tauri::Window, on_top: bool) {
 }
 
 #[tauri::command]
+async fn set_always_on_top<R: Runtime>(
+    app: tauri::AppHandle<R>,
+    always_on_top: bool,
+) -> Result<(), String> {
+    if let Some(window) = app.get_webview_window("main") {
+        window.set_always_on_top(always_on_top).map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
+#[tauri::command]
+async fn set_auto_start(enabled: bool) -> Result<(), String> {
+    #[cfg(target_os = "macos")]
+    {
+        use std::process::Command;
+        
+        let app_path = "/Applications/vibe-process-bar.app";
+        
+        if enabled {
+            // Add to login items using osascript
+            let script = format!(
+                r#"tell application "System Events" to make login item at end with properties {{path:"{}", hidden:false}}"#,
+                app_path
+            );
+            Command::new("osascript")
+                .args(&["-e", &script])
+                .output()
+                .map_err(|e| e.to_string())?;
+        } else {
+            // Remove from login items
+            let script = format!(
+                r#"tell application "System Events" to delete login item "vibe-process-bar""#
+            );
+            let _ = Command::new("osascript")
+                .args(&["-e", &script])
+                .output();
+        }
+    }
+    Ok(())
+}
+
+#[tauri::command]
 fn set_window_opacity(_window: tauri::Window, _opacity: f64) {}
 
 #[tauri::command]
@@ -1007,6 +1049,9 @@ async fn update_app_settings<R: Runtime>(
     db_state: tauri::State<'_, db::DatabaseState>,
     new_settings: AppSettings,
 ) -> Result<(), String> {
+    // 更新 HTTP server 的屏蔽设置
+    http_server::set_block_plugin_status(new_settings.block_plugin_status);
+
     {
         let mut settings = state
             .settings
@@ -1201,6 +1246,8 @@ fn main() {
             minimize_window,
             close_window,
             set_window_always_on_top,
+            set_always_on_top,
+            set_auto_start,
             set_window_opacity,
             set_window_transparency,
             show_window,
@@ -1271,6 +1318,9 @@ fn main() {
 
             let settings_state = app.state::<settings::SettingsState>();
             let current_settings = settings_state.get_settings();
+
+            // 初始化 HTTP server 的屏蔽设置
+            http_server::set_block_plugin_status(current_settings.block_plugin_status);
 
             http_server::start_server_background(current_settings.http_host.clone(), current_settings.http_port);
             info!(host = %current_settings.http_host, port = %current_settings.http_port, "HTTP server started");

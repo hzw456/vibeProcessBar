@@ -161,15 +161,52 @@ Content-Type: application/json
 
 ## Task Status Values
 
+- `armed` - Task is registered and monitoring
 - `running` - Task is in progress
 - `completed` - Task finished successfully
 - `error` - Task encountered an error
+- `cancelled` - Task was cancelled
+
+## Source Priority
+
+Updates are prioritized by source (highest to lowest):
+- `hook` - Shell hooks (highest priority)
+- `mcp` - MCP protocol calls
+- `plugin` - IDE plugin heartbeats (lowest priority)
+
+Lower priority sources cannot override higher priority sources.
+
+## Update State API
+
+Update task status with optional source priority.
+
+```
+POST /api/task/update_state
+Content-Type: application/json
+
+{
+  "task_id": "unique-task-id",
+  "status": "running",
+  "progress": 50,
+  "source": "hook"
+}
+```
+
+- `status` - New status (armed, running, completed, error, cancelled)
+- `progress` - Progress percentage (0-100)
+- `source` - Update source for priority (hook, mcp, plugin). Default: plugin
 
 ## Supported IDEs
 
 - `cursor` - Cursor IDE
 - `vscode` - Visual Studio Code
+- `kiro` - Kiro IDE
+- `windsurf` - Windsurf IDE
+- `antigravity` - Antigravity IDE
 - `claude` / `claude-code` - Claude Desktop
+- `opencode` - OpenCode (terminal)
+- `aider` - Aider (terminal)
+- `terminal` - Generic terminal tool
 
 ## Example Usage
 

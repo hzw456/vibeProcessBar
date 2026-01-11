@@ -301,6 +301,16 @@
   border-color: var(--primary-color);
 }
 
+.volume-control {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.volume-control input[type="range"] {
+  width: 80px;
+}
+
 .time-input {
   padding: 6px 10px;
   border-radius: 6px;

@@ -30,22 +30,6 @@
   --shadow-color: rgba(0, 0, 0, 0.3);
 }
 
-[data-theme="light"] {
-  --primary-color: #4f46e5;
-  --primary-hover: #4338ca;
-  --primary-color-10: rgba(79, 70, 229, 0.1);
-  --bg-color: rgba(255, 255, 255, 0.9);
-  --bg-secondary: rgba(79, 70, 229, 0.08);
-  --text-color: #1e293b;
-  --text-secondary: #64748b;
-  --text-muted: #94a3b8;
-  --success-color: #16a34a;
-  --warning-color: #d97706;
-  --error-color: #dc2626;
-  --border-color: rgba(148, 163, 184, 0.3);
-  --shadow-color: rgba(0, 0, 0, 0.15);
-}
-
 [data-theme="purple"] {
   --primary-color: #a855f7;
   --primary-hover: #9333ea;
@@ -139,6 +123,14 @@ body {
   background: transparent !important;
   width: 100%;
   height: 100%;
+  font-size: var(--app-font-size, 14px);
+}
+
+.app-container,
+.settings-panel,
+.task-row,
+.task-name-mini,
+.setting-item label {
   font-size: var(--app-font-size, 14px);
 }
 

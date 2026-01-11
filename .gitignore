@@ -25,3 +25,18 @@ src-tauri/._*
 .env.*
 coverage/
 test-results/
+
+# AI Agent generated
+.clinerules/
+.gemini/
+.claude/
+.cursor/
+.aider*
+.todo.md
+CLINE.md
+
+# Duplicate/nested folders (accidental)
+vibeProcessBar/
+
+# Scripts (if not needed in repo)
+scripts/

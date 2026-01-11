@@ -92,6 +92,9 @@ pub struct UpdateStateRequest {
     /// 进度 (0-100)
     #[serde(default)]
     pub progress: Option<u32>,
+    /// 上报来源: hook, mcp, plugin (可选，默认为 plugin)
+    #[serde(default)]
+    pub source: Option<String>,
 }
 
 /// Reset 请求
@@ -105,6 +108,24 @@ pub struct ResetRequest {
 #[derive(Serialize, Deserialize, Debug)]
 pub struct DeleteTaskRequest {
     pub task_id: String,
+}
+
+/// Update State by Path 请求
+#[derive(Serialize, Deserialize, Debug)]
+pub struct UpdateStateByPathRequest {
+    pub project_path: String,
+    /// IDE 类型 (可选，用于更精确匹配)
+    #[serde(default)]
+    pub ide: Option<String>,
+    /// 状态: running, completed, error, cancelled, armed
+    #[serde(default)]
+    pub status: Option<String>,
+    /// 进度 (0-100)
+    #[serde(default)]
+    pub progress: Option<u32>,
+    /// 上报来源: hook, mcp, plugin (可选，默认为 hook)
+    #[serde(default)]
+    pub source: Option<String>,
 }
 
 // ============================================================================
@@ -162,6 +183,7 @@ struct StatusResponse {
 pub struct SharedState {
     pub tasks: Mutex<Vec<Task>>,
     pub current_task_id: Mutex<Option<String>>,
+    pub block_plugin_status: Mutex<bool>, // 屏蔽插件状态上报
 }
 
 impl SharedState {
@@ -169,8 +191,23 @@ impl SharedState {
         SharedState {
             tasks: Mutex::new(Vec::new()),
             current_task_id: Mutex::new(None),
+            block_plugin_status: Mutex::new(true), // 默认开启屏蔽
         }
     }
+}
+
+/// 设置是否屏蔽插件状态上报
+pub fn set_block_plugin_status(block: bool) {
+    let state = SHARED_STATE.clone();
+    *state.block_plugin_status.lock().unwrap() = block;
+    info!("Block plugin status set to: {}", block);
+}
+
+/// 获取是否屏蔽插件状态上报
+pub fn get_block_plugin_status() -> bool {
+    let state = SHARED_STATE.clone();
+    let block = *state.block_plugin_status.lock().unwrap();
+    block
 }
 
 // ============================================================================
@@ -285,13 +322,16 @@ async fn report_task(
         // 更新心跳时间
         task.last_heartbeat = now_millis();
 
+        // 检测焦点变化：从无焦点变为有焦点
+        let focus_gained = req.is_focused && !task.is_focused;
+
         // 更新焦点状态
         task.is_focused = req.is_focused;
 
-        // 窗口获得焦点时，completed -> armed 自动转换
+        // 只有当窗口从"没有焦点"变为"有焦点"时，才把 completed -> armed
         // 注意：这个转换不受来源优先级限制，因为这是窗口状态驱动的
-        if req.is_focused && task.status == "completed" {
-            info!(task_id = %req.task_id, "Auto-transitioning completed task to armed (window focused)");
+        if focus_gained && task.status == "completed" {
+            info!(task_id = %req.task_id, "Auto-transitioning completed task to armed (focus gained)");
             task.status = "armed".to_string();
             // 不修改 source，保持原来的来源
             task.progress = 0;
@@ -354,18 +394,48 @@ async fn update_state(
     State(state): State<Arc<SharedState>>,
     Json(req): Json<UpdateStateRequest>,
 ) -> (StatusCode, Json<ApiResponse>) {
+    // 确定请求的 source（默认为 plugin）
+    let request_source = req.source.as_deref().unwrap_or("plugin");
+    
+    // 验证 source 值
+    let valid_sources = ["hook", "mcp", "plugin"];
+    if !valid_sources.contains(&request_source) {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(ApiResponse::error(&format!(
+                "Invalid source '{}'. Valid: {:?}",
+                request_source, valid_sources
+            ))),
+        );
+    }
+
+    // 检查是否屏蔽插件状态上报
+    if request_source == "plugin" {
+        let block = *state.block_plugin_status.lock().unwrap();
+        if block {
+            debug!(task_id = %req.task_id, "Ignoring plugin status update - blocked by settings");
+            return (
+                StatusCode::OK,
+                Json(ApiResponse::ignored("plugin_status_blocked")),
+            );
+        }
+    }
+
     let mut tasks = state.tasks.lock().unwrap();
     let found = tasks.iter_mut().find(|t| t.id == req.task_id);
 
     if let Some(task) = found {
-        // Check source priority for 'plugin' source
-        if !can_update_source(&task.source, "plugin") {
-            info!(task_id = %req.task_id, current_source = %task.source, "Ignoring update_state - lower priority");
+        // Check source priority
+        if !can_update_source(&task.source, request_source) {
+            info!(task_id = %req.task_id, current_source = %task.source, request_source = %request_source, "Ignoring update_state - lower priority");
             return (
                 StatusCode::OK,
                 Json(ApiResponse::ignored("lower_priority_source")),
             );
         }
+
+        // Update source to the new one (if higher or equal priority)
+        task.source = request_source.to_string();
 
         // Update progress if provided
         if let Some(progress) = req.progress {
@@ -394,7 +464,7 @@ async fn update_state(
             // Auto-record start_time when transitioning to running
             if status == "running" && task.start_time == 0 {
                 task.start_time = now_millis();
-                info!(task_id = %req.task_id, "Task started (auto-recorded start_time)");
+                info!(task_id = %req.task_id, source = %request_source, "Task started (auto-recorded start_time)");
             }
 
             // Auto-record end_time when transitioning to terminal states
@@ -403,7 +473,7 @@ async fn update_state(
                 if status == "completed" {
                     task.progress = 100;
                 }
-                info!(task_id = %req.task_id, old_status = %old_status, new_status = %status, "Task ended (auto-recorded end_time)");
+                info!(task_id = %req.task_id, old_status = %old_status, new_status = %status, source = %request_source, "Task ended (auto-recorded end_time)");
             }
         }
 
@@ -463,6 +533,98 @@ async fn delete_task(
         (
             StatusCode::NOT_FOUND,
             Json(ApiResponse::error("Task not found")),
+        )
+    }
+}
+
+/// POST /api/task/update_state_by_path - 通过 project_path 更新进程状态
+/// 用于 hook 脚本，因为 hook 无法获取 task_id
+async fn update_state_by_path(
+    State(state): State<Arc<SharedState>>,
+    Json(req): Json<UpdateStateByPathRequest>,
+) -> (StatusCode, Json<ApiResponse>) {
+    // 确定请求的 source（默认为 hook）
+    let request_source = req.source.as_deref().unwrap_or("hook");
+    
+    // 验证 source 值
+    let valid_sources = ["hook", "mcp", "plugin"];
+    if !valid_sources.contains(&request_source) {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(ApiResponse::error(&format!(
+                "Invalid source '{}'. Valid: {:?}",
+                request_source, valid_sources
+            ))),
+        );
+    }
+
+    let mut tasks = state.tasks.lock().unwrap();
+    
+    // 查找匹配 project_path 和 ide（如果提供）的任务
+    let found = tasks.iter_mut().find(|t| {
+        let path_match = t.project_path.as_ref().map_or(false, |p| p == &req.project_path);
+        let ide_match = req.ide.as_ref().map_or(true, |ide| &t.ide == ide);
+        path_match && ide_match
+    });
+
+    if let Some(task) = found {
+        // Check source priority
+        if !can_update_source(&task.source, request_source) {
+            info!(project_path = %req.project_path, current_source = %task.source, request_source = %request_source, "Ignoring update_state_by_path - lower priority");
+            return (
+                StatusCode::OK,
+                Json(ApiResponse::ignored("lower_priority_source")),
+            );
+        }
+
+        // Update source to the new one (if higher or equal priority)
+        task.source = request_source.to_string();
+
+        // Update progress if provided
+        if let Some(progress) = req.progress {
+            task.progress = progress.clamp(0, 100);
+            debug!(project_path = %req.project_path, progress = %task.progress, "Progress updated");
+        }
+
+        // Update status if provided, and auto-record timestamps
+        if let Some(ref status) = req.status {
+            let old_status = task.status.clone();
+
+            // Validate status
+            let valid_statuses = ["armed", "running", "completed", "error", "cancelled"];
+            if !valid_statuses.contains(&status.as_str()) {
+                return (
+                    StatusCode::BAD_REQUEST,
+                    Json(ApiResponse::error(&format!(
+                        "Invalid status '{}'. Valid: {:?}",
+                        status, valid_statuses
+                    ))),
+                );
+            }
+
+            task.status = status.clone();
+
+            // Auto-record start_time when transitioning to running
+            if status == "running" && task.start_time == 0 {
+                task.start_time = now_millis();
+                info!(project_path = %req.project_path, source = %request_source, "Task started (auto-recorded start_time)");
+            }
+
+            // Auto-record end_time when transitioning to terminal states
+            if status == "completed" || status == "error" || status == "cancelled" {
+                task.end_time = Some(now_millis());
+                if status == "completed" {
+                    task.progress = 100;
+                }
+                info!(project_path = %req.project_path, old_status = %old_status, new_status = %status, source = %request_source, "Task ended (auto-recorded end_time)");
+            }
+        }
+
+        (StatusCode::OK, Json(ApiResponse::ok()))
+    } else {
+        (
+            StatusCode::NOT_FOUND,
+            Json(ApiResponse::error("Task not found for project_path")),
         )
     }
 }
@@ -706,6 +868,7 @@ fn create_app(state: Arc<SharedState>) -> Router {
         .route("/api/status", get(get_status))
         .route("/api/task/report", post(report_task))
         .route("/api/task/update_state", post(update_state))
+        .route("/api/task/update_state_by_path", post(update_state_by_path))
         .route("/api/task/delete", post(delete_task))
         .route("/api/reset", post(reset_tasks))
         .route("/mcp", post(mcp_handler))

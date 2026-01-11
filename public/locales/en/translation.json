@@ -40,6 +40,8 @@
       "language": "Language",
       "autoStart": "Auto-start on login",
       "alwaysOnTop": "Always on top",
+      "showWindow": "Show Window",
+      "hideWindow": "Hide Window",
       "httpHost": "HTTP Listen Address",
       "httpPort": "HTTP API Port"
     },
