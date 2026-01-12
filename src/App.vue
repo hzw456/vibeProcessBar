@@ -488,14 +488,29 @@ watch([displayTasks, isCollapsed, isCollapseTransition], async () => {
         <span v-else class="task-ide-collapsed" :title="currentTask.name">{{ currentTask.name }}</span>
       </div>
       <!-- Expanded: show full status text -->
-      <StatusText
+      <div
         v-else-if="currentTask"
-        :status="currentTask.status"
-        :name="currentTask.name"
-        :is-focused="currentTask.isFocused"
-        :elapsed-time="getTimeStr(currentTask)"
-        :show-icon="true"
-      />
+        :class="[
+          'task-row',
+          'single-task-row',
+          { active: currentTask.id === store.currentTaskId || displayTasks.length === 1 },
+          { completed: currentTask.status === 'completed' },
+          { armed: currentTask.status === 'armed' },
+          { 'focused-state': currentTask.isFocused }
+        ]"
+        @click="handleTaskDoubleClick(currentTask)"
+        @dblclick="handleTaskDoubleClick(currentTask)"
+      >
+        <StatusText
+          :status="currentTask.status"
+          :name="currentTask.name"
+          :is-focused="currentTask.isFocused"
+          :elapsed-time="getTimeStr(currentTask)"
+          :show-icon="true"
+          :ide="currentTask.ide"
+          @activate="handleTaskDoubleClick(currentTask)"
+        />
+      </div>
     </template>
 
     <!-- Context menu -->
