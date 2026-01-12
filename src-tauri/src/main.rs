@@ -1,19 +1,21 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use serde_json::json;
-use std::process::Command;
 use tauri::menu::MenuItem;
 use tauri::tray::TrayIconBuilder;
 use tauri::{Emitter, Manager, Runtime, WindowEvent};
 use tracing::info;
 
-mod db;
 mod http_server;
 mod settings;
 mod window_manager;
 
-use db::DatabaseState;
 use settings::{AppSettings, SettingsState};
+use window_manager::IdeWindow;
+
+// ============================================================================
+// Window Commands
+// ============================================================================
 
 #[tauri::command]
 async fn activate_window<R: Runtime>(
@@ -24,14 +26,24 @@ async fn activate_window<R: Runtime>(
 }
 
 #[tauri::command]
-async fn get_translated_string<R: Runtime>(
-    window: tauri::Window<R>,
-    key: String,
-) -> Result<String, String> {
-    window
-        .emit("get-translated-string", key.clone())
-        .map_err(|e| e.to_string())?;
-    Ok(key)
+async fn activate_ide_window<R: Runtime>(
+    _window: tauri::Window<R>,
+    ide: String,
+    window_title: Option<String>,
+    project_path: Option<String>,
+    active_file: Option<String>,
+) -> Result<(), String> {
+    window_manager::activate_ide(
+        &ide,
+        window_title.as_deref(),
+        project_path.as_deref(),
+        active_file.as_deref(),
+    )
+}
+
+#[tauri::command]
+async fn get_ide_windows() -> Result<Vec<IdeWindow>, String> {
+    Ok(window_manager::scan_ide_windows())
 }
 
 #[tauri::command]
@@ -58,846 +70,90 @@ fn open_settings_window<R: Runtime>(app: tauri::AppHandle<R>) -> Result<(), Stri
     Ok(())
 }
 
-/// IDE bundle identifiers for window scanning
-const IDE_BUNDLES: &[(&str, &str)] = &[
-    ("com.microsoft.VSCode", "vscode"),
-    ("com.todesktop.230313mzl4w4u92", "cursor"),
-    ("dev.kiro.desktop", "kiro"),
-    ("com.google.antigravity", "antigravity"),
-    ("com.codeium.windsurf", "windsurf"),
-    ("com.trae.app", "trae"),
-    ("com.tencent.codebuddy", "codebuddy"),
-    ("com.tencent.codebuddycn", "codebuddycn"),
-];
+// ============================================================================
+// Task Commands (Rust层合并逻辑)
+// ============================================================================
 
-#[derive(serde::Serialize, Clone, Debug)]
-pub struct IdeWindow {
-    pub bundle_id: String,
-    pub ide: String,
-    pub window_title: String,
-    pub window_index: i32,
-}
-
-// Global state for storing scanned IDE windows for tray menu
-lazy_static::lazy_static! {
-    static ref SCANNED_WINDOWS: std::sync::Mutex<Vec<IdeWindow>> = std::sync::Mutex::new(Vec::new());
-}
-
-/// Scan all IDE windows using a single AppleScript call
-/// This avoids the bug where querying by PID returns incomplete results
 #[tauri::command]
-async fn get_ide_windows() -> Result<Vec<IdeWindow>, String> {
-    #[cfg(target_os = "macos")]
-    {
-        let mut all_windows = Vec::new();
+async fn get_tasks() -> Result<Vec<http_server::Task>, String> {
+    Ok(http_server::get_merged_tasks())
+}
 
-        // Use a single AppleScript to iterate all IDE processes and get their windows
-        // Note: Most VSCode-based IDEs use "Electron" as process name, but Cursor uses "Cursor"
-        // Format: appPath:::pid:::winName1|||winName2\n
-        let script = r#"
-            set output to ""
-            tell application "System Events"
-                -- Scan Electron processes (VS Code, Kiro, Antigravity, Windsurf, Trae, etc.)
-                repeat with p in (every application process whose name is "Electron")
-                    try
-                        set pId to unix id of p
-                        set appFile to application file of p
-                        set appPath to POSIX path of appFile
-                        set winNames to name of every window of p
-                        set AppleScript's text item delimiters to "|||"
-                        set winNamesStr to winNames as text
-                        if winNamesStr is not "" then
-                            set output to output & appPath & ":::" & pId & ":::" & winNamesStr & "\n"
-                        end if
-                    end try
-                end repeat
-                -- Scan Cursor process (Cursor uses "Cursor" as process name, not "Electron")
-                repeat with p in (every application process whose name is "Cursor")
-                    try
-                        set pId to unix id of p
-                        set appFile to application file of p
-                        set appPath to POSIX path of appFile
-                        set winNames to name of every window of p
-                        set AppleScript's text item delimiters to "|||"
-                        set winNamesStr to winNames as text
-                        if winNamesStr is not "" then
-                            set output to output & appPath & ":::" & pId & ":::" & winNamesStr & "\n"
-                        end if
-                    end try
-                end repeat
-            end tell
-            return output
-        "#;
+// ============================================================================
+// Settings Commands
+// ============================================================================
 
-        let output = Command::new("osascript").args(&["-e", script]).output();
-
-        if let Ok(result) = output {
-            if result.status.success() {
-                let stdout = String::from_utf8_lossy(&result.stdout);
-
-                for line in stdout.lines() {
-                    let line = line.trim();
-                    if line.is_empty() {
-                        continue;
-                    }
-
-                    // Format: appPath:::pid:::winName1|||winName2|||...
-                    let parts: Vec<&str> = line.splitn(3, ":::").collect();
-                    if parts.len() != 3 {
-                        continue;
-                    }
-
-                    let app_path = parts[0];
-                    let pid = parts[1];
-                    let win_names_str = parts[2];
-
-                    // Determine IDE type from app path
-                    let ide = if app_path.contains("Antigravity") {
-                        "antigravity"
-                    } else if app_path.contains("Kiro") {
-                        "kiro"
-                    } else if app_path.contains("Cursor") {
-                        "cursor"
-                    } else if app_path.contains("Windsurf") {
-                        "windsurf"
-                    } else if app_path.contains("Trae") {
-                        "trae"
-                    } else if app_path.contains("CodeBuddyCN") || app_path.contains("codebuddycn") {
-                        "codebuddycn"
-                    } else if app_path.contains("CodeBuddy") || app_path.contains("codebuddy") {
-                        "codebuddy"
-                    } else {
-                        "vscode"
-                    };
-
-                    // Split window names by |||
-                    let win_names: Vec<&str> = win_names_str.split("|||").collect();
-                    for (idx, win_title) in win_names.iter().enumerate() {
-                        let win_title = win_title.trim();
-                        if !win_title.is_empty() {
-                            all_windows.push(IdeWindow {
-                                bundle_id: format!("pid:{}", pid),
-                                ide: ide.to_string(),
-                                window_title: win_title.to_string(),
-                                window_index: (idx + 1) as i32,
-                            });
-                        }
-                    }
-                }
-            }
-        }
-
-        info!("Scanned {} IDE windows", all_windows.len());
-
-        // Update global state for tray menu
-        if let Ok(mut windows) = SCANNED_WINDOWS.lock() {
-            *windows = all_windows.clone();
-        }
-
-        Ok(all_windows)
-    }
-
-    #[cfg(not(target_os = "macos"))]
-    {
-        Ok(Vec::new())
-    }
+#[tauri::command]
+async fn get_app_settings(
+    state: tauri::State<'_, SettingsState>,
+) -> Result<AppSettings, String> {
+    Ok(state.get_settings())
 }
 
 #[tauri::command]
-async fn activate_ide_window<R: Runtime>(
-    _window: tauri::Window<R>,
-    ide: String,
-    window_title: Option<String>,
-    project_path: Option<String>,
-    active_file: Option<String>,
+async fn update_app_settings<R: Runtime>(
+    app: tauri::AppHandle<R>,
+    state: tauri::State<'_, SettingsState>,
+    new_settings: AppSettings,
 ) -> Result<(), String> {
-    activate_ide(
-        &ide,
-        window_title.as_deref(),
-        project_path.as_deref(),
-        active_file.as_deref(),
-    )
+    // 更新 HTTP server 的屏蔽设置
+    http_server::set_block_plugin_status(new_settings.block_plugin_status);
+
+    // 保存设置
+    state.update_settings(new_settings.clone())?;
+
+    // 通过 emit 发送到所有窗口
+    app.emit("settings-changed", &new_settings)
+        .map_err(|e| e.to_string())?;
+
+    Ok(())
 }
 
-fn activate_ide(
-    ide: &str,
-    window_title: Option<&str>,
-    project_path: Option<&str>,
-    active_file: Option<&str>,
-) -> Result<(), String> {
-    info!(
-        "activate_ide called with ide={}, window_title={:?}, project_path={:?}, active_file={:?}",
-        ide, window_title, project_path, active_file
-    );
-    #[cfg(target_os = "macos")]
-    {
-        let script = match ide.trim().to_lowercase().as_str() {
-            // VSCode-based AI IDEs (forks with extension support)
-            "cursor" => {
-                let workspace_search = window_title.unwrap_or("");
-                let file_search = active_file.unwrap_or("");
-
-                if !workspace_search.is_empty() || !file_search.is_empty() {
-                    format!(
-                        r#"
-                        tell application "System Events"
-                            set workspaceTerm to "{}"
-                            set fileTerm to "{}"
-                            set foundWindow to false
-                            -- Cursor uses process name "Cursor"
-                            repeat with p in (every application process whose name is "Cursor")
-                                try
-                                    set appPath to POSIX path of (application file of p)
-                                    if appPath contains "Cursor" then
-                                        -- First try workspace (window_title)
-                                        if workspaceTerm is not "" then
-                                            repeat with w in (every window of p)
-                                                set winTitle to title of w
-                                                if winTitle contains workspaceTerm then
-                                                    set frontmost of p to true
-                                                    perform action "AXRaise" of w
-                                                    set foundWindow to true
-                                                    exit repeat
-                                                end if
-                                            end repeat
-                                        end if
-                                        -- If workspace not found, try active_file
-                                        if not foundWindow and fileTerm is not "" then
-                                            repeat with w in (every window of p)
-                                                set winTitle to title of w
-                                                if winTitle contains fileTerm then
-                                                    set frontmost of p to true
-                                                    perform action "AXRaise" of w
-                                                    set foundWindow to true
-                                                    exit repeat
-                                                end if
-                                            end repeat
-                                        end if
-                                        if foundWindow then exit repeat
-                                    end if
-                                end try
-                            end repeat
-                        end tell
-                        if not foundWindow then
-                            tell application "Cursor" to activate
-                        end if
-                    "#,
-                        workspace_search, file_search
-                    )
-                } else {
-                    r#"
-                    tell application "Cursor" to activate
-                    "#
-                    .to_string()
-                }
-            }
-            "windsurf" | "codeium" | "codeium editor" => {
-                let workspace_search = window_title.unwrap_or("");
-                let file_search = active_file.unwrap_or("");
-
-                if !workspace_search.is_empty() || !file_search.is_empty() {
-                    format!(
-                        r#"
-                        tell application "System Events"
-                            set workspaceTerm to "{}"
-                            set fileTerm to "{}"
-                            set foundWindow to false
-                            repeat with p in (every application process whose name is "Electron")
-                                try
-                                    set appPath to POSIX path of (application file of p)
-                                    if appPath contains "Windsurf" then
-                                        -- First try workspace (window_title)
-                                        if workspaceTerm is not "" then
-                                            repeat with w in (every window of p)
-                                                set winTitle to title of w
-                                                if winTitle contains workspaceTerm then
-                                                    set frontmost of p to true
-                                                    perform action "AXRaise" of w
-                                                    set foundWindow to true
-                                                    exit repeat
-                                                end if
-                                            end repeat
-                                        end if
-                                        -- If workspace not found, try active_file
-                                        if not foundWindow and fileTerm is not "" then
-                                            repeat with w in (every window of p)
-                                                set winTitle to title of w
-                                                if winTitle contains fileTerm then
-                                                    set frontmost of p to true
-                                                    perform action "AXRaise" of w
-                                                    set foundWindow to true
-                                                    exit repeat
-                                                end if
-                                            end repeat
-                                        end if
-                                        if foundWindow then exit repeat
-                                    end if
-                                end try
-                            end repeat
-                        end tell
-                        if not foundWindow then
-                            tell application "Windsurf" to activate
-                        end if
-                    "#,
-                        workspace_search, file_search
-                    )
-                } else {
-                    r#"
-                    tell application "Windsurf" to activate
-                    "#
-                    .to_string()
-                }
-            }
-            "trae" => {
-                // Matching priority: IDE -> workspace (window_title) -> active_file
-                let workspace_search = window_title.unwrap_or("");
-                let file_search = active_file.unwrap_or("");
-
-                if !workspace_search.is_empty() || !file_search.is_empty() {
-                    format!(
-                        r#"
-                        tell application "System Events"
-                            set workspaceTerm to "{}"
-                            set fileTerm to "{}"
-                            set foundWindow to false
-                            repeat with p in (every application process whose name is "Electron")
-                                try
-                                    set appPath to POSIX path of (application file of p)
-                                    if appPath contains "Trae" then
-                                        -- First try workspace (window_title)
-                                        if workspaceTerm is not "" then
-                                            repeat with w in (every window of p)
-                                                set winTitle to title of w
-                                                if winTitle contains workspaceTerm then
-                                                    set frontmost of p to true
-                                                    perform action "AXRaise" of w
-                                                    set foundWindow to true
-                                                    exit repeat
-                                                end if
-                                            end repeat
-                                        end if
-                                        -- If workspace not found, try active_file
-                                        if not foundWindow and fileTerm is not "" then
-                                            repeat with w in (every window of p)
-                                                set winTitle to title of w
-                                                if winTitle contains fileTerm then
-                                                    set frontmost of p to true
-                                                    perform action "AXRaise" of w
-                                                    set foundWindow to true
-                                                    exit repeat
-                                                end if
-                                            end repeat
-                                        end if
-                                        if foundWindow then exit repeat
-                                    end if
-                                end try
-                            end repeat
-                        end tell
-                        if not foundWindow then
-                            tell application "Trae" to activate
-                        end if
-                    "#,
-                        workspace_search, file_search
-                    )
-                } else {
-                    r#"
-                    tell application "Trae" to activate
-                    "#
-                    .to_string()
-                }
-            }
-            "void" | "void editor" | "void-editor" => {
-                let workspace_search = window_title.unwrap_or("");
-                let file_search = active_file.unwrap_or("");
-
-                if !workspace_search.is_empty() || !file_search.is_empty() {
-                    format!(
-                        r#"
-                        tell application "System Events"
-                            set workspaceTerm to "{}"
-                            set fileTerm to "{}"
-                            set foundWindow to false
-                            repeat with p in (every application process whose name is "Electron")
-                                try
-                                    set appPath to POSIX path of (application file of p)
-                                    if appPath contains "Void" then
-                                        -- First try workspace (window_title)
-                                        if workspaceTerm is not "" then
-                                            repeat with w in (every window of p)
-                                                set winTitle to title of w
-                                                if winTitle contains workspaceTerm then
-                                                    set frontmost of p to true
-                                                    perform action "AXRaise" of w
-                                                    set foundWindow to true
-                                                    exit repeat
-                                                end if
-                                            end repeat
-                                        end if
-                                        -- If workspace not found, try active_file
-                                        if not foundWindow and fileTerm is not "" then
-                                            repeat with w in (every window of p)
-                                                set winTitle to title of w
-                                                if winTitle contains fileTerm then
-                                                    set frontmost of p to true
-                                                    perform action "AXRaise" of w
-                                                    set foundWindow to true
-                                                    exit repeat
-                                                end if
-                                            end repeat
-                                        end if
-                                        if foundWindow then exit repeat
-                                    end if
-                                end try
-                            end repeat
-                        end tell
-                        if not foundWindow then
-                            tell application "Void" to activate
-                        end if
-                    "#,
-                        workspace_search, file_search
-                    )
-                } else {
-                    r#"
-                    tell application "Void" to activate
-                    "#
-                    .to_string()
-                }
-            }
-            "pearai" | "pear-ai" | "pear ai" => r#"
-                tell application "PearAI"
-                    activate
-                    delay 0.3
-                end tell
-                "#
-            .to_string(),
-            "blueberryai" | "blueberry ai" | "blueberry" => r#"
-                tell application "BlueberryAI"
-                    activate
-                    delay 0.3
-                end tell
-                "#
-            .to_string(),
-            "aide" | "codestoryai" | "codestory ai" => r#"
-                tell application "Aide"
-                    activate
-                    delay 0.3
-                end tell
-                "#
-            .to_string(),
-            "codebuddy" | "code buddy" | "tencent codebuddy" => {
-                let workspace_search = window_title.unwrap_or("");
-                let file_search = active_file.unwrap_or("");
-
-                if !workspace_search.is_empty() || !file_search.is_empty() {
-                    format!(
-                        r#"
-                        tell application "System Events"
-                            set workspaceTerm to "{}"
-                            set fileTerm to "{}"
-                            set foundWindow to false
-                            repeat with p in (every application process whose name is "Electron")
-                                try
-                                    set appPath to POSIX path of (application file of p)
-                                    if appPath contains "CodeBuddy" and appPath does not contain "CodeBuddy CN" then
-                                        -- First try workspace (window_title)
-                                        if workspaceTerm is not "" then
-                                            repeat with w in (every window of p)
-                                                set winTitle to title of w
-                                                if winTitle contains workspaceTerm then
-                                                    set frontmost of p to true
-                                                    perform action "AXRaise" of w
-                                                    set foundWindow to true
-                                                    exit repeat
-                                                end if
-                                            end repeat
-                                        end if
-                                        -- If workspace not found, try active_file
-                                        if not foundWindow and fileTerm is not "" then
-                                            repeat with w in (every window of p)
-                                                set winTitle to title of w
-                                                if winTitle contains fileTerm then
-                                                    set frontmost of p to true
-                                                    perform action "AXRaise" of w
-                                                    set foundWindow to true
-                                                    exit repeat
-                                                end if
-                                            end repeat
-                                        end if
-                                        if foundWindow then exit repeat
-                                    end if
-                                end try
-                            end repeat
-                        end tell
-                        if not foundWindow then
-                            tell application "CodeBuddy" to activate
-                        end if
-                    "#,
-                        workspace_search, file_search
-                    )
-                } else {
-                    r#"
-                    tell application "CodeBuddy" to activate
-                    "#
-                    .to_string()
-                }
-            }
-            "codebuddycn" | "codebuddy cn" | "tencent codebuddycn" => {
-                let workspace_search = window_title.unwrap_or("");
-                let file_search = active_file.unwrap_or("");
-
-                if !workspace_search.is_empty() || !file_search.is_empty() {
-                    format!(
-                        r#"
-                        tell application "System Events"
-                            set workspaceTerm to "{}"
-                            set fileTerm to "{}"
-                            set foundWindow to false
-                            repeat with p in (every application process whose name is "Electron")
-                                try
-                                    set appPath to POSIX path of (application file of p)
-                                    if appPath contains "CodeBuddy CN" then
-                                        -- First try workspace (window_title)
-                                        if workspaceTerm is not "" then
-                                            repeat with w in (every window of p)
-                                                set winTitle to title of w
-                                                if winTitle contains workspaceTerm then
-                                                    set frontmost of p to true
-                                                    perform action "AXRaise" of w
-                                                    set foundWindow to true
-                                                    exit repeat
-                                                end if
-                                            end repeat
-                                        end if
-                                        -- If workspace not found, try active_file
-                                        if not foundWindow and fileTerm is not "" then
-                                            repeat with w in (every window of p)
-                                                set winTitle to title of w
-                                                if winTitle contains fileTerm then
-                                                    set frontmost of p to true
-                                                    perform action "AXRaise" of w
-                                                    set foundWindow to true
-                                                    exit repeat
-                                                end if
-                                            end repeat
-                                        end if
-                                        if foundWindow then exit repeat
-                                    end if
-                                end try
-                            end repeat
-                        end tell
-                        if not foundWindow then
-                            tell application "CodeBuddy CN" to activate
-                        end if
-                    "#,
-                        workspace_search, file_search
-                    )
-                } else {
-                    r#"
-                    tell application "CodeBuddy CN" to activate
-                    "#
-                    .to_string()
-                }
-            }
-            "kilocode" | "kilo-code" | "kilo" => r#"
-                tell application "Kilo Code"
-                    activate
-                    delay 0.3
-                end tell
-                "#
-            .to_string(),
-            "kiro" => {
-                // Matching priority: IDE -> workspace (window_title) -> active_file
-                let workspace_search = window_title.unwrap_or("");
-                let file_search = active_file.unwrap_or("");
-
-                if !workspace_search.is_empty() || !file_search.is_empty() {
-                    format!(
-                        r#"
-                        tell application "System Events"
-                            set workspaceTerm to "{}"
-                            set fileTerm to "{}"
-                            set foundWindow to false
-                            repeat with p in (every application process whose name is "Electron")
-                                try
-                                    set appPath to POSIX path of (application file of p)
-                                    if appPath contains "Kiro" then
-                                        -- First try workspace (window_title)
-                                        if workspaceTerm is not "" then
-                                            repeat with w in (every window of p)
-                                                set winTitle to title of w
-                                                if winTitle contains workspaceTerm then
-                                                    set frontmost of p to true
-                                                    perform action "AXRaise" of w
-                                                    set foundWindow to true
-                                                    exit repeat
-                                                end if
-                                            end repeat
-                                        end if
-                                        -- If workspace not found, try active_file
-                                        if not foundWindow and fileTerm is not "" then
-                                            repeat with w in (every window of p)
-                                                set winTitle to title of w
-                                                if winTitle contains fileTerm then
-                                                    set frontmost of p to true
-                                                    perform action "AXRaise" of w
-                                                    set foundWindow to true
-                                                    exit repeat
-                                                end if
-                                            end repeat
-                                        end if
-                                        if foundWindow then exit repeat
-                                    end if
-                                end try
-                            end repeat
-                        end tell
-                        tell application "Kiro" to activate
-                    "#,
-                        workspace_search, file_search
-                    )
-                } else {
-                    r#"
-                    tell application "Kiro" to activate
-                    "#
-                    .to_string()
-                }
-            }
-            "antigravity" => {
-                // Matching priority: IDE -> workspace (window_title) -> active_file
-                let workspace_search = window_title.unwrap_or("");
-                let file_search = active_file.unwrap_or("");
-
-                if !workspace_search.is_empty() || !file_search.is_empty() {
-                    format!(
-                        r#"
-                        tell application "System Events"
-                            set workspaceTerm to "{}"
-                            set fileTerm to "{}"
-                            set foundWindow to false
-                            repeat with p in (every application process whose name is "Electron")
-                                try
-                                    set appPath to POSIX path of (application file of p)
-                                    if appPath contains "Antigravity" then
-                                        -- First try workspace (window_title)
-                                        if workspaceTerm is not "" then
-                                            repeat with w in (every window of p)
-                                                set winTitle to title of w
-                                                if winTitle contains workspaceTerm then
-                                                    set frontmost of p to true
-                                                    perform action "AXRaise" of w
-                                                    set foundWindow to true
-                                                    exit repeat
-                                                end if
-                                            end repeat
-                                        end if
-                                        -- If workspace not found, try active_file
-                                        if not foundWindow and fileTerm is not "" then
-                                            repeat with w in (every window of p)
-                                                set winTitle to title of w
-                                                if winTitle contains fileTerm then
-                                                    set frontmost of p to true
-                                                    perform action "AXRaise" of w
-                                                    set foundWindow to true
-                                                    exit repeat
-                                                end if
-                                            end repeat
-                                        end if
-                                        if foundWindow then exit repeat
-                                    end if
-                                end try
-                            end repeat
-                        end tell
-                        tell application "Antigravity" to activate
-                    "#,
-                        workspace_search, file_search
-                    )
-                } else {
-                    r#"
-                    tell application "Antigravity" to activate
-                    "#
-                    .to_string()
-                }
-            }
-            "claude" | "claude-code" => r#"
-                tell application "Claude"
-                    activate
-                    delay 0.3
-                end tell
-                "#
-            .to_string(),
-            "vscode" | "visual studio code" => {
-                // Matching priority: IDE -> workspace (window_title) -> active_file
-                let workspace_search = window_title.unwrap_or("");
-                let file_search = active_file.unwrap_or("");
-
-                if !workspace_search.is_empty() || !file_search.is_empty() {
-                    format!(
-                        r#"
-                        tell application "System Events"
-                            set workspaceTerm to "{}"
-                            set fileTerm to "{}"
-                            set foundWindow to false
-                            repeat with p in (every application process whose name is "Electron")
-                                try
-                                    set appPath to POSIX path of (application file of p)
-                                    if appPath contains "Visual Studio Code" then
-                                        -- First try workspace (window_title)
-                                        if workspaceTerm is not "" then
-                                            repeat with w in (every window of p)
-                                                set winTitle to title of w
-                                                if winTitle contains workspaceTerm then
-                                                    set frontmost of p to true
-                                                    perform action "AXRaise" of w
-                                                    set foundWindow to true
-                                                    exit repeat
-                                                end if
-                                            end repeat
-                                        end if
-                                        -- If workspace not found, try active_file
-                                        if not foundWindow and fileTerm is not "" then
-                                            repeat with w in (every window of p)
-                                                set winTitle to title of w
-                                                if winTitle contains fileTerm then
-                                                    set frontmost of p to true
-                                                    perform action "AXRaise" of w
-                                                    set foundWindow to true
-                                                    exit repeat
-                                                end if
-                                            end repeat
-                                        end if
-                                        if foundWindow then exit repeat
-                                    end if
-                                end try
-                            end repeat
-                        end tell
-                        tell application "Visual Studio Code" to activate
-                    "#,
-                        workspace_search, file_search
-                    )
-                } else {
-                    r#"
-                    tell application "Visual Studio Code" to activate
-                    "#
-                    .to_string()
-                }
-            }
-            _ => {
-                return Err(format!("Unknown IDE: {}", ide));
-            }
-        };
-
-        info!("Running AppleScript for IDE: {}", ide);
-        let output = Command::new("osascript")
-            .args(&["-e", &script])
-            .output()
-            .map_err(|e| e.to_string())?;
-
-        if !output.status.success() {
-            let stderr = String::from_utf8_lossy(&output.stderr);
-            info!("AppleScript failed for {}: {}", ide, stderr);
-            return Err(stderr.to_string());
-        }
-        Ok(())
-    }
-
-    #[cfg(target_os = "windows")]
-    {
-        let ide_exe = match ide {
-            "cursor" => "Cursor.exe",
-            "windsurf" | "codeium" | "codeium editor" => "Windsurf.exe",
-            "trae" => "Trae.exe",
-            "void" | "void editor" | "void-editor" => "Void.exe",
-            "pearai" | "pear-ai" | "pear ai" => "PearAI.exe",
-            "blueberryai" | "blueberry ai" | "blueberry" => "BlueberryAI.exe",
-            "aide" | "codestoryai" | "codestory ai" => "Aide.exe",
-            "codebuddy" | "code buddy" | "tencent codebuddy" => "CodeBuddy.exe",
-            "codebuddycn" | "codebuddy cn" | "tencent codebuddycn" => "CodeBuddy CN.exe",
-            "kilocode" | "kilo-code" | "kilo" => "Kilo Code.exe",
-            "kiro" => "Kiro.exe",
-            "antigravity" => "Antigravity.exe",
-            "claude" | "claude-code" => "Claude.exe",
-            "vscode" | "visual studio code" => "Code.exe",
-            _ => {
-                let output = Command::new("powershell")
-                    .args(&["-Command", &format!(r#"Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.SendKeys]::SendWait('^{}`');"#)])
-                    .output()
-                    .map_err(|e| e.to_string())?;
-                if !output.status.success() {
-                    return Err(String::from_utf8_lossy(&output.stderr).to_string());
-                }
-                return Ok(());
-            }
-        };
-
-        let output = Command::new("powershell")
-            .args(&[
-                "-Command",
-                &format!(r#"Start-Process {}; Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.SendKeys]::SendWait('^{}`');"#, ide_exe),
-            ])
-            .output()
-            .map_err(|e| e.to_string())?;
-
-        if !output.status.success() {
-            return Err(String::from_utf8_lossy(&output.stderr).to_string());
-        }
-        Ok(())
-    }
-
-    #[cfg(target_os = "linux")]
-    {
-        let ide_name = match ide {
-            "cursor" => "Cursor",
-            "windsurf" | "codeium" | "codeium editor" => "Windsurf",
-            "trae" => "Trae",
-            "void" | "void editor" | "void-editor" => "Void",
-            "pearai" | "pear-ai" | "pear ai" => "PearAI",
-            "blueberryai" | "blueberry ai" | "blueberry" => "BlueberryAI",
-            "aide" | "codestoryai" | "codestory ai" => "Aide",
-            "codebuddy" | "code buddy" | "tencent codebuddy" => "CodeBuddy",
-            "codebuddycn" | "codebuddy cn" | "tencent codebuddycn" => "CodeBuddy CN",
-            "kilocode" | "kilo-code" | "kilo" => "Kilo Code",
-            "kiro" => "Kiro",
-            "antigravity" => "Antigravity",
-            "claude" | "claude-code" => "Claude",
-            "vscode" | "visual studio code" => "code",
-            _ => return Err(format!("Unknown IDE: {}", ide)),
-        };
-
-        let output = Command::new("wmctrl")
-            .args(&["-a", ide_name])
-            .output()
-            .map_err(|e| e.to_string())?;
-
-        if !output.status.success() {
-            let fallback = Command::new("xdotool")
-                .args(&["search", "--name", ide_name, "windowactivate"])
-                .output()
-                .map_err(|e| e.to_string())?;
-
-            if !fallback.status.success() {
-                return Err(String::from_utf8_lossy(&fallback.stderr).to_string());
-            }
-        }
-        Ok(())
-    }
+#[tauri::command]
+async fn get_window_visibility(
+    state: tauri::State<'_, SettingsState>,
+) -> Result<bool, String> {
+    Ok(state.get_settings().window_visible)
 }
+
+#[tauri::command]
+async fn set_window_visibility<R: Runtime>(
+    app: tauri::AppHandle<R>,
+    state: tauri::State<'_, SettingsState>,
+    visible: bool,
+) -> Result<(), String> {
+    let mut settings = state.get_settings();
+    settings.window_visible = visible;
+    state.update_settings(settings)?;
+
+    app.emit("window-visibility-changed", visible)
+        .map_err(|e| e.to_string())?;
+
+    Ok(())
+}
+
+// ============================================================================
+// Window Management Commands
+// ============================================================================
 
 #[tauri::command]
 fn get_app_version() -> String {
     env!("CARGO_PKG_VERSION").to_string()
 }
+
 #[tauri::command]
 fn minimize_window(window: tauri::Window) {
-    window.minimize().unwrap();
+    let _ = window.minimize();
 }
 
 #[tauri::command]
 fn close_window(window: tauri::Window) {
-    window.close().unwrap();
+    let _ = window.close();
 }
 
 #[tauri::command]
 fn set_window_always_on_top(window: tauri::Window, on_top: bool) {
-    window.set_always_on_top(on_top).unwrap();
+    let _ = window.set_always_on_top(on_top);
 }
 
 #[tauri::command]
@@ -916,11 +172,9 @@ async fn set_auto_start(enabled: bool) -> Result<(), String> {
     #[cfg(target_os = "macos")]
     {
         use std::process::Command;
-        
         let app_path = "/Applications/vibe-process-bar.app";
         
         if enabled {
-            // Add to login items using osascript
             let script = format!(
                 r#"tell application "System Events" to make login item at end with properties {{path:"{}", hidden:false}}"#,
                 app_path
@@ -930,13 +184,8 @@ async fn set_auto_start(enabled: bool) -> Result<(), String> {
                 .output()
                 .map_err(|e| e.to_string())?;
         } else {
-            // Remove from login items
-            let script = format!(
-                r#"tell application "System Events" to delete login item "vibe-process-bar""#
-            );
-            let _ = Command::new("osascript")
-                .args(&["-e", &script])
-                .output();
+            let script = r#"tell application "System Events" to delete login item "vibe-process-bar""#;
+            let _ = Command::new("osascript").args(&["-e", script]).output();
         }
     }
     Ok(())
@@ -950,13 +199,13 @@ fn set_window_transparency(_window: tauri::Window, _transparent: bool) {}
 
 #[tauri::command]
 fn show_window(window: tauri::Window) {
-    window.show().unwrap();
-    window.set_focus().unwrap();
+    let _ = window.show();
+    let _ = window.set_focus();
 }
 
 #[tauri::command]
 fn hide_window(window: tauri::Window) {
-    window.hide().unwrap();
+    let _ = window.hide();
 }
 
 #[tauri::command]
@@ -969,39 +218,28 @@ fn get_window_position(window: tauri::Window) -> (f64, f64) {
 
 #[tauri::command]
 fn set_window_position(window: tauri::Window, x: f64, y: f64) {
-    window
-        .set_position(tauri::LogicalPosition::new(x, y))
-        .unwrap();
+    let _ = window.set_position(tauri::LogicalPosition::new(x, y));
 }
 
 #[tauri::command]
 fn resize_window(window: tauri::Window, width: f64, height: f64) {
-    window
-        .set_size(tauri::LogicalSize::new(width, height))
-        .unwrap();
+    let _ = window.set_size(tauri::LogicalSize::new(width, height));
 }
 
 #[tauri::command]
 async fn toggle_window_always_on_top<R: Runtime>(window: tauri::Window<R>) -> Result<bool, String> {
     let current = window.is_always_on_top().map_err(|e| e.to_string())?;
     let new_value = !current;
-    window
-        .set_always_on_top(new_value)
-        .map_err(|e| e.to_string())?;
+    window.set_always_on_top(new_value).map_err(|e| e.to_string())?;
     Ok(new_value)
 }
 
 #[tauri::command]
-async fn get_all_windows<R: Runtime>(
-    app: tauri::AppHandle<R>,
-) -> Result<serde_json::Value, String> {
+async fn get_all_windows<R: Runtime>(app: tauri::AppHandle<R>) -> Result<serde_json::Value, String> {
     let windows = app.webview_windows();
     let mut result = Vec::new();
     for (label, win) in windows {
-        let position = win
-            .inner_position()
-            .ok()
-            .map(|p| json!({"x": p.x, "y": p.y}));
+        let position = win.inner_position().ok().map(|p| json!({"x": p.x, "y": p.y}));
         let size = win.inner_size().map_err(|e| e.to_string())?;
         result.push(json!({
             "label": label,
@@ -1033,154 +271,11 @@ async fn trigger_notification<R: Runtime>(
     Ok(())
 }
 
-/// 更新托盘菜单（语言改变时调用）
-fn update_tray_menu<R: Runtime>(app: &tauri::AppHandle<R>) {
-    let trans = get_tray_translations_internal();
+// ============================================================================
+// Tray Menu
+// ============================================================================
 
-    let window = app.get_webview_window("main");
-    let is_visible = window
-        .map(|w| w.is_visible().unwrap_or(true))
-        .unwrap_or(true);
-
-    let window_text = if is_visible {
-        &trans.hide_window
-    } else {
-        &trans.show_window
-    };
-
-    let window_toggle =
-        tauri::menu::MenuItem::with_id(app, "toggle-window", window_text, true, None::<&str>).ok();
-    let settings_item =
-        tauri::menu::MenuItem::with_id(app, "settings", &trans.settings, true, None::<&str>).ok();
-    let quit_item = tauri::menu::MenuItem::with_id(app, "quit", &trans.quit, true, None::<&str>).ok();
-
-    if let (Some(w), Some(s), Some(q)) = (window_toggle, settings_item, quit_item) {
-        // Get tasks from http_server state
-        let tasks: Vec<http_server::Task> = http_server::get_state()
-            .tasks
-            .lock()
-            .map(|t| t.clone())
-            .unwrap_or_default();
-
-        let mut items: Vec<&dyn tauri::menu::IsMenuItem<R>> = vec![&w, &s, &q];
-        let sep1 = tauri::menu::PredefinedMenuItem::separator(app).ok();
-        let mut task_items: Vec<tauri::menu::MenuItem<R>> = Vec::new();
-
-        for task in &tasks {
-            let status_icon = match task.status.as_str() {
-                "running" => "🔄",
-                "armed" => "⏳",
-                "completed" => "✅",
-                "error" => "❌",
-                "cancelled" => "⏹️",
-                "registered" => "📋",
-                "active" => "👁️",
-                _ => "•",
-            };
-            let title = format!("{} {} - {}", status_icon, task.name, task.status);
-            let id = format!("task_{}", task.id);
-            if let Ok(item) = tauri::menu::MenuItem::with_id(app, &id, &title, true, None::<&str>) {
-                task_items.push(item);
-            }
-        }
-
-        if !task_items.is_empty() {
-            if let Some(ref sep) = sep1 {
-                items.push(sep);
-            }
-            for item in &task_items {
-                items.push(item);
-            }
-        }
-
-        if let Ok(menu) = tauri::menu::Menu::with_items(app, &items) {
-            if let Some(tray) = app.tray_by_id("main-tray") {
-                let _ = tray.set_menu(Some(menu));
-            }
-        }
-    }
-}
-
-#[tauri::command]
-async fn get_app_settings(
-    state: tauri::State<'_, settings::SettingsState>,
-    db_state: tauri::State<'_, db::DatabaseState>,
-) -> Result<AppSettings, String> {
-    let settings = state.get_settings();
-    Ok(settings)
-}
-
-#[tauri::command]
-async fn update_app_settings<R: Runtime>(
-    app: tauri::AppHandle<R>,
-    state: tauri::State<'_, settings::SettingsState>,
-    db_state: tauri::State<'_, db::DatabaseState>,
-    new_settings: AppSettings,
-) -> Result<(), String> {
-    // 更新 HTTP server 的屏蔽设置
-    http_server::set_block_plugin_status(new_settings.block_plugin_status);
-
-    {
-        let mut settings = state
-            .settings
-            .lock()
-            .map_err(|_| "Failed to lock settings mutex")?;
-        *settings = new_settings.clone();
-    }
-
-    {
-        let conn = db_state.get_connection();
-        state.save(&conn)?;
-    }
-
-    // 发送到所有窗口
-    for (_, window) in app.webview_windows() {
-        let _ = window.emit("settings-changed", new_settings.clone());
-    }
-
-    Ok(())
-}
-
-#[tauri::command]
-async fn get_window_visibility(
-    state: tauri::State<'_, settings::SettingsState>,
-    _db_state: tauri::State<'_, db::DatabaseState>,
-) -> Result<bool, String> {
-    let settings = state.get_settings();
-    Ok(settings.window_visible)
-}
-
-#[tauri::command]
-async fn set_window_visibility<R: Runtime>(
-    app: tauri::AppHandle<R>,
-    state: tauri::State<'_, settings::SettingsState>,
-    db_state: tauri::State<'_, db::DatabaseState>,
-    visible: bool,
-) -> Result<(), String> {
-    {
-        let mut settings = state
-            .settings
-            .lock()
-            .map_err(|_| "Failed to lock settings mutex")?;
-        settings.window_visible = visible;
-    }
-
-    {
-        let conn = db_state.get_connection();
-        let settings = state
-            .settings
-            .lock()
-            .map_err(|_| "Failed to lock settings mutex")?;
-        settings.save(&conn).map_err(|e| e.to_string())?;
-    }
-
-    app.emit("window-visibility-changed", visible)
-        .map_err(|e| e.to_string())?;
-
-    Ok(())
-}
-
-#[derive(Debug, Clone, PartialEq, serde::Deserialize)]
+#[derive(Debug, Clone, PartialEq, serde::Deserialize, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TrayTranslations {
     pub show_window: String,
@@ -1191,7 +286,6 @@ pub struct TrayTranslations {
     pub tasks: String,
 }
 
-// 全局存储托盘翻译
 lazy_static::lazy_static! {
     static ref TRAY_TRANSLATIONS: std::sync::Mutex<TrayTranslations> = std::sync::Mutex::new(TrayTranslations {
         show_window: "☀ Show Window".to_string(),
@@ -1219,28 +313,87 @@ async fn update_tray_translations<R: Runtime>(
     app: tauri::AppHandle<R>,
     translations: TrayTranslations,
 ) -> Result<(), String> {
-    // 更新全局翻译
     if let Ok(mut trans) = TRAY_TRANSLATIONS.lock() {
         if *trans == translations {
-            // 如果翻译没有变化，不更新托盘菜单，避免闪烁
             return Ok(());
         }
         *trans = translations;
     }
-    
-    // 更新托盘菜单
     update_tray_menu(&app);
-    
     Ok(())
 }
 
 #[tauri::command]
 async fn get_current_language(
-    state: tauri::State<'_, settings::SettingsState>,
+    state: tauri::State<'_, SettingsState>,
 ) -> Result<String, String> {
-    let settings = state.get_settings();
-    Ok(settings.language)
+    Ok(state.get_settings().language)
 }
+
+fn update_tray_menu<R: Runtime>(app: &tauri::AppHandle<R>) {
+    let trans = get_tray_translations_internal();
+
+    let window = app.get_webview_window("main");
+    let is_visible = window.map(|w| w.is_visible().unwrap_or(true)).unwrap_or(true);
+
+    let window_text = if is_visible { &trans.hide_window } else { &trans.show_window };
+
+    let window_toggle = MenuItem::with_id(app, "toggle-window", window_text, true, None::<&str>).ok();
+    let settings_item = MenuItem::with_id(app, "settings", &trans.settings, true, None::<&str>).ok();
+    let quit_item = MenuItem::with_id(app, "quit", &trans.quit, true, None::<&str>).ok();
+
+    if let (Some(w), Some(s), Some(q)) = (window_toggle, settings_item, quit_item) {
+        let tasks = http_server::get_merged_tasks();
+        let mut items: Vec<&dyn tauri::menu::IsMenuItem<R>> = vec![&w, &s, &q];
+        let sep1 = tauri::menu::PredefinedMenuItem::separator(app).ok();
+        let mut task_items: Vec<MenuItem<R>> = Vec::new();
+
+        for task in &tasks {
+            let status_icon = match task.status.as_str() {
+                "running" => "🔄",
+                "armed" => "⏳",
+                "completed" => "✅",
+                "error" => "❌",
+                "cancelled" => "⏹️",
+                _ => "•",
+            };
+            let title = format!("{} {} - {}", status_icon, task.name, task.status);
+            let id = format!("task_{}", task.id);
+            if let Ok(item) = MenuItem::with_id(app, &id, &title, true, None::<&str>) {
+                task_items.push(item);
+            }
+        }
+
+        if !task_items.is_empty() {
+            if let Some(ref sep) = sep1 {
+                items.push(sep);
+            }
+            for item in &task_items {
+                items.push(item);
+            }
+        }
+
+        if let Ok(menu) = tauri::menu::Menu::with_items(app, &items) {
+            if let Some(tray) = app.tray_by_id("main-tray") {
+                let _ = tray.set_menu(Some(menu));
+            }
+        }
+    }
+}
+
+// ============================================================================
+// Emit Events (任务更新推送)
+// ============================================================================
+
+#[tauri::command]
+async fn emit_tasks_updated<R: Runtime>(app: tauri::AppHandle<R>) -> Result<(), String> {
+    let tasks = http_server::get_merged_tasks();
+    app.emit("tasks-updated", &tasks).map_err(|e| e.to_string())
+}
+
+// ============================================================================
+// Main
+// ============================================================================
 
 fn main() {
     tracing_subscriber::fmt::init();
@@ -1248,8 +401,6 @@ fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
-            // When a second instance is launched, show and focus the main window
-            // Also show settings window if it exists
             if let Some(main_window) = app.get_webview_window("main") {
                 let _ = main_window.show();
                 let _ = main_window.set_focus();
@@ -1278,34 +429,32 @@ fn main() {
             open_url,
             start_http_server,
             trigger_notification,
+            activate_window,
             activate_ide_window,
             get_ide_windows,
             open_settings_window,
-            get_translated_string,
             get_app_settings,
             update_app_settings,
             get_window_visibility,
             set_window_visibility,
             update_tray_translations,
             get_current_language,
+            get_tasks,
+            emit_tasks_updated,
         ])
         .setup(|app| {
             let app_handle = app.app_handle().clone();
 
-            let db_state = DatabaseState::new(&app_handle);
-            app.manage(db_state.clone());
-
+            // 初始化设置 (JSON文件存储)
             let settings_state = SettingsState::new(&app_handle);
-            settings_state.load(&db_state.get_connection());
+            let current_settings = settings_state.get_settings();
             app.manage(settings_state);
 
             let window = app_handle.get_webview_window("main").unwrap();
 
             #[cfg(target_os = "macos")]
             {
-                use window_vibrancy::{
-                    apply_vibrancy, NSVisualEffectMaterial, NSVisualEffectState,
-                };
+                use window_vibrancy::{apply_vibrancy, NSVisualEffectMaterial, NSVisualEffectState};
                 let _ = apply_vibrancy(
                     &window,
                     NSVisualEffectMaterial::HudWindow,
@@ -1320,32 +469,18 @@ fn main() {
                 let _ = apply_blur(&window, Some((18, 18, 18, 200)));
             }
 
-            let db_state = app.state::<db::DatabaseState>();
-            let json_path = {
-                let app_handle = app.app_handle();
-                app_handle
-                    .path()
-                    .app_config_dir()
-                    .expect("Failed to get app config dir")
-                    .join("settings.json")
-            };
-
-            if json_path.exists() {
-                let _ = db_state.migrate_from_json(&json_path);
-            }
-
-            let settings_state = app.state::<settings::SettingsState>();
-            let current_settings = settings_state.get_settings();
-
             // 初始化 HTTP server 的屏蔽设置
             http_server::set_block_plugin_status(current_settings.block_plugin_status);
 
-            http_server::start_server_background(current_settings.http_host.clone(), current_settings.http_port);
+            // 启动 HTTP server
+            http_server::start_server_background(
+                current_settings.http_host.clone(),
+                current_settings.http_port,
+            );
             info!(host = %current_settings.http_host, port = %current_settings.http_port, "HTTP server started");
-            
-            // 使用默认英文翻译初始化托盘
-            let trans = get_tray_translations_internal();
 
+            // 创建托盘
+            let trans = get_tray_translations_internal();
             let window_toggle_item = MenuItem::with_id(
                 &app_handle,
                 "toggle-window",
@@ -1353,8 +488,7 @@ fn main() {
                 true,
                 None::<&str>,
             )?;
-            let settings_item =
-                MenuItem::with_id(&app_handle, "settings", &trans.settings, true, None::<&str>)?;
+            let settings_item = MenuItem::with_id(&app_handle, "settings", &trans.settings, true, None::<&str>)?;
             let quit_item = MenuItem::with_id(&app_handle, "quit", &trans.quit, true, None::<&str>)?;
 
             let icon_bytes = include_bytes!("../icons/tray.png");
@@ -1365,11 +499,6 @@ fn main() {
             let icon = tauri::image::Image::new_owned(raw_data, width, height);
 
             info!("Creating system tray with icon {}x{}", width, height);
-
-            // NOTE: rebuild_menu was removed because calling set_menu during on_menu_event
-            // causes use-after-free crashes. The menu item being clicked gets freed during rebuild.
-            // Menu text updates (like "Show Window" <-> "Hide Window") are not supported
-            // to avoid this crash. Only tooltip is updated.
 
             let tray = TrayIconBuilder::with_id("main-tray")
                 .icon(icon)
@@ -1383,43 +512,24 @@ fn main() {
                 .on_menu_event(move |app, event| {
                     match event.id.as_ref() {
                         "toggle-window" => {
-                            let db_state = app.state::<db::DatabaseState>();
-                            let settings_state = app.state::<settings::SettingsState>();
-
-                            let conn = db_state.get_connection();
-                            let _settings = AppSettings::load(&conn);
-                            drop(conn);
-
+                            let settings_state = app.state::<SettingsState>();
                             let window = app.get_webview_window("main").unwrap();
                             let is_visible = window.is_visible().unwrap_or(true);
 
                             if is_visible {
                                 let _ = window.hide();
-                                let mut settings = settings_state.settings.lock().unwrap();
+                                let mut settings = settings_state.get_settings();
                                 settings.window_visible = false;
-                                drop(settings);
-                                let conn = db_state.get_connection();
-                                let _ = settings_state.save(&conn);
-                                drop(conn);
-                                let _ = app
-                                    .tray_by_id("main-tray")
-                                    .unwrap()
+                                let _ = settings_state.update_settings(settings);
+                                let _ = app.tray_by_id("main-tray").unwrap()
                                     .set_tooltip(Some("Vibe Process Bar (Hidden)"));
-                                // NOTE: Don't call rebuild_menu here - it causes use-after-free crash
-                                // because the menu item being clicked gets freed during rebuild
                             } else {
                                 let _ = window.show();
-                                let mut settings = settings_state.settings.lock().unwrap();
+                                let mut settings = settings_state.get_settings();
                                 settings.window_visible = true;
-                                drop(settings);
-                                let conn = db_state.get_connection();
-                                let _ = settings_state.save(&conn);
-                                drop(conn);
-                                let _ = app
-                                    .tray_by_id("main-tray")
-                                    .unwrap()
+                                let _ = settings_state.update_settings(settings);
+                                let _ = app.tray_by_id("main-tray").unwrap()
                                     .set_tooltip(Some("Vibe Process Bar"));
-                                // NOTE: Don't call rebuild_menu here - it causes use-after-free crash
                             }
                         }
                         "settings" => {
@@ -1429,20 +539,12 @@ fn main() {
                             app.exit(0);
                         }
                         other => {
-                            // Handle task activation events
                             if other.starts_with("task_") {
                                 if let Some(task_id) = other.strip_prefix("task_") {
-                                    let tasks: Vec<http_server::Task> = http_server::get_state()
-                                        .tasks
-                                        .lock()
-                                        .map(|t| t.clone())
-                                        .unwrap_or_default();
+                                    let tasks = http_server::get_merged_tasks();
                                     if let Some(task) = tasks.iter().find(|t| t.id == task_id) {
-                                        info!(
-                                            "Activating task from tray: {} ({})",
-                                            task.name, task.ide
-                                        );
-                                        let _ = activate_ide(
+                                        info!("Activating task: {} ({})", task.name, task.ide);
+                                        let _ = window_manager::activate_ide(
                                             &task.ide,
                                             Some(&task.window_title),
                                             task.project_path.as_deref(),
@@ -1451,40 +553,12 @@ fn main() {
                                     }
                                 }
                             }
-                            // Handle window activation events
-                            else if other.starts_with("activate_win_") {
-                                if let Some(index_str) = other.strip_prefix("activate_win_") {
-                                    if let Ok(index) = index_str.parse::<usize>() {
-                                        let windows: Vec<IdeWindow> = SCANNED_WINDOWS
-                                            .lock()
-                                            .map(|w| w.clone())
-                                            .unwrap_or_default();
-                                        if let Some(win) = windows.get(index) {
-                                            info!(
-                                                "Activating window from tray: {} ({})",
-                                                win.window_title, win.ide
-                                            );
-                                            let _ = activate_ide(
-                                                &win.ide,
-                                                Some(&win.window_title),
-                                                None,
-                                                None,
-                                            );
-                                        }
-                                    }
-                                }
-                            }
                         }
                     }
                 })
                 .build(app)?;
 
-            info!("System tray created successfully with id: {:?}", tray.id());
-
-            // NOTE: Removed background thread menu updates to prevent use-after-free crashes
-            // when user clicks on menu while it's being updated.
-            // Menu is now only updated when menu events are handled (toggle-window, etc.)
-
+            info!("System tray created successfully");
             Box::leak(Box::new(tray));
 
             let window_clone = window.clone();
@@ -1493,15 +567,11 @@ fn main() {
             window.on_window_event(move |event| {
                 if let WindowEvent::CloseRequested { api, .. } = event {
                     api.prevent_close();
-                    let db_state = app_handle_clone.state::<db::DatabaseState>();
-                    let settings_state = app_handle_clone.state::<settings::SettingsState>();
-
-                    let conn = db_state.get_connection();
-                    let mut settings = settings_state.settings.lock().unwrap();
+                    let settings_state = app_handle_clone.state::<SettingsState>();
+                    let mut settings = settings_state.get_settings();
                     settings.window_visible = false;
-                    let _ = settings_state.save(&conn);
-
-                    window_clone.hide().unwrap();
+                    let _ = settings_state.update_settings(settings);
+                    let _ = window_clone.hide();
                 }
             });
 

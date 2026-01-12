@@ -80,11 +80,11 @@ const allDisplayItems = computed(() => {
     const existingTask = store.tasks.find(t =>
       t.ide === win.ide &&
       (
-        t.windowTitle === win.window_title ||
-        t.windowTitle === projectName ||
-        win.window_title.includes(t.windowTitle || '') ||
-        projectName.includes(t.windowTitle || '') ||
-        (t.windowTitle || '').includes(projectName)
+        t.window_title === win.window_title ||
+        t.window_title === projectName ||
+        win.window_title.includes(t.window_title || '') ||
+        projectName.includes(t.window_title || '') ||
+        (t.window_title || '').includes(projectName)
       )
     );
     if (!existingTask) {
@@ -96,7 +96,7 @@ const allDisplayItems = computed(() => {
         status: 'idle',
         startTime: 0,
         ide: win.ide,
-        windowTitle: win.window_title,
+        window_title: win.window_title,
       };
       items.push(virtualTask);
     }
@@ -107,8 +107,8 @@ const allDisplayItems = computed(() => {
     const ideA = a.ide || '';
     const ideB = b.ide || '';
     if (ideA !== ideB) return ideA.localeCompare(ideB);
-    const nameA = a.windowTitle || a.name || '';
-    const nameB = b.windowTitle || b.name || '';
+    const nameA = a.window_title || a.name || '';
+    const nameB = b.window_title || b.name || '';
     return nameA.localeCompare(nameB);
   });
 
@@ -121,11 +121,8 @@ const displayTasks = computed(() =>
   )
 );
 
-const currentTask = computed(() =>
-  store.tasks.find(t => t.id === store.currentTaskId) ||
-  store.tasks.find(t => t.status === 'running') ||
-  displayTasks.value[0] || null
-);
+// 单任务视图直接用第一个任务
+const singleTask = computed(() => displayTasks.value[0] || null);
 
 // Scan IDE windows
 async function scanIdeWindows() {
@@ -140,11 +137,7 @@ async function scanIdeWindows() {
   }
 }
 
-// Handle task click
-function handleTaskClick(task: ProgressTask) {
-  debug('Task clicked', { taskId: task.id });
-  store.setCurrentTask(task.id);
-}
+
 
 // Handle task double click - navigate to IDE
 async function handleTaskDoubleClick(task: ProgressTask) {
@@ -160,9 +153,9 @@ async function handleTaskDoubleClick(task: ProgressTask) {
     try {
       await safeInvoke('activate_ide_window', {
         ide: task.ide,
-        windowTitle: task.windowTitle || null,
-        projectPath: task.projectPath || null,
-        activeFile: task.activeFile || null
+        windowTitle: task.window_title || null,
+        projectPath: task.project_path || null,
+        activeFile: task.active_file || null
       });
     } catch (err) {
       error('Failed to activate IDE window', { error: String(err) });
@@ -249,14 +242,14 @@ async function handleMouseDown(event: MouseEvent) {
 function getTimeStr(task: ProgressTask): string {
   // Focused state does NOT affect time display - only the icon changes
   if (task.status === 'armed') return '⏳';
-  if (task.status === 'completed' && task.startTime > 0) {
-    const elapsed = (task.endTime || Date.now()) - task.startTime;
+  if (task.status === 'completed' && task.start_time > 0) {
+    const elapsed = (task.end_time || Date.now()) - task.start_time;
     const minutes = Math.floor(elapsed / 60000);
     const seconds = Math.floor((elapsed % 60000) / 1000);
     return `${minutes}:${seconds.toString().padStart(2, '0')}`;
   }
-  if (task.status === 'running' && task.startTime > 0) {
-    const elapsed = Date.now() - task.startTime;
+  if (task.status === 'running' && task.start_time > 0) {
+    const elapsed = Date.now() - task.start_time;
     const minutes = Math.floor(elapsed / 60000);
     const seconds = Math.floor((elapsed % 60000) / 1000);
     return `${minutes}:${seconds.toString().padStart(2, '0')}`;
@@ -267,7 +260,7 @@ function getTimeStr(task: ProgressTask): string {
 // Get status icon - focused state shows eye icon, otherwise based on status
 function getStatusIcon(task: ProgressTask): string {
   // Focused window shows eye icon (only icon changes, not other styles)
-  if (task.isFocused) return '👁';
+  if (task.is_focused) return '👁';
   switch (task.status) {
     case 'running': return '◉';
     case 'completed': return '✓';
@@ -300,7 +293,7 @@ watch(() => store.tasks, (newTasks) => {
 
   // Track focused/running tasks
   newTasks.forEach(task => {
-    if (task.isFocused || task.status === 'running') {
+    if (task.is_focused || task.status === 'running') {
       seenActiveTasks.value = new Set([...seenActiveTasks.value, task.id]);
     }
   });
@@ -365,21 +358,10 @@ watch([displayTasks, isCollapsed, isCollapseTransition], async () => {
   let scanInterval: number;
   let forceUpdateInterval: number;
   let settingsPollInterval: number;
-  let unlistenSettings: (() => void) | undefined;
 
   onMounted(async () => {
-    // Setup settings listener
-    if (isTauri) {
-      try {
-        const { listen } = await import('@tauri-apps/api/event');
-        unlistenSettings = await listen<AppSettings>('settings-changed', (event) => {
-          debug('Settings changed event received', event.payload);
-          store.setSettings(event.payload);
-        });
-      } catch (e) {
-        error('Failed to setup settings listener', { error: String(e) });
-      }
-    }
+    // 初始化事件监听 (tasks-updated, settings-changed)
+    await store.initEventListeners();
 
     // Always load settings to apply theme
     await store.loadSettings();
@@ -388,10 +370,10 @@ watch([displayTasks, isCollapsed, isCollapseTransition], async () => {
     if (!isSettingsWindow.value) {
         // Initial scan
         await scanIdeWindows();
-        await store.syncFromHttpApi();
+        await store.fetchTasks();
 
-        // Set up intervals
-        syncInterval = window.setInterval(() => store.syncFromHttpApi(), 1000);
+        // Set up intervals - 使用 fetchTasks 替代 syncFromHttpApi
+        syncInterval = window.setInterval(() => store.fetchTasks(), 1000);
         scanInterval = window.setInterval(scanIdeWindows, 5000);
         forceUpdateInterval = window.setInterval(() => {}, 1000); // Force update for time
         
@@ -407,7 +389,7 @@ watch([displayTasks, isCollapsed, isCollapseTransition], async () => {
     if (scanInterval) clearInterval(scanInterval);
     if (forceUpdateInterval) clearInterval(forceUpdateInterval);
     if (settingsPollInterval) clearInterval(settingsPollInterval);
-    if (unlistenSettings) unlistenSettings();
+    store.cleanupEventListeners();
   });
 </script>
 
@@ -445,13 +427,11 @@ watch([displayTasks, isCollapsed, isCollapseTransition], async () => {
         :key="task.id"
         :class="[
           'task-row',
-          { active: task.id === store.currentTaskId },
           { completed: task.status === 'completed' && !clickedCompletedTasks.has(task.id) },
           { 'completed-clicked': clickedCompletedTasks.has(task.id) },
           { armed: task.status === 'armed' },
-          { 'focused-state': task.isFocused }
+          { 'focused-state': task.is_focused }
         ]"
-        @click="handleTaskClick(task)"
         @dblclick="handleTaskDoubleClick(task)"
       >
         <span :class="['mini-status', `status-${task.status}`]">
@@ -480,35 +460,34 @@ watch([displayTasks, isCollapsed, isCollapseTransition], async () => {
         <span class="app-title">{{ t('app.title') }}</span>
       </div>
       <!-- Collapsed: show status + IDE badge -->
-      <div v-else-if="isCollapsed && currentTask" class="collapsed-single-task">
-        <span :class="['mini-status', `status-${currentTask.status}`]">
-          {{ getStatusIcon(currentTask) }}
+      <div v-else-if="isCollapsed && singleTask" class="collapsed-single-task">
+        <span :class="['mini-status', `status-${singleTask.status}`]">
+          {{ getStatusIcon(singleTask) }}
         </span>
-        <span v-if="currentTask.ide" class="ide-badge-mini">{{ currentTask.ide }}</span>
-        <span v-else class="task-ide-collapsed" :title="currentTask.name">{{ currentTask.name }}</span>
+        <span v-if="singleTask.ide" class="ide-badge-mini">{{ singleTask.ide }}</span>
+        <span v-else class="task-ide-collapsed" :title="singleTask.name">{{ singleTask.name }}</span>
       </div>
       <!-- Expanded: show full status text -->
       <div
-        v-else-if="currentTask"
+        v-else-if="singleTask"
         :class="[
           'task-row',
           'single-task-row',
-          { active: currentTask.id === store.currentTaskId || displayTasks.length === 1 },
-          { completed: currentTask.status === 'completed' },
-          { armed: currentTask.status === 'armed' },
-          { 'focused-state': currentTask.isFocused }
+          { completed: singleTask.status === 'completed' },
+          { armed: singleTask.status === 'armed' },
+          { 'focused-state': singleTask.is_focused }
         ]"
-        @click="handleTaskDoubleClick(currentTask)"
-        @dblclick="handleTaskDoubleClick(currentTask)"
+        @click="handleTaskDoubleClick(singleTask)"
+        @dblclick="handleTaskDoubleClick(singleTask)"
       >
         <StatusText
-          :status="currentTask.status"
-          :name="currentTask.name"
-          :is-focused="currentTask.isFocused"
-          :elapsed-time="getTimeStr(currentTask)"
+          :status="singleTask.status"
+          :name="singleTask.name"
+          :is-focused="singleTask.is_focused"
+          :elapsed-time="getTimeStr(singleTask)"
           :show-icon="true"
-          :ide="currentTask.ide"
-          @activate="handleTaskDoubleClick(currentTask)"
+          :ide="singleTask.ide"
+          @activate="handleTaskDoubleClick(singleTask)"
         />
       </div>
     </template>

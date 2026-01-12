@@ -5,7 +5,6 @@ describe('ProgressStore', () => {
   beforeEach(() => {
     useProgressStore.setState({
       tasks: [],
-      currentTaskId: null,
       history: [],
       settings: {
         language: 'en',
@@ -43,12 +42,6 @@ describe('ProgressStore', () => {
       expect(tasks[0].progress).toBe(0);
       expect(tasks[0].tokens).toBe(0);
       expect(taskId).toBeDefined();
-    });
-
-    it('should set new task as current task', () => {
-      const taskId = useProgressStore.getState().addTask('Test Task');
-
-      expect(useProgressStore.getState().currentTaskId).toBe(taskId);
     });
 
     it('should add task with IDE info', () => {
@@ -154,13 +147,6 @@ describe('ProgressStore', () => {
       useProgressStore.getState().removeTask(taskId);
 
       expect(useProgressStore.getState().tasks).toHaveLength(0);
-    });
-
-    it('should clear currentTaskId when removing current task', () => {
-      const taskId = useProgressStore.getState().addTask('Test Task');
-      useProgressStore.getState().removeTask(taskId);
-
-      expect(useProgressStore.getState().currentTaskId).toBeNull();
     });
   });
 
