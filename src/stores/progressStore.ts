@@ -18,7 +18,6 @@ async function safeInvoke<T>(cmd: string, args?: Record<string, unknown>): Promi
 export interface ProgressTask {
   id: string;
   name: string;
-  display_name?: string;
   progress: number;
   tokens: number;
   status: 'armed' | 'running' | 'completed' | 'idle' | 'error' | 'cancelled';

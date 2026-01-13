@@ -269,15 +269,19 @@ function getStatusIcon(task: ProgressTask): string {
   }
 }
 
-// Get display name without IDE prefix (uses backend-provided displayName or fallback)
+// Get display name: activeFile - workspace 格式
 function getDisplayName(task: ProgressTask): string {
-  // Use displayName from backend if available
-  if (task.displayName) {
-    return task.displayName;
+  const activeFile = task.active_file ? task.active_file.split('/').pop() || task.active_file : null;
+  const workspace = task.project_path ? task.project_path.split('/').pop() || task.project_path : null;
+  
+  if (activeFile && workspace) {
+    return `${activeFile} - ${workspace}`;
   }
-  // Fallback: remove IDE prefix locally
-  if (task.ide && task.name.startsWith(`${task.ide} - `)) {
-    return task.name.substring(task.ide.length + 3);
+  if (workspace) {
+    return workspace;
+  }
+  if (activeFile) {
+    return activeFile;
   }
   return task.name;
 }
@@ -295,6 +299,15 @@ watch(() => store.tasks, (newTasks) => {
   newTasks.forEach(task => {
     if (task.is_focused || task.status === 'running') {
       seenActiveTasks.value = new Set([...seenActiveTasks.value, task.id]);
+    }
+    
+    // 当任务重新开始（armed/running）时，从 clickedCompletedTasks 中移除
+    if (task.status === 'armed' || task.status === 'running') {
+      if (clickedCompletedTasks.value.has(task.id)) {
+        const newSet = new Set(clickedCompletedTasks.value);
+        newSet.delete(task.id);
+        clickedCompletedTasks.value = newSet;
+      }
     }
   });
 

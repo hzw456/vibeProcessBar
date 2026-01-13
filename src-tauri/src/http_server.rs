@@ -22,8 +22,6 @@ lazy_static::lazy_static! {
 pub struct Task {
     pub id: String,
     pub name: String,
-    #[serde(default, skip_deserializing)]
-    pub display_name: String,
     pub is_focused: bool,
     pub ide: String,
     pub window_title: String,
@@ -182,15 +180,6 @@ fn sort_tasks_by_priority(tasks: &mut Vec<Task>) {
     });
 }
 
-fn get_display_name(name: &str, ide: &str) -> String {
-    let prefix = format!("{} - ", ide);
-    if name.starts_with(&prefix) {
-        name[prefix.len()..].to_string()
-    } else {
-        name.to_string()
-    }
-}
-
 fn now_millis() -> u64 {
     chrono::Utc::now().timestamp_millis() as u64
 }
@@ -226,11 +215,6 @@ pub fn get_merged_tasks() -> Vec<Task> {
 
     let mut tasks_vec = state.tasks.lock().unwrap().clone();
     sort_tasks_by_priority(&mut tasks_vec);
-
-    // Calculate display_name for each task
-    for task in &mut tasks_vec {
-        task.display_name = get_display_name(&task.name, &task.ide);
-    }
 
     tasks_vec
 }
@@ -289,7 +273,6 @@ async fn report_task(
         let task = Task {
             id: req.task_id.clone(),
             name: req.name,
-            display_name: String::new(),
             progress: 0,
             status: "armed".to_string(),
             is_focused: req.is_focused,
