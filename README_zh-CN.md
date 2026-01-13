@@ -86,6 +86,16 @@
 
 ## 🚀 快速开始
 
+### ⚠️ 前置条件
+
+**必须安装 VS Code 插件才能正常使用 Vibe Process Bar：**
+
+👉 **[Vibe Process Bar VS Code 插件](https://github.com/hzw456/vibeProcessBarVSCodeExt)**
+
+桌面应用通过 VS Code 插件来检测 AI 编程活动。没有安装插件，进度条将无法正常工作。
+
+---
+
 ### 方式一：下载预编译版本（推荐）
 
 前往 [Releases](https://github.com/hzw456/vibeProcessBar/releases) 页面下载：
@@ -163,6 +173,9 @@ Vibe Process Bar 提供了三种灵活的状态检测机制，适配不同的使
 通过 VS Code 插件分析代码变更频率。
 - **原理**：监测文件修改速度、字符变化量来推断 AI 是否正在生成代码。
 - **支持插件**：GitHub Copilot, RooCode, Cline, Claude Code 等所有在 VS Code 内运行的 AI 插件。
+
+**⚠️ 必须安装**：使用此功能需要安装 [Vibe Process Bar VS Code 插件](https://github.com/hzw456/vibeProcessBarVSCodeExt)。
+
 > [!WARNING]
 > **不推荐用于精确监测**
 > 此方式是基于代码修改行为的"猜测"，准确度不如 MCP 或 Hook 方式。仅建议在无法使用 MCP 或 Hook 时作为补充手段使用。

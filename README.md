@@ -85,6 +85,16 @@ Fully supports mainstream AI coding tools and IDEs:
 
 ## 🚀 Quick Start
 
+### ⚠️ Prerequisites
+
+**You MUST install the VS Code extension for Vibe Process Bar to work properly:**
+
+👉 **[Vibe Process Bar VS Code Extension](https://github.com/hzw456/vibeProcessBarVSCodeExt)**
+
+The desktop app communicates with the VS Code extension to detect AI coding activity. Without the extension, the progress bar will not function.
+
+---
+
 ### Method 1: Download Pre-built Version (Recommended)
 
 Download from the [Releases](https://github.com/hzw456/vibeProcessBar/releases) page:
@@ -162,6 +172,9 @@ Connects directly via the Model Context Protocol standard.
 Analyzes code change frequency via VS Code extension.
 - **Principle**: Monitors file modification speed and character changes to infer if AI is generating code.
 - **Supported Plugins**: GitHub Copilot, RooCode, Cline, Claude Code, and all other AI plugins running inside VS Code.
+
+**⚠️ Required**: You must install the [Vibe Process Bar VS Code Extension](https://github.com/hzw456/vibeProcessBarVSCodeExt) to enable this feature.
+
 > [!WARNING]
 > **Not recommended for precise tracking**
 > This method is a "guess" based on code modification behavior, which is less accurate than MCP or Hook methods. Only recommended as a supplement when MCP or Hook cannot be used.
