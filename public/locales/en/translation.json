@@ -44,6 +44,7 @@
       "hideWindow": "Hide Window",
       "httpHost": "HTTP Listen Address",
       "httpPort": "HTTP API Port",
+      "httpRestartHint": "Changes take effect after restart",
       "blockPluginStatus": "Block plugin status reporting"
     },
     "appearance": {
@@ -58,6 +59,10 @@
       },
       "fontSize": "Font Size: {size}px",
       "opacity": "Opacity: {percentage}%",
+      "windowPosition": "Window Position",
+      "windowPositionHint": "Drag the window to set position, or enter coordinates",
+      "positionX": "X",
+      "positionY": "Y",
       "primaryColor": "Custom Primary Color",
       "resetColors": "Reset Custom Colors",
       "reset": "Reset"
@@ -142,8 +147,8 @@
     "vscode": "VS Code"
   },
   "tray": {
-    "showWindow": "☀ Show Window",
-    "hideWindow": "☾ Hide Window",
+    "showWindow": "Show/Hide",
+    "hideWindow": "Show/Hide",
     "settings": "Settings",
     "quit": "Quit",
     "noTasks": "No tasks",

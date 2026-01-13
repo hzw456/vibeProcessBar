@@ -44,6 +44,8 @@ export interface AppSettings {
   httpPort: number;
   windowVisible: boolean;
   blockPluginStatus: boolean;
+  windowX: number | null;
+  windowY: number | null;
 }
 
 const defaultSettings: AppSettings = {
@@ -59,6 +61,8 @@ const defaultSettings: AppSettings = {
   httpPort: 31415,
   windowVisible: true,
   blockPluginStatus: true,
+  windowX: null,
+  windowY: null,
 };
 
 export const useProgressStore = defineStore('progress', () => {
@@ -318,6 +322,30 @@ export const useProgressStore = defineStore('progress', () => {
     updateSettingAndSync('blockPluginStatus', value);
   }
 
+  function setWindowPosition(x: number, y: number) {
+    settings.value.windowX = x;
+    settings.value.windowY = y;
+    // 移动主窗口到新位置
+    safeInvoke('set_main_window_position', { x, y });
+    // 保存设置
+    safeInvoke('update_app_settings', { newSettings: settings.value });
+  }
+
+  // 只更新位置数值，不保存到文件（用于拖动时实时显示）
+  function updateWindowPositionDisplay(x: number, y: number) {
+    settings.value.windowX = x;
+    settings.value.windowY = y;
+  }
+
+  // 保存当前位置到配置文件
+  async function saveWindowPositionToFile() {
+    try {
+      await safeInvoke('update_app_settings', { newSettings: settings.value });
+    } catch (err) {
+      error('Failed to save window position', { error: String(err) });
+    }
+  }
+
   async function setWindowVisible(value: boolean) {
     settings.value.windowVisible = value;
     try {
@@ -365,6 +393,9 @@ export const useProgressStore = defineStore('progress', () => {
     setHttpHost,
     setHttpPort,
     setBlockPluginStatus,
+    setWindowPosition,
+    updateWindowPositionDisplay,
+    saveWindowPositionToFile,
     setWindowVisible,
     addToHistory,
     clearHistory,

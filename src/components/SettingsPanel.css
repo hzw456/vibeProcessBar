@@ -181,6 +181,40 @@
   border-color: var(--primary-color);
 }
 
+.position-inputs {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.position-label {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.position-input {
+  width: 70px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  border: 1px solid var(--border-color);
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text-color);
+  font-size: 13px;
+  text-align: center;
+}
+
+.position-input:focus {
+  outline: none;
+  border-color: var(--primary-color);
+}
+
+.setting-hint {
+  font-size: 11px;
+  color: var(--text-secondary);
+  padding: 4px 0 8px 0;
+  opacity: 0.7;
+}
+
 .vscode-help {
   margin-top: 16px;
   padding: 12px;

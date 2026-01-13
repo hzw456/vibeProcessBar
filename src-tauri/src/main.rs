@@ -49,10 +49,12 @@ async fn get_ide_windows() -> Result<Vec<IdeWindow>, String> {
 #[tauri::command]
 fn open_settings_window<R: Runtime>(app: tauri::AppHandle<R>) -> Result<(), String> {
     if let Some(window) = app.get_webview_window("settings") {
+        // 窗口已存在，确保显示并聚焦
         let _ = window.show();
         let _ = window.set_focus();
     } else {
-        let _ = tauri::WebviewWindowBuilder::new(
+        // 创建新窗口，设置 visible: true 确保立即显示
+        let window = tauri::WebviewWindowBuilder::new(
             &app,
             "settings",
             tauri::WebviewUrl::App("index.html?type=settings".into()),
@@ -64,8 +66,14 @@ fn open_settings_window<R: Runtime>(app: tauri::AppHandle<R>) -> Result<(), Stri
         .maximizable(false)
         .decorations(true)
         .transparent(false)
+        .visible(true)
+        .focused(true)
         .build()
         .map_err(|e| e.to_string())?;
+        
+        // 确保窗口显示并聚焦
+        let _ = window.show();
+        let _ = window.set_focus();
     }
     Ok(())
 }
@@ -222,6 +230,14 @@ fn set_window_position(window: tauri::Window, x: f64, y: f64) {
 }
 
 #[tauri::command]
+async fn set_main_window_position<R: Runtime>(app: tauri::AppHandle<R>, x: f64, y: f64) -> Result<(), String> {
+    if let Some(window) = app.get_webview_window("main") {
+        window.set_position(tauri::LogicalPosition::new(x, y)).map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
+#[tauri::command]
 fn resize_window(window: tauri::Window, width: f64, height: f64) {
     let _ = window.set_size(tauri::LogicalSize::new(width, height));
 }
@@ -288,8 +304,8 @@ pub struct TrayTranslations {
 
 lazy_static::lazy_static! {
     static ref TRAY_TRANSLATIONS: std::sync::Mutex<TrayTranslations> = std::sync::Mutex::new(TrayTranslations {
-        show_window: "☀ Show Window".to_string(),
-        hide_window: "☾ Hide Window".to_string(),
+        show_window: "Show/Hide".to_string(),
+        hide_window: "Show/Hide".to_string(),
         settings: "Settings".to_string(),
         quit: "Quit".to_string(),
         no_tasks: "No tasks".to_string(),
@@ -299,8 +315,8 @@ lazy_static::lazy_static! {
 
 fn get_tray_translations_internal() -> TrayTranslations {
     TRAY_TRANSLATIONS.lock().map(|t| t.clone()).unwrap_or_else(|_| TrayTranslations {
-        show_window: "☀ Show Window".to_string(),
-        hide_window: "☾ Hide Window".to_string(),
+        show_window: "Show/Hide".to_string(),
+        hide_window: "Show/Hide".to_string(),
         settings: "Settings".to_string(),
         quit: "Quit".to_string(),
         no_tasks: "No tasks".to_string(),
@@ -333,45 +349,12 @@ async fn get_current_language(
 fn update_tray_menu<R: Runtime>(app: &tauri::AppHandle<R>) {
     let trans = get_tray_translations_internal();
 
-    let window = app.get_webview_window("main");
-    let is_visible = window.map(|w| w.is_visible().unwrap_or(true)).unwrap_or(true);
-
-    let window_text = if is_visible { &trans.hide_window } else { &trans.show_window };
-
-    let window_toggle = MenuItem::with_id(app, "toggle-window", window_text, true, None::<&str>).ok();
+    let window_toggle = MenuItem::with_id(app, "toggle-window", &trans.show_window, true, None::<&str>).ok();
     let settings_item = MenuItem::with_id(app, "settings", &trans.settings, true, None::<&str>).ok();
     let quit_item = MenuItem::with_id(app, "quit", &trans.quit, true, None::<&str>).ok();
 
     if let (Some(w), Some(s), Some(q)) = (window_toggle, settings_item, quit_item) {
-        let tasks = http_server::get_merged_tasks();
-        let mut items: Vec<&dyn tauri::menu::IsMenuItem<R>> = vec![&w, &s, &q];
-        let sep1 = tauri::menu::PredefinedMenuItem::separator(app).ok();
-        let mut task_items: Vec<MenuItem<R>> = Vec::new();
-
-        for task in &tasks {
-            let status_icon = match task.status.as_str() {
-                "running" => "🔄",
-                "armed" => "⏳",
-                "completed" => "✅",
-                "error" => "❌",
-                "cancelled" => "⏹️",
-                _ => "•",
-            };
-            let title = format!("{} {} - {}", status_icon, task.name, task.status);
-            let id = format!("task_{}", task.id);
-            if let Ok(item) = MenuItem::with_id(app, &id, &title, true, None::<&str>) {
-                task_items.push(item);
-            }
-        }
-
-        if !task_items.is_empty() {
-            if let Some(ref sep) = sep1 {
-                items.push(sep);
-            }
-            for item in &task_items {
-                items.push(item);
-            }
-        }
+        let items: Vec<&dyn tauri::menu::IsMenuItem<R>> = vec![&w, &s, &q];
 
         if let Ok(menu) = tauri::menu::Menu::with_items(app, &items) {
             if let Some(tray) = app.tray_by_id("main-tray") {
@@ -423,6 +406,7 @@ fn main() {
             hide_window,
             get_window_position,
             set_window_position,
+            set_main_window_position,
             resize_window,
             toggle_window_always_on_top,
             get_all_windows,
@@ -451,6 +435,12 @@ fn main() {
             app.manage(settings_state);
 
             let window = app_handle.get_webview_window("main").unwrap();
+
+            // 恢复保存的窗口位置
+            if let (Some(x), Some(y)) = (current_settings.window_x, current_settings.window_y) {
+                let _ = window.set_position(tauri::LogicalPosition::new(x, y));
+                info!("Restored window position: ({}, {})", x, y);
+            }
 
             #[cfg(target_os = "macos")]
             {
@@ -538,22 +528,7 @@ fn main() {
                         "quit" => {
                             app.exit(0);
                         }
-                        other => {
-                            if other.starts_with("task_") {
-                                if let Some(task_id) = other.strip_prefix("task_") {
-                                    let tasks = http_server::get_merged_tasks();
-                                    if let Some(task) = tasks.iter().find(|t| t.id == task_id) {
-                                        info!("Activating task: {} ({})", task.name, task.ide);
-                                        let _ = window_manager::activate_ide(
-                                            &task.ide,
-                                            Some(&task.window_title),
-                                            task.project_path.as_deref(),
-                                            task.active_file.as_deref(),
-                                        );
-                                    }
-                                }
-                            }
-                        }
+                        _ => {}
                     }
                 })
                 .build(app)?;

@@ -231,10 +231,62 @@ async function handleMouseDown(event: MouseEvent) {
   try {
     const win = await getWindow();
     if (win) {
+      // 标记正在拖动
+      isDragging = true;
       await win.startDragging();
     }
   } catch {
     // Ignore drag errors
+  }
+}
+
+// 标记是否正在拖动
+let isDragging = false;
+
+// 监听全局 mouseup 来检测拖动结束
+if (typeof window !== 'undefined') {
+  window.addEventListener('mouseup', async () => {
+    if (isDragging) {
+      isDragging = false;
+      // 延迟一点确保位置已更新
+      setTimeout(async () => {
+        await saveWindowPosition();
+      }, 100);
+    }
+  });
+}
+
+// 保存窗口位置到配置文件
+async function saveWindowPosition() {
+  try {
+    const win = await getWindow();
+    if (win) {
+      const position = await win.innerPosition();
+      const scaleFactor = await win.scaleFactor();
+      const x = Math.round(position.x / scaleFactor);
+      const y = Math.round(position.y / scaleFactor);
+      store.updateWindowPositionDisplay(x, y);
+      await store.saveWindowPositionToFile();
+      debug('Window position saved', { x, y });
+    }
+  } catch (e) {
+    error('Failed to save window position', { error: String(e) });
+  }
+}
+
+// 更新位置显示（不保存到文件）
+async function updatePositionDisplay() {
+  try {
+    const win = await getWindow();
+    if (win) {
+      const position = await win.innerPosition();
+      const scaleFactor = await win.scaleFactor();
+      const x = Math.round(position.x / scaleFactor);
+      const y = Math.round(position.y / scaleFactor);
+      store.updateWindowPositionDisplay(x, y);
+    }
+  } catch {
+    // Ignore errors
   }
 }
 
@@ -371,6 +423,7 @@ watch([displayTasks, isCollapsed, isCollapseTransition], async () => {
   let scanInterval: number;
   let forceUpdateInterval: number;
   let settingsPollInterval: number;
+  let unlistenMove: (() => void) | null = null;
 
   onMounted(async () => {
     // 初始化事件监听 (tasks-updated, settings-changed)
@@ -381,6 +434,14 @@ watch([displayTasks, isCollapsed, isCollapseTransition], async () => {
 
     // The rest is only for Main Window
     if (!isSettingsWindow.value) {
+        // 监听窗口移动事件，实时更新位置显示
+        if (isTauri) {
+          const { listen } = await import('@tauri-apps/api/event');
+          unlistenMove = await listen('tauri://move', () => {
+            updatePositionDisplay();
+          });
+        }
+
         // Initial scan
         await scanIdeWindows();
         await store.fetchTasks();
@@ -402,6 +463,7 @@ watch([displayTasks, isCollapsed, isCollapseTransition], async () => {
     if (scanInterval) clearInterval(scanInterval);
     if (forceUpdateInterval) clearInterval(forceUpdateInterval);
     if (settingsPollInterval) clearInterval(settingsPollInterval);
+    if (unlistenMove) unlistenMove();
     store.cleanupEventListeners();
   });
 </script>

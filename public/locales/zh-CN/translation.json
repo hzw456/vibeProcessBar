@@ -44,6 +44,7 @@
       "hideWindow": "隐藏窗口",
       "httpHost": "HTTP 监听地址",
       "httpPort": "HTTP API 端口",
+      "httpRestartHint": "修改后需重启应用生效",
       "blockPluginStatus": "屏蔽插件状态上报"
     },
     "appearance": {
@@ -58,6 +59,10 @@
       },
       "fontSize": "字体大小: {size}px",
       "opacity": "透明度: {percentage}%",
+      "windowPosition": "悬浮窗位置",
+      "windowPositionHint": "拖动窗口设置位置，或输入坐标",
+      "positionX": "X",
+      "positionY": "Y",
       "primaryColor": "自定义主色",
       "resetColors": "重置自定义颜色",
       "reset": "重置"
@@ -142,8 +147,8 @@
     "vscode": "VS Code"
   },
   "tray": {
-    "showWindow": "☀ 显示窗口",
-    "hideWindow": "☾ 隐藏窗口",
+    "showWindow": "显示/隐藏",
+    "hideWindow": "显示/隐藏",
     "settings": "设置",
     "quit": "退出",
     "noTasks": "无任务",

@@ -1,6 +1,10 @@
 # Vibe Process Bar
 
 <p align="center">
+  <a href="README.md">English</a> | <a href="README_zh-CN.md">简体中文</a>
+</p>
+
+<p align="center">
   <img src="./src-tauri/icons/512x512.png" alt="Vibe Process Bar Logo" width="128" height="128">
 </p>
 
@@ -15,7 +19,7 @@
 <p align="center">
   <img src="https://img.shields.io/badge/platform-macOS-blue" alt="Platform">
   <img src="https://img.shields.io/badge/built%20with-Tauri%20%2B%20Vue-green" alt="Built with">
-  <img src="https://img.shields.io/badge/license-MIT-orange" alt="License">
+  <img src="https://img.shields.io/badge/license-GPLv3-orange" alt="License">
 </p>
 
 ---
@@ -29,6 +33,14 @@
 - 🔄 **多任务难以追踪** — 同时运行多个 AI 任务时容易混乱
 
 **Vibe Process Bar** 解决了这些问题！它是一个轻量级的悬浮窗口，始终显示在屏幕顶层，让你随时掌握 AI 的工作状态。
+
+---
+
+## 📸 截图展示
+
+| 运行中 | 已完成 | 监控面板 |
+|:---:|:---:|:---:|
+| ![运行中](./docs/images/runing.png) | ![已完成](./docs/images/complete.png) | ![监控面板](./docs/images/monitor.png) |
 
 ---
 
@@ -56,7 +68,6 @@
 - **Antigravity** (原生支持)
 - **Trae** (原生支持)
 - **CodeBuddy / CodeBuddy CN** (原生支持)
-
 
 ### 🎨 优雅的悬浮设计
 
@@ -119,6 +130,13 @@ Vibe Process Bar 提供了三种灵活的状态检测机制，适配不同的使
 - **支持应用**：Cursor, Windsurf, Kiro, Trae, CodeBuddy, Antigravity。
 - **特点**：官方或原生 Hook 接口触发，准确性极高。
 
+**Hook 脚本位置**：`rules/on-agent-start.sh` 和 `rules/on-agent-complete.sh`
+
+将这些脚本复制到你的 IDE 的 hook 配置目录：
+- **Kiro**：复制到 `.kiro/hooks/` 目录
+- **Cursor**：在 `.cursorrules` 文件中引用
+- **其他 IDE**：按照各自的 hook 配置方式进行配置
+
 ### 2️⃣ MCP 协议 (推荐)
 通过 Model Context Protocol 标准协议直接连接。
 - **原理**：AI Agent 通过 MCP Client 主动连接 Vibe Process Bar Server。
@@ -126,7 +144,10 @@ Vibe Process Bar 提供了三种灵活的状态检测机制，适配不同的使
     - `list_tasks`: 获取当前活跃任务列表。
     - `update_task_status`: 汇报任务状态 (running, completed, error 等)。
 - **支持应用**：支持所有兼容 MCP 协议的插件与工具（如 Claude Desktop, Cline, RooCode 等）。
-- **配置示例**：
+
+**重要提示**：使用 MCP 时，建议同时使用 `rules/rules.md` 中的规则，以确保 AI Agent 正确上报状态。将 `rules/rules.md` 的内容添加到你的 AI 助手的系统提示词或规则配置中。
+
+**配置示例**：
 
 ```json
 {
@@ -144,7 +165,25 @@ Vibe Process Bar 提供了三种灵活的状态检测机制，适配不同的使
 - **支持插件**：GitHub Copilot, RooCode, Cline, Claude Code 等所有在 VS Code 内运行的 AI 插件。
 > [!WARNING]
 > **不推荐用于精确监测**
-> 此方式是基于代码修改行为的“猜测”，准确度不如 MCP 或 Hook 方式。仅建议在无法使用 MCP 或 Hook 时作为补充手段使用。
+> 此方式是基于代码修改行为的"猜测"，准确度不如 MCP 或 Hook 方式。仅建议在无法使用 MCP 或 Hook 时作为补充手段使用。
+
+
+---
+
+## 📁 项目结构
+
+```
+vibeProcessBar/
+├── docs/
+│   └── images/              # 截图和文档图片
+├── rules/
+│   ├── on-agent-start.sh    # Hook 脚本：AI agent 启动时调用
+│   ├── on-agent-complete.sh # Hook 脚本：AI agent 完成时调用
+│   └── rules.md             # MCP 规则，供 AI 助手使用
+├── src/                     # Vue 前端源码
+├── src-tauri/               # Tauri/Rust 后端源码
+└── ...
+```
 
 ---
 
@@ -159,12 +198,9 @@ Vibe Process Bar 提供了三种灵活的状态检测机制，适配不同的使
 | **Claude Desktop** | ✅ MCP | 需在配置中添加 MCP Server |
 | **Cline** | ✅ MCP | 推荐使用 MCP，体验最佳 |
 | **RooCode** | ✅ MCP | 推荐使用 MCP |
-| **GitHub Copilot** | ⚠️ 插件上报 | 需配合 [Vibe Process Bar 插件](https://github.com/hzw456/vibeProcessBarVSCodeExt) 使用 |
 | **VS Code** | 🔌 插件 | 必需安装 VS Code 插件才能检测内部 AI 行为 |
 
 **注意**：对于在 VS Code 中运行的 AI 助手（如 GitHub Copilot），**必须** 安装配合 Vibe Process Bar 的 VS Code 插件才能实现状态检测。
-
-
 
 ---
 
@@ -179,9 +215,39 @@ Vibe Process Bar 提供了三种灵活的状态检测机制，适配不同的使
 
 ---
 
+## ☕ 支持与捐赠
+
+如果你觉得 Vibe Process Bar 对你有帮助，欢迎请我喝杯咖啡！
+
+<a href="https://ko-fi.com/hzw456" target="_blank">
+  <img src="https://ko-fi.com/img/githubbutton_sm.svg" alt="在 Ko-fi 上支持我">
+</a>
+
+---
+
 ## 📄 许可证
 
-MIT License © 2024
+本项目代码采用 [GNU General Public License v3.0 (GPLv3)](https://www.gnu.org/licenses/gpl-3.0.html) 进行许可。
+
+**本软件开源免费，严禁二次售卖。**
+
+### ⚠️ 商标保护声明
+
+**"Vibe Process Bar" 名称及 Logo 不包含在开源许可范围内。**
+
+- 软件名称 "Vibe Process Bar" 及相关 Logo 为本项目专有标识
+- 未经书面授权，禁止在衍生作品或分发版本中使用本项目名称和 Logo
+- 如需使用，请联系作者获取授权
+
+### 你可以：
+- ✅ 自由使用、修改和分发源代码
+- ✅ 基于本项目进行二次开发
+- ✅ 在遵守 GPLv3 的前提下发布衍生作品
+
+### 你不可以：
+- ❌ 将本软件或衍生作品进行售卖
+- ❌ 未经授权使用 "Vibe Process Bar" 名称和 Logo
+- ❌ 闭源分发修改后的版本
 
 ---
 

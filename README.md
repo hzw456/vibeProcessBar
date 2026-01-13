@@ -1,6 +1,10 @@
 # Vibe Process Bar
 
 <p align="center">
+  <a href="README.md">English</a> | <a href="README_zh-CN.md">简体中文</a>
+</p>
+
+<p align="center">
   <img src="./src-tauri/icons/512x512.png" alt="Vibe Process Bar Logo" width="128" height="128">
 </p>
 
@@ -15,7 +19,7 @@
 <p align="center">
   <img src="https://img.shields.io/badge/platform-macOS-blue" alt="Platform">
   <img src="https://img.shields.io/badge/built%20with-Tauri%20%2B%20Vue-green" alt="Built with">
-  <img src="https://img.shields.io/badge/license-MIT-orange" alt="License">
+  <img src="https://img.shields.io/badge/license-GPLv3-orange" alt="License">
 </p>
 
 ---
@@ -29,6 +33,14 @@ When using AI coding assistants like Cursor, Kiro, or Claude, do you often face 
 - 🔄 **Multi-task Chaos** — Easy to get confused when running multiple AI tasks
 
 **Vibe Process Bar** solves these problems! It is a lightweight floating window that continuously stays on top, keeping you informed of the AI's working status at all times.
+
+---
+
+## 📸 Screenshots
+
+| Running | Completed | Monitor |
+|:---:|:---:|:---:|
+| ![Running](./docs/images/runing.png) | ![Completed](./docs/images/complete.png) | ![Monitor](./docs/images/monitor.png) |
 
 ---
 
@@ -117,6 +129,13 @@ Syncs status precisely via the IDE's own Hook mechanism.
 - **Supported Apps**: Cursor, Windsurf, Kiro, Trae, CodeBuddy, Antigravity.
 - **Features**: Triggered by official or native Hook interfaces, extremely accurate.
 
+**Hook Scripts Location**: `rules/on-agent-start.sh` and `rules/on-agent-complete.sh`
+
+Copy these scripts to your IDE's hook configuration directory:
+- **Kiro**: Copy to `.kiro/hooks/` directory
+- **Cursor**: Reference in `.cursorrules` file
+- **Other IDEs**: Follow their respective hook configuration methods
+
 ### 2️⃣ MCP Protocol (Recommended)
 Connects directly via the Model Context Protocol standard.
 - **Principle**: AI Agent actively connects to Vibe Process Bar Server via MCP Client.
@@ -124,7 +143,10 @@ Connects directly via the Model Context Protocol standard.
     - `list_tasks`: Get current active task list.
     - `update_task_status`: Report task status (running, completed, error, etc.).
 - **Supported Apps**: Supports all plugins and tools compatible with MCP protocol (like Claude Desktop, Cline, RooCode, etc.).
-- **Configuration Example**:
+
+**Important**: When using MCP, it's recommended to also use the rules in `rules/rules.md` to ensure the AI Agent properly reports status. Add the content of `rules/rules.md` to your AI assistant's system prompt or rules configuration.
+
+**Configuration Example**:
 
 ```json
 {
@@ -143,6 +165,23 @@ Analyzes code change frequency via VS Code extension.
 > [!WARNING]
 > **Not recommended for precise tracking**
 > This method is a "guess" based on code modification behavior, which is less accurate than MCP or Hook methods. Only recommended as a supplement when MCP or Hook cannot be used.
+
+---
+
+## 📁 Project Structure
+
+```
+vibeProcessBar/
+├── docs/
+│   └── images/           # Screenshots and documentation images
+├── rules/
+│   ├── on-agent-start.sh    # Hook script: called when AI agent starts
+│   ├── on-agent-complete.sh # Hook script: called when AI agent completes
+│   └── rules.md             # MCP rules for AI assistants
+├── src/                  # Vue frontend source code
+├── src-tauri/            # Tauri/Rust backend source code
+└── ...
+```
 
 ---
 
@@ -175,9 +214,39 @@ Click the settings icon on the right side of the progress bar to configure:
 
 ---
 
+## ☕ Support & Donation
+
+If you find Vibe Process Bar helpful, consider buying me a coffee!
+
+<a href="https://ko-fi.com/hzw456" target="_blank">
+  <img src="https://ko-fi.com/img/githubbutton_sm.svg" alt="Support me on Ko-fi">
+</a>
+
+---
+
 ## 📄 License
 
-MIT License © 2024
+This project's source code is licensed under the [GNU General Public License v3.0 (GPLv3)](https://www.gnu.org/licenses/gpl-3.0.html).
+
+**This software is open source and free to use. Resale is strictly prohibited.**
+
+### ⚠️ Trademark Protection
+
+**The "Vibe Process Bar" name and Logo are NOT included in the open source license.**
+
+- The software name "Vibe Process Bar" and associated Logo are proprietary identifiers of this project
+- Use of the project name and Logo in derivative works or distributions is prohibited without written permission
+- Please contact the author for authorization if needed
+
+### You CAN:
+- ✅ Freely use, modify, and distribute the source code
+- ✅ Create derivative works based on this project
+- ✅ Publish derivative works under GPLv3 compliance
+
+### You CANNOT:
+- ❌ Sell this software or derivative works
+- ❌ Use "Vibe Process Bar" name and Logo without authorization
+- ❌ Distribute modified versions as closed source
 
 ---
 

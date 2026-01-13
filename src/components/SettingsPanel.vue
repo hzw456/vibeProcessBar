@@ -55,6 +55,17 @@ function handleToggleWindow() {
 function handleTestSound() {
   playSound(store.settings.soundVolume);
 }
+
+function handlePositionChange(event: Event) {
+  const input = event.target as HTMLInputElement;
+  const axis = input.dataset.axis;
+  const value = parseInt(input.value) || 0;
+  
+  const x = axis === 'x' ? value : (store.settings.windowX ?? 0);
+  const y = axis === 'y' ? value : (store.settings.windowY ?? 0);
+  
+  store.setWindowPosition(x, y);
+}
 </script>
 
 <template>
@@ -110,6 +121,7 @@ function handleTestSound() {
           <label>{{ t('settings.general.httpPort') }}</label>
           <input type="number" :value="store.settings.httpPort" @change="store.setHttpPort(parseInt(($event.target as HTMLInputElement).value))" min="1024" max="65535" class="port-input" />
         </div>
+        <div class="setting-hint">{{ t('settings.general.httpRestartHint') }}</div>
         <div class="setting-item">
           <label>{{ t('settings.general.blockPluginStatus') }}</label>
           <input type="checkbox" :checked="store.settings.blockPluginStatus" @change="store.setBlockPluginStatus(($event.target as HTMLInputElement).checked)" />
@@ -134,6 +146,16 @@ function handleTestSound() {
           <label>{{ opacityLabel }}</label>
           <input type="range" :value="store.settings.opacity" @input="store.setOpacity(parseFloat(($event.target as HTMLInputElement).value))" min="0.5" max="1" step="0.05" />
         </div>
+        <div class="setting-item">
+          <label>{{ t('settings.appearance.windowPosition') }}</label>
+          <div class="position-inputs">
+            <label class="position-label">{{ t('settings.appearance.positionX') }}</label>
+            <input type="number" :value="store.settings.windowX ?? 0" @change="handlePositionChange" class="position-input" data-axis="x" />
+            <label class="position-label">{{ t('settings.appearance.positionY') }}</label>
+            <input type="number" :value="store.settings.windowY ?? 0" @change="handlePositionChange" class="position-input" data-axis="y" />
+          </div>
+        </div>
+        <div class="setting-hint">{{ t('settings.appearance.windowPositionHint') }}</div>
       </div>
     </div>
 

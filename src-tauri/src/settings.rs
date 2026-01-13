@@ -20,6 +20,10 @@ pub struct AppSettings {
     pub window_visible: bool,
     pub language: String,
     pub block_plugin_status: bool,
+    #[serde(default)]
+    pub window_x: Option<f64>,
+    #[serde(default)]
+    pub window_y: Option<f64>,
 }
 
 impl Default for AppSettings {
@@ -37,6 +41,8 @@ impl Default for AppSettings {
             window_visible: true,
             language: "en".to_string(),
             block_plugin_status: true,
+            window_x: None,
+            window_y: None,
         }
     }
 }
