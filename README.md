@@ -207,9 +207,11 @@ For the best experience, we recommend choosing the integration method that best 
 
 | Tool/IDE | Recommended Method | Optimization |
 |:---|:---|:---|
-| **Cursor** | ✅ MCP | Automatic support, no config needed |
-| **Windsurf** | ✅ MCP | Automatic support |
-| **Cline** | ✅ MCP | Recommended, best experience |
+| **Cursor** | ✅ MCP | Recommended |
+| **Windsurf** | ✅ MCP | Recommended |
+| **Kiro** | ✅ HOOK | Recommended |
+| **Antigravity** | ✅ MCP | Recommended |
+| **Cline** | ✅ MCP | Recommended |
 | **RooCode** | ✅ MCP | Recommended |
 | **GitHub Copilot** |✅ MCP | Recommended |
 | **VS Code** | ✅ MCP | Recommended |
