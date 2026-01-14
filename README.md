@@ -31,8 +31,11 @@ When using AI coding assistants like Cursor, Kiro, or Claude, do you often face 
 - 🤔 **Unknown Status** — AI is thinking in the background while you wait blindly
 - ⏰ **Uncertain Completion** — Lose track of progress after switching windows
 - 🔄 **Multi-task Chaos** — Easy to get confused when running multiple AI tasks
+- 🪟 **Window Switching Pain** — Hard to find the right IDE window among many open apps
 
-**Vibe Process Bar** solves these problems! It is a lightweight floating window that continuously stays on top, keeping you informed of the AI's working status at all times.
+**Vibe Process Bar** solves these problems! It is a lightweight floating window that continuously stays on top, keeping you informed of the AI's working status at all times. **Double-click any task to instantly jump to its IDE window** — no more hunting through your taskbar!
+
+> ⚠️ **Note**: The window jump feature requires macOS Accessibility permission. Grant it in System Settings → Privacy & Security → Accessibility.
 
 ---
 
@@ -72,7 +75,7 @@ Fully supports mainstream AI coding tools and IDEs:
 
 - Translucent frosted glass effect, doesn't obstruct workspace
 - Draggable to any position
-- Double-click to jump to the corresponding window
+- **Double-click to jump to the corresponding task window** (requires macOS Accessibility permission)
 - Always on top, always visible
 
 ### 📊 Multi-task Management
