@@ -207,13 +207,14 @@ For the best experience, we recommend choosing the integration method that best 
 
 | Tool/IDE | Recommended Method | Optimization |
 |:---|:---|:---|
-| **Cursor** | ✅ Hook | Automatic support, no config needed |
-| **Windsurf** | ✅ Hook | Automatic support |
-| **Claude Desktop** | ✅ MCP | Add MCP Server to config |
-| **Cline** | ✅ MCP | Recommended, best experience |
+| **Cursor** | ✅ MCP | Recommended |
+| **Windsurf** | ✅ MCP | Recommended |
+| **Kiro** | ✅ HOOK | Recommended |
+| **Antigravity** | ✅ MCP | Recommended |
+| **Cline** | ✅ MCP | Recommended |
 | **RooCode** | ✅ MCP | Recommended |
-| **GitHub Copilot** | ⚠️ Plugin Reporting | Requires [Vibe Process Bar Extension](https://github.com/hzw456/vibeProcessBarVSCodeExt) |
-| **VS Code** | 🔌 Plugin | Must install VS Code extension to detect internal AI activity |
+| **GitHub Copilot** |✅ MCP | Recommended |
+| **VS Code** | ✅ MCP | Recommended |
 
 **Note**: For AI assistants running in VS Code (like GitHub Copilot), you **must** install the Vibe Process Bar VS Code extension to enable status detection.
 
