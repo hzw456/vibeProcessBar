@@ -1,7 +1,9 @@
 use serde::{Deserialize, Serialize};
-use std::process::Command;
 use tauri::Runtime;
 use tracing::info;
+
+#[cfg(target_os = "windows")]
+use std::os::windows::process::CommandExt;
 
 /// IDE bundle identifiers for window scanning
 pub const IDE_BUNDLES: &[(&str, &str, &str)] = &[
@@ -104,21 +106,75 @@ pub fn scan_ide_windows() -> Vec<IdeWindow> {
 
 #[cfg(target_os = "windows")]
 pub fn scan_ide_windows() -> Vec<IdeWindow> {
-    use std::process::Command;
+    use std::process::{Command, Stdio};
     
     let mut all_windows = Vec::new();
     
-    // Use PowerShell to enumerate windows
+    // Use PowerShell with EnumWindows to get ALL windows (not just MainWindowHandle)
     let script = r#"
-        Get-Process | Where-Object {$_.MainWindowTitle -ne ""} | 
-        Where-Object {$_.ProcessName -match "Code|Cursor|Kiro|Antigravity|Windsurf|Trae|CodeBuddy"} |
-        ForEach-Object {
-            "$($_.ProcessName)|$($_.Id)|$($_.MainWindowTitle)"
+        Add-Type @"
+            using System;
+            using System.Runtime.InteropServices;
+            using System.Text;
+            using System.Collections.Generic;
+            
+            public class WinEnum {
+                public delegate bool EnumWindowsProc(IntPtr hWnd, IntPtr lParam);
+                
+                [DllImport("user32.dll")]
+                public static extern bool EnumWindows(EnumWindowsProc lpEnumFunc, IntPtr lParam);
+                
+                [DllImport("user32.dll")]
+                public static extern int GetWindowText(IntPtr hWnd, StringBuilder lpString, int nMaxCount);
+                
+                [DllImport("user32.dll")]
+                public static extern int GetWindowTextLength(IntPtr hWnd);
+                
+                [DllImport("user32.dll")]
+                public static extern bool IsWindowVisible(IntPtr hWnd);
+                
+                [DllImport("user32.dll")]
+                public static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint lpdwProcessId);
+                
+                public static List<string> GetAllWindows() {
+                    var windows = new List<string>();
+                    EnumWindows((hWnd, lParam) => {
+                        if (IsWindowVisible(hWnd)) {
+                            int length = GetWindowTextLength(hWnd);
+                            if (length > 0) {
+                                StringBuilder sb = new StringBuilder(length + 1);
+                                GetWindowText(hWnd, sb, sb.Capacity);
+                                uint pid;
+                                GetWindowThreadProcessId(hWnd, out pid);
+                                windows.Add(hWnd.ToInt64() + "|" + pid + "|" + sb.ToString());
+                            }
+                        }
+                        return true;
+                    }, IntPtr.Zero);
+                    return windows;
+                }
+            }
+"@
+        
+        $ideProcessNames = @("Code", "Cursor", "Kiro", "Antigravity", "Windsurf", "Trae", "CodeBuddy")
+        $ideProcesses = Get-Process | Where-Object { 
+            $name = $_.ProcessName
+            $ideProcessNames | Where-Object { $name -match $_ }
+        } | Select-Object -ExpandProperty Id
+        
+        $allWindows = [WinEnum]::GetAllWindows()
+        $allWindows | Where-Object { 
+            $parts = $_ -split '\|', 3
+            $ideProcesses -contains [int]$parts[1]
         }
     "#;
     
     let output = Command::new("powershell")
-        .args(&["-NoProfile", "-Command", script])
+        .args(&["-NoProfile", "-WindowStyle", "Hidden", "-Command", script])
+        .creation_flags(0x08000000) // CREATE_NO_WINDOW
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null())
         .output();
     
     if let Ok(result) = output {
@@ -131,18 +187,18 @@ pub fn scan_ide_windows() -> Vec<IdeWindow> {
                     continue;
                 }
                 
-                let parts: Vec<&str> = line.split('|').collect();
+                let parts: Vec<&str> = line.splitn(3, '|').collect();
                 if parts.len() != 3 {
                     continue;
                 }
                 
-                let process_name = parts[0].to_lowercase();
+                let hwnd = parts[0];
                 let pid = parts[1];
                 let window_title = parts[2];
                 
-                // Match IDE from process name
-                let ide_info = IDE_BUNDLES.iter().find(|(_, ide, _)| {
-                    process_name.contains(&ide.to_lowercase())
+                // Match IDE from window title
+                let ide_info = IDE_BUNDLES.iter().find(|(_, _, app_name)| {
+                    window_title.to_lowercase().contains(&app_name.to_lowercase())
                 });
                 
                 if let Some((bundle_id, ide, app_name)) = ide_info {
@@ -152,7 +208,7 @@ pub fn scan_ide_windows() -> Vec<IdeWindow> {
                         app_name: app_name.to_string(),
                         window_title: window_title.to_string(),
                         window_index: 1,
-                        pid: pid.to_string(),
+                        pid: format!("{}:{}", pid, hwnd), // Store both PID and HWND
                     });
                 }
             }
@@ -357,33 +413,93 @@ pub fn activate_ide_by_name(ide: &str) -> Result<(), String> {
 
 #[cfg(target_os = "windows")]
 pub fn activate_ide_window(window: &IdeWindow) -> Result<(), String> {
-    use std::process::Command;
+    use std::process::{Command, Stdio};
     
-    // Use PowerShell to activate window by PID and title
+    // Parse PID:HWND format
+    let parts: Vec<&str> = window.pid.split(':').collect();
+    let hwnd = if parts.len() == 2 {
+        parts[1] // Use HWND directly
+    } else {
+        return Err("Invalid window handle format".to_string());
+    };
+    
+    // Use PowerShell with direct HWND to activate the specific window
     let script = format!(
         r#"
-        $proc = Get-Process -Id {} -ErrorAction SilentlyContinue
-        if ($proc) {{
-            Add-Type @"
-                using System;
-                using System.Runtime.InteropServices;
-                public class Win32 {{
-                    [DllImport("user32.dll")]
-                    public static extern bool SetForegroundWindow(IntPtr hWnd);
-                    [DllImport("user32.dll")]
-                    public static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
-                }}
+        Add-Type @"
+            using System;
+            using System.Runtime.InteropServices;
+            public class Win32Activate {{
+                [DllImport("user32.dll")]
+                public static extern bool SetForegroundWindow(IntPtr hWnd);
+                [DllImport("user32.dll")]
+                public static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
+                [DllImport("user32.dll")]
+                public static extern bool IsIconic(IntPtr hWnd);
+                [DllImport("user32.dll")]
+                public static extern void keybd_event(byte bVk, byte bScan, uint dwFlags, UIntPtr dwExtraInfo);
+                [DllImport("user32.dll")]
+                public static extern IntPtr GetForegroundWindow();
+                [DllImport("user32.dll")]
+                public static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint lpdwProcessId);
+                [DllImport("user32.dll")]
+                public static extern bool AttachThreadInput(uint idAttach, uint idAttachTo, bool fAttach);
+                [DllImport("kernel32.dll")]
+                public static extern uint GetCurrentThreadId();
+                [DllImport("user32.dll")]
+                public static extern bool IsWindow(IntPtr hWnd);
+                [DllImport("user32.dll")]
+                public static extern bool BringWindowToTop(IntPtr hWnd);
+                [DllImport("user32.dll")]
+                public static extern IntPtr SetFocus(IntPtr hWnd);
+            }}
 "@
-            $hwnd = $proc.MainWindowHandle
-            [Win32]::ShowWindow($hwnd, 9) # SW_RESTORE
-            [Win32]::SetForegroundWindow($hwnd)
+        $hwnd = [IntPtr]::new({})
+        
+        if ([Win32Activate]::IsWindow($hwnd)) {{
+            $foregroundHwnd = [Win32Activate]::GetForegroundWindow()
+            $foregroundPid = 0
+            $foregroundThread = [Win32Activate]::GetWindowThreadProcessId($foregroundHwnd, [ref]$foregroundPid)
+            $targetPid = 0
+            $targetThread = [Win32Activate]::GetWindowThreadProcessId($hwnd, [ref]$targetPid)
+            $currentThread = [Win32Activate]::GetCurrentThreadId()
+            
+            # Attach thread input
+            [Win32Activate]::AttachThreadInput($currentThread, $foregroundThread, $true)
+            [Win32Activate]::AttachThreadInput($currentThread, $targetThread, $true)
+            [Win32Activate]::AttachThreadInput($foregroundThread, $targetThread, $true)
+            
+            # Simulate Alt key to bypass foreground restriction
+            [Win32Activate]::keybd_event(0x12, 0, 0x0001, [UIntPtr]::Zero)
+            [Win32Activate]::keybd_event(0x12, 0, 0x0003, [UIntPtr]::Zero)
+            
+            # Restore if minimized
+            if ([Win32Activate]::IsIconic($hwnd)) {{
+                [Win32Activate]::ShowWindow($hwnd, 9)
+            }} else {{
+                # Show and activate
+                [Win32Activate]::ShowWindow($hwnd, 5) # SW_SHOW
+            }}
+            
+            [Win32Activate]::BringWindowToTop($hwnd)
+            [Win32Activate]::SetForegroundWindow($hwnd)
+            [Win32Activate]::SetFocus($hwnd)
+            
+            # Detach thread input
+            [Win32Activate]::AttachThreadInput($foregroundThread, $targetThread, $false)
+            [Win32Activate]::AttachThreadInput($currentThread, $targetThread, $false)
+            [Win32Activate]::AttachThreadInput($currentThread, $foregroundThread, $false)
         }}
         "#,
-        window.pid
+        hwnd
     );
     
     let output = Command::new("powershell")
-        .args(&["-NoProfile", "-Command", &script])
+        .args(&["-NoProfile", "-WindowStyle", "Hidden", "-Command", &script])
+        .creation_flags(0x08000000) // CREATE_NO_WINDOW
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null())
         .output()
         .map_err(|e| e.to_string())?;
     
@@ -397,7 +513,7 @@ pub fn activate_ide_window(window: &IdeWindow) -> Result<(), String> {
 
 #[cfg(target_os = "windows")]
 pub fn activate_ide_by_name(ide: &str) -> Result<(), String> {
-    use std::process::Command;
+    use std::process::{Command, Stdio};
     
     let app_name = IDE_BUNDLES
         .iter()
@@ -408,6 +524,10 @@ pub fn activate_ide_by_name(ide: &str) -> Result<(), String> {
     // Try to start the application if not running
     let _ = Command::new("cmd")
         .args(&["/C", "start", "", app_name])
+        .creation_flags(0x08000000) // CREATE_NO_WINDOW
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
         .spawn();
     
     Ok(())
