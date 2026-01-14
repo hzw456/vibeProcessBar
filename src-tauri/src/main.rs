@@ -196,6 +196,48 @@ async fn set_auto_start(enabled: bool) -> Result<(), String> {
             let _ = Command::new("osascript").args(&["-e", script]).output();
         }
     }
+    
+    #[cfg(target_os = "windows")]
+    {
+        use std::process::Command;
+        
+        // Get the current executable path
+        let exe_path = std::env::current_exe()
+            .map_err(|e| e.to_string())?
+            .to_string_lossy()
+            .to_string();
+        
+        let app_name = "VibeProcessBar";
+        
+        if enabled {
+            // Add to Windows startup using registry
+            let script = format!(
+                r#"New-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Run" -Name "{}" -Value '"{}"' -PropertyType String -Force"#,
+                app_name, exe_path
+            );
+            
+            Command::new("powershell")
+                .args(&["-NoProfile", "-Command", &script])
+                .output()
+                .map_err(|e| e.to_string())?;
+        } else {
+            // Remove from Windows startup
+            let script = format!(
+                r#"Remove-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Run" -Name "{}" -ErrorAction SilentlyContinue"#,
+                app_name
+            );
+            
+            let _ = Command::new("powershell")
+                .args(&["-NoProfile", "-Command", &script])
+                .output();
+        }
+    }
+    
+    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+    {
+        let _ = enabled;
+    }
+    
     Ok(())
 }
 

@@ -102,7 +102,68 @@ pub fn scan_ide_windows() -> Vec<IdeWindow> {
     all_windows
 }
 
-#[cfg(not(target_os = "macos"))]
+#[cfg(target_os = "windows")]
+pub fn scan_ide_windows() -> Vec<IdeWindow> {
+    use std::process::Command;
+    
+    let mut all_windows = Vec::new();
+    
+    // Use PowerShell to enumerate windows
+    let script = r#"
+        Get-Process | Where-Object {$_.MainWindowTitle -ne ""} | 
+        Where-Object {$_.ProcessName -match "Code|Cursor|Kiro|Antigravity|Windsurf|Trae|CodeBuddy"} |
+        ForEach-Object {
+            "$($_.ProcessName)|$($_.Id)|$($_.MainWindowTitle)"
+        }
+    "#;
+    
+    let output = Command::new("powershell")
+        .args(&["-NoProfile", "-Command", script])
+        .output();
+    
+    if let Ok(result) = output {
+        if result.status.success() {
+            let stdout = String::from_utf8_lossy(&result.stdout);
+            
+            for line in stdout.lines() {
+                let line = line.trim();
+                if line.is_empty() {
+                    continue;
+                }
+                
+                let parts: Vec<&str> = line.split('|').collect();
+                if parts.len() != 3 {
+                    continue;
+                }
+                
+                let process_name = parts[0].to_lowercase();
+                let pid = parts[1];
+                let window_title = parts[2];
+                
+                // Match IDE from process name
+                let ide_info = IDE_BUNDLES.iter().find(|(_, ide, _)| {
+                    process_name.contains(&ide.to_lowercase())
+                });
+                
+                if let Some((bundle_id, ide, app_name)) = ide_info {
+                    all_windows.push(IdeWindow {
+                        bundle_id: bundle_id.to_string(),
+                        ide: ide.to_string(),
+                        app_name: app_name.to_string(),
+                        window_title: window_title.to_string(),
+                        window_index: 1,
+                        pid: pid.to_string(),
+                    });
+                }
+            }
+        }
+    }
+    
+    info!("Scanned {} IDE windows on Windows", all_windows.len());
+    all_windows
+}
+
+#[cfg(not(any(target_os = "macos", target_os = "windows")))]
 pub fn scan_ide_windows() -> Vec<IdeWindow> {
     Vec::new()
 }
@@ -294,12 +355,70 @@ pub fn activate_ide_by_name(ide: &str) -> Result<(), String> {
     Ok(())
 }
 
-#[cfg(not(target_os = "macos"))]
+#[cfg(target_os = "windows")]
+pub fn activate_ide_window(window: &IdeWindow) -> Result<(), String> {
+    use std::process::Command;
+    
+    // Use PowerShell to activate window by PID and title
+    let script = format!(
+        r#"
+        $proc = Get-Process -Id {} -ErrorAction SilentlyContinue
+        if ($proc) {{
+            Add-Type @"
+                using System;
+                using System.Runtime.InteropServices;
+                public class Win32 {{
+                    [DllImport("user32.dll")]
+                    public static extern bool SetForegroundWindow(IntPtr hWnd);
+                    [DllImport("user32.dll")]
+                    public static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
+                }}
+"@
+            $hwnd = $proc.MainWindowHandle
+            [Win32]::ShowWindow($hwnd, 9) # SW_RESTORE
+            [Win32]::SetForegroundWindow($hwnd)
+        }}
+        "#,
+        window.pid
+    );
+    
+    let output = Command::new("powershell")
+        .args(&["-NoProfile", "-Command", &script])
+        .output()
+        .map_err(|e| e.to_string())?;
+    
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(stderr.to_string());
+    }
+    
+    Ok(())
+}
+
+#[cfg(target_os = "windows")]
+pub fn activate_ide_by_name(ide: &str) -> Result<(), String> {
+    use std::process::Command;
+    
+    let app_name = IDE_BUNDLES
+        .iter()
+        .find(|(_, id, _)| id.to_lowercase() == ide.to_lowercase())
+        .map(|(_, _, name)| *name)
+        .unwrap_or(ide);
+    
+    // Try to start the application if not running
+    let _ = Command::new("cmd")
+        .args(&["/C", "start", "", app_name])
+        .spawn();
+    
+    Ok(())
+}
+
+#[cfg(not(any(target_os = "macos", target_os = "windows")))]
 pub fn activate_ide_window(_window: &IdeWindow) -> Result<(), String> {
     Ok(())
 }
 
-#[cfg(not(target_os = "macos"))]
+#[cfg(not(any(target_os = "macos", target_os = "windows")))]
 pub fn activate_ide_by_name(_ide: &str) -> Result<(), String> {
     Ok(())
 }
@@ -338,7 +457,29 @@ pub fn activate_ide(
         }
     }
 
-    #[cfg(not(target_os = "macos"))]
+    #[cfg(target_os = "windows")]
+    {
+        // Scan current windows
+        let windows = scan_ide_windows();
+
+        // Build match criteria
+        let criteria = MatchCriteria {
+            ide: Some(ide.to_string()),
+            workspace: workspace.map(|s| s.to_string()),
+            file: active_file.map(|s| s.to_string()),
+        };
+
+        // Find best match
+        if let Some(window) = find_best_match(&windows, &criteria) {
+            info!("Found matching window: {:?}", window);
+            activate_ide_window(window)
+        } else {
+            info!("No matching window found, activating IDE by name");
+            activate_ide_by_name(ide)
+        }
+    }
+
+    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
     {
         Ok(())
     }
