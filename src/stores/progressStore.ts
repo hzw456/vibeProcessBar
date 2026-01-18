@@ -18,7 +18,6 @@ async function safeInvoke<T>(cmd: string, args?: Record<string, unknown>): Promi
 export interface ProgressTask {
   id: string;
   name: string;
-  progress: number;
   tokens: number;
   status: 'armed' | 'running' | 'completed' | 'idle' | 'error' | 'cancelled';
   is_focused?: boolean;
@@ -29,6 +28,8 @@ export interface ProgressTask {
   window_title?: string;
   project_path?: string;
   active_file?: string;
+  estimated_duration?: number; // 预估总时长（毫秒）
+  current_stage?: string; // 当前阶段描述
 }
 
 export interface AppSettings {
@@ -187,7 +188,6 @@ export const useProgressStore = defineStore('progress', () => {
     const newTask: ProgressTask = {
       id,
       name,
-      progress: 0,
       tokens: 0,
       status: 'armed',
       is_focused: false,
@@ -202,13 +202,6 @@ export const useProgressStore = defineStore('progress', () => {
 
   function removeTask(id: string) {
     tasks.value = tasks.value.filter(t => t.id !== id);
-  }
-
-  function updateProgress(id: string, progress: number) {
-    const task = tasks.value.find(t => t.id === id);
-    if (task) {
-      task.progress = Math.min(100, Math.max(0, progress));
-    }
   }
 
   function updateTokens(id: string, tokens: number, increment?: boolean) {
@@ -231,7 +224,6 @@ export const useProgressStore = defineStore('progress', () => {
   function completeTask(id: string, totalTokens?: number) {
     const task = tasks.value.find(t => t.id === id);
     if (task) {
-      task.progress = 100;
       task.status = 'completed';
       task.end_time = Date.now();
       if (totalTokens !== undefined) {
@@ -243,12 +235,13 @@ export const useProgressStore = defineStore('progress', () => {
   function resetTask(id: string) {
     const task = tasks.value.find(t => t.id === id);
     if (task) {
-      task.progress = 0;
       task.tokens = 0;
       task.status = 'armed';
       task.is_focused = false;
       task.start_time = Date.now();
       task.end_time = undefined;
+      task.estimated_duration = undefined;
+      task.current_stage = undefined;
     }
   }
 
@@ -377,7 +370,6 @@ export const useProgressStore = defineStore('progress', () => {
     setSettings,
     addTask,
     removeTask,
-    updateProgress,
     updateTokens,
     updateStatus,
     completeTask,

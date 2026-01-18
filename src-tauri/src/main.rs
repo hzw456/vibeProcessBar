@@ -42,6 +42,11 @@ async fn activate_ide_window<R: Runtime>(
 }
 
 #[tauri::command]
+async fn reset_task_to_armed(task_id: String) -> Result<(), String> {
+    http_server::reset_task_to_armed(&task_id)
+}
+
+#[tauri::command]
 async fn get_ide_windows() -> Result<Vec<IdeWindow>, String> {
     Ok(window_manager::scan_ide_windows())
 }
@@ -457,6 +462,7 @@ fn main() {
             trigger_notification,
             activate_window,
             activate_ide_window,
+            reset_task_to_armed,
             get_ide_windows,
             open_settings_window,
             get_app_settings,

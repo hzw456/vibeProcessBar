@@ -7,12 +7,13 @@ export interface AdapterConfig {
 export interface TaskInfo {
   id: string;
   name: string;
-  progress: number;
   status: 'idle' | 'running' | 'completed' | 'error';
   startTime: number;
   endTime?: number;
   adapter: string;
   metadata?: Record<string, unknown>;
+  estimated_duration?: number;
+  current_stage?: string;
 }
 
 export interface ProgressAdapter {
@@ -24,7 +25,6 @@ export interface ProgressAdapter {
   getTasks: () => Promise<TaskInfo[]>;
   onProgress: (callback: (task: TaskInfo) => void) => () => void;
   startTask: (name: string) => Promise<string>;
-  updateProgress: (taskId: string, progress: number) => Promise<void>;
   completeTask: (taskId: string) => Promise<void>;
 }
 

@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use std::process::Command;
 use tauri::Runtime;
 use tracing::info;
 

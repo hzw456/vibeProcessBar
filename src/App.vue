@@ -147,6 +147,12 @@ async function handleTaskDoubleClick(task: ProgressTask) {
 
   if (task.status === 'completed') {
     clickedCompletedTasks.value = new Set([...clickedCompletedTasks.value, task.id]);
+    // 双击跳转后重置为 armed 状态
+    try {
+      await safeInvoke('reset_task_to_armed', { taskId: task.id });
+    } catch (err) {
+      error('Failed to reset task to armed', { error: String(err) });
+    }
   }
 
   if (task.ide) {
@@ -304,9 +310,28 @@ function getTimeStr(task: ProgressTask): string {
     const elapsed = Date.now() - task.start_time;
     const minutes = Math.floor(elapsed / 60000);
     const seconds = Math.floor((elapsed % 60000) / 1000);
-    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+    const elapsedStr = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+    
+    // 如果有预估时长，显示 已用时间/总时间
+    if (task.estimated_duration && task.estimated_duration > 0) {
+      const totalMinutes = Math.floor(task.estimated_duration / 60000);
+      const totalSeconds = Math.floor((task.estimated_duration % 60000) / 1000);
+      const totalStr = `${totalMinutes}:${totalSeconds.toString().padStart(2, '0')}`;
+      return `${elapsedStr}/${totalStr}`;
+    }
+    return elapsedStr;
   }
   return '';
+}
+
+// 根据已用时间/总时间计算进度百分比
+function getTimeProgress(task: ProgressTask): number {
+  if (task.status !== 'running' || !task.start_time || !task.estimated_duration || task.estimated_duration <= 0) {
+    return 0;
+  }
+  const elapsed = Date.now() - task.start_time;
+  const progress = (elapsed / task.estimated_duration) * 100;
+  return Math.min(99, Math.max(0, progress)); // 最大99%，完成时才100%
 }
 
 // Get status icon - focused state shows eye icon, otherwise based on status
@@ -321,8 +346,17 @@ function getStatusIcon(task: ProgressTask): string {
   }
 }
 
-// Get display name: activeFile - workspace 格式
+// Get display name: 优先显示 current_stage，否则显示 activeFile - workspace 格式
 function getDisplayName(task: ProgressTask): string {
+  // 如果有当前阶段描述，优先显示
+  if (task.current_stage) {
+    // 特殊标记 __completed__ 使用 i18n 翻译
+    if (task.current_stage === '__completed__') {
+      return t('status.completed');
+    }
+    return task.current_stage;
+  }
+  
   const activeFile = task.active_file ? task.active_file.split('/').pop() || task.active_file : null;
   const workspace = task.project_path ? task.project_path.split('/').pop() || task.project_path : null;
   
@@ -507,6 +541,7 @@ watch([displayTasks, isCollapsed, isCollapseTransition], async () => {
           { armed: task.status === 'armed' },
           { 'focused-state': task.is_focused }
         ]"
+        :style="{ '--progress': getTimeProgress(task) + '%' }"
         @dblclick="handleTaskDoubleClick(task)"
       >
         <span :class="['mini-status', `status-${task.status}`]">
@@ -552,6 +587,7 @@ watch([displayTasks, isCollapsed, isCollapseTransition], async () => {
           { armed: singleTask.status === 'armed' },
           { 'focused-state': singleTask.is_focused }
         ]"
+        :style="{ '--progress': getTimeProgress(singleTask) + '%' }"
         @click="handleTaskDoubleClick(singleTask)"
         @dblclick="handleTaskDoubleClick(singleTask)"
       >
