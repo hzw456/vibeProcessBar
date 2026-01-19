@@ -67,8 +67,8 @@ cargo build --release
 
 ### 发布版
 - 可执行文件：`src-tauri/target/release/vibe-process-bar.exe`
-- MSI 安装包：`src-tauri/target/release/bundle/msi/VibeProcessbar_1.0.0_x64_en-US.msi`
-- NSIS 安装包：`src-tauri/target/release/bundle/nsis/VibeProcessbar_1.0.0_x64-setup.exe`
+- MSI 安装包：`src-tauri/target/release/bundle/msi/VibeProcessbar_1.0.1_x64_en-US.msi`
+- NSIS 安装包：`src-tauri/target/release/bundle/nsis/VibeProcessbar_1.0.1_x64-setup.exe`
 
 ## Windows 特定功能
 

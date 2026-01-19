@@ -27,7 +27,7 @@ const activeTab = ref<TabType>('general');
 const themes = ['dark', 'purple', 'ocean', 'forest', 'midnight'] as const;
 
 // App version
-const appVersion = '0.1.0';
+const appVersion = '1.0.1';
 
 // Computed labels
 const volumeLabel = computed(() => t('settings.notifications.volume', { percentage: Math.round(store.settings.soundVolume * 100) }));

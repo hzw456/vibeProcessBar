@@ -152,8 +152,8 @@ async fn set_auto_start(enabled: bool) -> Result<(), String>
 - `src-tauri\target\release\vibe-process-bar.exe` (约 8-12 MB)
 
 ### 安装包
-- `src-tauri\target\release\bundle\msi\VibeProcessbar_1.0.0_x64_en-US.msi` (约 10-15 MB)
-- `src-tauri\target\release\bundle\nsis\VibeProcessbar_1.0.0_x64-setup.exe` (约 8-12 MB)
+- `src-tauri\target\release\bundle\msi\VibeProcessbar_1.0.1_x64_en-US.msi` (约 10-15 MB)
+- `src-tauri\target\release\bundle\nsis\VibeProcessbar_1.0.1_x64-setup.exe` (约 8-12 MB)
 
 ## 🚀 下一步
 
