@@ -577,29 +577,28 @@ watch([displayTasks, isCollapsed, isCollapseTransition], async () => {
         <span v-if="singleTask.ide" class="ide-badge-mini">{{ singleTask.ide }}</span>
         <span v-else class="task-ide-collapsed" :title="singleTask.name">{{ singleTask.name }}</span>
       </div>
-      <!-- Expanded: show full status text -->
+      <!-- Expanded: show full status text (same layout as multi-task) -->
       <div
         v-else-if="singleTask"
         :class="[
           'task-row',
           'single-task-row',
-          { completed: singleTask.status === 'completed' },
+          { completed: singleTask.status === 'completed' && !clickedCompletedTasks.has(singleTask.id) },
+          { 'completed-clicked': clickedCompletedTasks.has(singleTask.id) },
           { armed: singleTask.status === 'armed' },
           { 'focused-state': singleTask.is_focused }
         ]"
         :style="{ '--progress': getTimeProgress(singleTask) + '%' }"
-        @click="handleTaskDoubleClick(singleTask)"
         @dblclick="handleTaskDoubleClick(singleTask)"
       >
-        <StatusText
-          :status="singleTask.status"
-          :name="singleTask.name"
-          :is-focused="singleTask.is_focused"
-          :elapsed-time="getTimeStr(singleTask)"
-          :show-icon="true"
-          :ide="singleTask.ide"
-          @activate="handleTaskDoubleClick(singleTask)"
-        />
+        <span :class="['mini-status', `status-${singleTask.status}`]">
+          {{ getStatusIcon(singleTask) }}
+        </span>
+        <span class="task-name-mini">{{ getDisplayName(singleTask) }}</span>
+        <span :class="['task-time-mini', { 'completed-time': singleTask.status === 'completed', 'armed-time': singleTask.status === 'armed' }]">
+          {{ singleTask.status === 'completed' ? `✓ ${getTimeStr(singleTask)}` : getTimeStr(singleTask) }}
+        </span>
+        <span v-if="singleTask.ide" class="ide-badge-mini">{{ singleTask.ide }}</span>
       </div>
     </template>
 
