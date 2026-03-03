@@ -27,6 +27,13 @@
   "notification": {
     "taskCompleted": "{{taskName}} Concluída!"
   },
+  "contextMenu": {
+    "cancelTask": "Cancelar tarefa",
+    "renameIde": "Renomear IDE",
+    "hideWindow": "Ocultar janela",
+    "hideTask": "Ocultar tarefa",
+    "showAllTasks": "Mostrar todas as tarefas"
+  },
   "settings": {
     "title": "Configurações",
     "tabs": {
@@ -41,7 +48,8 @@
       "alwaysOnTop": "Sempre visível",
       "httpPort": "Porta API HTTP",
       "configManagement": "Exportar/Importar Configuração",
-      "manage": "Gerenciar"
+      "manage": "Gerenciar",
+      "showOnlyWhenRunning": "Mostrar apenas com tarefas em execução"
     },
     "appearance": {
       "theme": "Tema",

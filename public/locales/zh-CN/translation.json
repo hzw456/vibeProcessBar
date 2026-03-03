@@ -27,6 +27,13 @@
   "notification": {
     "taskCompleted": "{taskName} 已完成！"
   },
+  "contextMenu": {
+    "cancelTask": "取消任务",
+    "renameIde": "自定义标题",
+    "hideWindow": "隐藏窗口",
+    "hideTask": "隐藏条目",
+    "showAllTasks": "显示所有条目"
+  },
   "settings": {
     "title": "设置",
     "tabs": {
@@ -45,7 +52,8 @@
       "httpHost": "HTTP 监听地址",
       "httpPort": "HTTP API 端口",
       "httpRestartHint": "修改后需重启应用生效",
-      "blockPluginStatus": "屏蔽插件状态上报"
+      "blockPluginStatus": "屏蔽插件状态上报",
+      "showOnlyWhenRunning": "仅在有任务运行时显示"
     },
     "appearance": {
       "theme": "主题",

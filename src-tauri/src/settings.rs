@@ -24,6 +24,8 @@ pub struct AppSettings {
     pub window_x: Option<f64>,
     #[serde(default)]
     pub window_y: Option<f64>,
+    #[serde(default)]
+    pub show_only_when_running: bool,
 }
 
 impl Default for AppSettings {
@@ -43,6 +45,7 @@ impl Default for AppSettings {
             block_plugin_status: true,
             window_x: None,
             window_y: None,
+            show_only_when_running: false,
         }
     }
 }

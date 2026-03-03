@@ -1,8 +1,7 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
+import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue';
 import { useI18n } from 'vue-i18n';
-import { useProgressStore, type ProgressTask, type AppSettings } from './stores/progressStore';
-import StatusText from './components/StatusText.vue';
+import { useProgressStore, type ProgressTask } from './stores/progressStore';
 import SettingsPanel from './components/SettingsPanel.vue';
 import { debug, error } from './utils/logger';
 import { playCompletionSound } from './utils/notifications';
@@ -55,7 +54,6 @@ const store = useProgressStore();
 
 // Reactive state
 const containerRef = ref<HTMLDivElement | null>(null);
-const showMenu = ref(false);
 const completedTask = ref<string | null>(null);
 const clickedCompletedTasks = ref<Set<string>>(new Set());
 const seenActiveTasks = ref<Set<string>>(new Set());
@@ -65,15 +63,49 @@ const ideWindows = ref<IdeWindow[]>([]);
 const prevTasks = ref<ProgressTask[]>([]);
 const isActivatingRef = ref(false);
 
+// Right-click context menu state
+const contextMenu = ref<{ show: boolean; x: number; y: number; task: ProgressTask | null }>({
+  show: false, x: 0, y: 0, task: null
+});
+const isRenamingIde = ref(false);
+const renameIdeValue = ref('');
+const renameInputRef = ref<HTMLInputElement | null>(null);
+
+// Background right-click menu state
+const bgMenu = ref<{ show: boolean; x: number; y: number }>({ show: false, x: 0, y: 0 });
+
+// Task custom title map (persisted in localStorage, keyed by task id)
+const taskCustomTitles = ref<Record<string, string>>(
+  JSON.parse(localStorage.getItem('taskCustomTitles') || '{}')
+);
+
+// Hidden tasks set (persisted in localStorage, keyed by task id)
+const hiddenTaskIds = ref<Set<string>>(
+  new Set(JSON.parse(localStorage.getItem('hiddenTaskIds') || '[]'))
+);
+
+function saveHiddenTaskIds() {
+  localStorage.setItem('hiddenTaskIds', JSON.stringify([...hiddenTaskIds.value]));
+}
+
+function saveTaskCustomTitles() {
+  localStorage.setItem('taskCustomTitles', JSON.stringify(taskCustomTitles.value));
+}
+
+// Get display title for IDE badge position (custom title or IDE name)
+function getTaskBadgeTitle(task: ProgressTask): string {
+  if (taskCustomTitles.value[task.id]) return taskCustomTitles.value[task.id];
+  return task.ide || '';
+}
+
 // Computed - 确保透明度响应式更新
 const windowOpacity = computed(() => store.settings.opacity);
 
 // Computed
-const allDisplayItems = computed(() => {
+const displayTasks = computed(() => {
   const items = [...store.tasks];
   
   ideWindows.value.forEach(win => {
-    // Extract project name from window title (format: "filename — ProjectName" or just "ProjectName")
     const winTitleParts = win.window_title.split(' — ');
     const projectName = winTitleParts.length > 1 ? winTitleParts[winTitleParts.length - 1] : win.window_title;
     
@@ -102,7 +134,6 @@ const allDisplayItems = computed(() => {
     }
   });
 
-  // Sort by IDE then name for stable order
   items.sort((a, b) => {
     const ideA = a.ide || '';
     const ideB = b.ide || '';
@@ -112,14 +143,11 @@ const allDisplayItems = computed(() => {
     return nameA.localeCompare(nameB);
   });
 
-  return items;
+  return items.filter(t =>
+    ['completed', 'running', 'armed', 'idle'].includes(t.status) &&
+    !hiddenTaskIds.value.has(t.id)
+  );
 });
-
-const displayTasks = computed(() =>
-  allDisplayItems.value.filter(t =>
-    ['completed', 'running', 'armed', 'idle'].includes(t.status)
-  )
-);
 
 // 单任务视图直接用第一个任务
 const singleTask = computed(() => displayTasks.value[0] || null);
@@ -213,25 +241,142 @@ async function handleCollapse() {
   }
 }
 
-// Open settings
-async function handleOpenSettings() {
-  setShowMenu(false);
+// Handle right-click on task row
+function handleTaskContextMenu(event: MouseEvent, task: ProgressTask) {
+  event.preventDefault();
+  event.stopPropagation();
+  isRenamingIde.value = false;
+  renameIdeValue.value = '';
+
+  // Estimate menu height (each item ~34px + padding)
+  const hasCancel = task.status === 'running' || task.status === 'completed';
+  const hasRename = !!task.ide;
+  const hasHide = true;
+  const itemCount = (hasCancel ? 1 : 0) + (hasRename ? 1 : 0) + (hasHide ? 1 : 0);
+  const menuHeight = itemCount * 34 + 8;
+  const menuWidth = 140;
+
+  // Adjust position to keep menu within viewport
+  const viewportH = window.innerHeight;
+  const viewportW = window.innerWidth;
+  let y = event.clientY;
+  let x = event.clientX;
+
+  if (y + menuHeight > viewportH) {
+    y = Math.max(0, y - menuHeight);
+  }
+  if (x + menuWidth > viewportW) {
+    x = Math.max(0, viewportW - menuWidth - 4);
+  }
+
+  contextMenu.value = { show: true, x, y, task };
+}
+
+function closeContextMenu() {
+  contextMenu.value.show = false;
+  contextMenu.value.task = null;
+  isRenamingIde.value = false;
+}
+
+// Background right-click menu
+function handleBgContextMenu(event: MouseEvent) {
+  event.preventDefault();
+  // Only show on background, not on task rows
+  const target = event.target as HTMLElement;
+  if (target.closest('.task-row') || target.closest('.collapsed-single-task') || target.closest('.task-context-menu')) {
+    return;
+  }
+  bgMenu.value = { show: true, x: event.clientX, y: event.clientY };
+}
+
+function closeBgMenu() {
+  bgMenu.value.show = false;
+}
+
+async function handleHideWindow() {
+  closeBgMenu();
   try {
-    await safeInvoke('open_settings_window');
+    await safeInvoke('hide_window');
   } catch (err) {
-    error('Failed to open settings', { error: String(err) });
+    error('Failed to hide window', { error: String(err) });
   }
 }
 
-function setShowMenu(value: boolean) {
-  showMenu.value = value;
+// Hide a single task
+function handleHideTask() {
+  const task = contextMenu.value.task;
+  if (!task) return;
+  closeContextMenu();
+  hiddenTaskIds.value = new Set([...hiddenTaskIds.value, task.id]);
+  saveHiddenTaskIds();
+}
+
+// Show all hidden tasks
+function handleShowAllTasks() {
+  closeBgMenu();
+  hiddenTaskIds.value = new Set();
+  saveHiddenTaskIds();
+}
+
+// Cancel a running/completed task -> reset to armed
+async function handleCancelTask() {
+  const task = contextMenu.value.task;
+  if (!task) return;
+  closeContextMenu();
+  try {
+    const port = store.settings.httpPort || 31415;
+    const host = store.settings.httpHost || '127.0.0.1';
+    await fetch(`http://${host}:${port}/api/task/update_state`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ task_id: task.id, status: 'armed', source: 'hook' })
+    });
+    debug('Task reset to armed', { taskId: task.id });
+  } catch (err) {
+    error('Failed to cancel task', { error: String(err) });
+  }
+}
+
+// Start renaming task badge title
+function startRenameIde() {
+  const task = contextMenu.value.task;
+  if (!task) return;
+  isRenamingIde.value = true;
+  renameIdeValue.value = taskCustomTitles.value[task.id] || task.ide || '';
+  
+  // Recalculate position for rename input (height ~40px)
+  const menuHeight = 40;
+  const viewportH = window.innerHeight;
+  if (contextMenu.value.y + menuHeight > viewportH) {
+    contextMenu.value.y = Math.max(0, viewportH - menuHeight - 4);
+  }
+  
+  nextTick(() => {
+    renameInputRef.value?.focus();
+    renameInputRef.value?.select();
+  });
+}
+
+// Confirm task badge title rename
+function confirmRenameIde() {
+  const task = contextMenu.value.task;
+  if (!task) return;
+  const newName = renameIdeValue.value.trim();
+  if (newName) {
+    taskCustomTitles.value[task.id] = newName;
+  } else {
+    delete taskCustomTitles.value[task.id];
+  }
+  saveTaskCustomTitles();
+  isRenamingIde.value = false;
+  closeContextMenu();
 }
 
 // Handle mouse down for window dragging
 async function handleMouseDown(event: MouseEvent) {
   // Only start drag if clicking on the container itself (not buttons or interactive elements)
   const target = event.target as HTMLElement;
-  if (target.closest('button') || target.closest('.task-row') || target.closest('.menu-item') || target.closest('.context-menu')) {
+  if (target.closest('button') || target.closest('.task-row') || target.closest('.menu-item') || target.closest('.task-context-menu')) {
     return;
   }
   try {
@@ -299,7 +444,7 @@ async function updatePositionDisplay() {
 // Get time string for task
 function getTimeStr(task: ProgressTask): string {
   // Focused state does NOT affect time display - only the icon changes
-  if (task.status === 'armed') return '⏳';
+  if (task.status === 'armed') return '';
   if (task.status === 'completed' && task.start_time > 0) {
     const elapsed = (task.end_time || Date.now()) - task.start_time;
     const minutes = Math.floor(elapsed / 60000);
@@ -314,8 +459,10 @@ function getTimeStr(task: ProgressTask): string {
     
     // 如果有预估时长，显示 已用时间/总时间
     if (task.estimated_duration && task.estimated_duration > 0) {
-      const totalMinutes = Math.floor(task.estimated_duration / 60000);
-      const totalSeconds = Math.floor((task.estimated_duration % 60000) / 1000);
+      // 如果运行时间超过预估时间，预估时间跟随运行时间
+      const effectiveEstimated = Math.max(task.estimated_duration, elapsed);
+      const totalMinutes = Math.floor(effectiveEstimated / 60000);
+      const totalSeconds = Math.floor((effectiveEstimated % 60000) / 1000);
       const totalStr = `${totalMinutes}:${totalSeconds.toString().padStart(2, '0')}`;
       return `${elapsedStr}/${totalStr}`;
     }
@@ -330,20 +477,39 @@ function getTimeProgress(task: ProgressTask): number {
     return 0;
   }
   const elapsed = Date.now() - task.start_time;
-  const progress = (elapsed / task.estimated_duration) * 100;
-  return Math.min(99, Math.max(0, progress)); // 最大99%，完成时才100%
+  // 如果运行时间超过预估时间，预估时间跟随运行时间，进度保持在99%
+  const effectiveEstimated = Math.max(task.estimated_duration, elapsed);
+  const progress = (elapsed / effectiveEstimated) * 100;
+  return Math.min(99, Math.max(0, progress));
 }
 
 // Get status icon - focused state shows eye icon, otherwise based on status
 function getStatusIcon(task: ProgressTask): string {
   // Focused window shows eye icon (only icon changes, not other styles)
-  if (task.is_focused) return '👁';
+  if (task.is_focused) return '🎯';
   switch (task.status) {
     case 'running': return '◉';
     case 'completed': return '✓';
     case 'armed': return '◎';
     default: return '○';
   }
+}
+
+// Get IDE color class
+function getIdeColorClass(ide?: string): string {
+  if (!ide) return '';
+  const key = ide.toLowerCase();
+  const map: Record<string, string> = {
+    kiro: 'ide-kiro',
+    cursor: 'ide-cursor',
+    windsurf: 'ide-windsurf',
+    codebuddycn: 'ide-codebuddy',
+    codebuddy: 'ide-codebuddy',
+    antigravity: 'ide-antigravity',
+    vscode: 'ide-vscode',
+    trae: 'ide-trae',
+  };
+  return map[key] || 'ide-default';
 }
 
 // Get display name: 优先显示 current_stage，否则显示 activeFile - workspace 格式
@@ -452,10 +618,26 @@ watch([displayTasks, isCollapsed, isCollapseTransition], async () => {
   }
 });
 
+// Auto show/hide window when "show only when running" is enabled
+watch([displayTasks, () => store.settings.showOnlyWhenRunning], async () => {
+  if (isSettingsWindow.value) return;
+  if (!store.settings.showOnlyWhenRunning) return;
+
+  const hasRunning = store.tasks.some(t => t.status === 'running');
+  try {
+    if (hasRunning) {
+      await safeInvoke('show_window');
+    } else {
+      await safeInvoke('hide_window');
+    }
+  } catch (e) {
+    error('Failed to auto show/hide window', { error: String(e) });
+  }
+});
+
   // Intervals
   let syncInterval: number;
   let scanInterval: number;
-  let forceUpdateInterval: number;
   let settingsPollInterval: number;
   let unlistenMove: (() => void) | null = null;
 
@@ -483,7 +665,6 @@ watch([displayTasks, isCollapsed, isCollapseTransition], async () => {
         // Set up intervals - 使用 fetchTasks 替代 syncFromHttpApi
         syncInterval = window.setInterval(() => store.fetchTasks(), 1000);
         scanInterval = window.setInterval(scanIdeWindows, 5000);
-        forceUpdateInterval = window.setInterval(() => {}, 1000); // Force update for time
         
         // Poll settings every 2 seconds to ensure sync across windows even if events are missed
         settingsPollInterval = window.setInterval(() => {
@@ -495,7 +676,6 @@ watch([displayTasks, isCollapsed, isCollapseTransition], async () => {
   onUnmounted(() => {
     if (syncInterval) clearInterval(syncInterval);
     if (scanInterval) clearInterval(scanInterval);
-    if (forceUpdateInterval) clearInterval(forceUpdateInterval);
     if (settingsPollInterval) clearInterval(settingsPollInterval);
     if (unlistenMove) unlistenMove();
     store.cleanupEventListeners();
@@ -515,6 +695,7 @@ watch([displayTasks, isCollapsed, isCollapseTransition], async () => {
     :class="['app-container', { collapsed: isCollapsed, 'multi-task': displayTasks.length > 1, 'has-completed': !!completedTask }]"
     :style="{ opacity: windowOpacity }"
     @mousedown="handleMouseDown"
+    @contextmenu="handleBgContextMenu"
   >
     <!-- Collapse/Expand button -->
     <button
@@ -543,22 +724,24 @@ watch([displayTasks, isCollapsed, isCollapseTransition], async () => {
         ]"
         :style="{ '--progress': getTimeProgress(task) + '%' }"
         @dblclick="handleTaskDoubleClick(task)"
+        @contextmenu="handleTaskContextMenu($event, task)"
       >
         <span :class="['mini-status', `status-${task.status}`]">
           {{ getStatusIcon(task) }}
         </span>
-        <!-- Collapsed: show status + IDE badge -->
+        <!-- Collapsed: show status + IDE badge + time -->
         <template v-if="isCollapsed">
-          <span v-if="task.ide" class="ide-badge-mini">{{ task.ide }}</span>
+          <span v-if="task.ide || taskCustomTitles[task.id]" :class="['ide-badge-mini', getIdeColorClass(task.ide)]" :title="getTaskBadgeTitle(task)">{{ getTaskBadgeTitle(task) }}</span>
           <span v-else class="task-ide-collapsed" :title="task.name">{{ task.name }}</span>
+          <span v-if="getTimeStr(task)" class="collapsed-time">{{ getTimeStr(task) }}</span>
         </template>
         <!-- Expanded: show task name without IDE prefix -->
         <template v-else>
-          <span class="task-name-mini">{{ getDisplayName(task) }}</span>
+          <span class="task-name-mini" :title="getDisplayName(task)">{{ getDisplayName(task) }}</span>
           <span :class="['task-time-mini', { 'completed-time': task.status === 'completed', 'armed-time': task.status === 'armed' }]">
             {{ task.status === 'completed' ? `✓ ${getTimeStr(task)}` : getTimeStr(task) }}
           </span>
-          <span v-if="task.ide" class="ide-badge-mini">{{ task.ide }}</span>
+          <span v-if="task.ide || taskCustomTitles[task.id]" :class="['ide-badge-mini', getIdeColorClass(task.ide)]" :title="getTaskBadgeTitle(task)">{{ getTaskBadgeTitle(task) }}</span>
         </template>
       </div>
     </div>
@@ -569,13 +752,14 @@ watch([displayTasks, isCollapsed, isCollapseTransition], async () => {
         <span class="app-icon">{{ t('app.icon') }}</span>
         <span class="app-title">{{ t('app.title') }}</span>
       </div>
-      <!-- Collapsed: show status + IDE badge -->
+      <!-- Collapsed: show status + IDE badge + time -->
       <div v-else-if="isCollapsed && singleTask" class="collapsed-single-task">
         <span :class="['mini-status', `status-${singleTask.status}`]">
           {{ getStatusIcon(singleTask) }}
         </span>
-        <span v-if="singleTask.ide" class="ide-badge-mini">{{ singleTask.ide }}</span>
+        <span v-if="singleTask.ide || taskCustomTitles[singleTask.id]" :class="['ide-badge-mini', getIdeColorClass(singleTask.ide)]" :title="getTaskBadgeTitle(singleTask)">{{ getTaskBadgeTitle(singleTask) }}</span>
         <span v-else class="task-ide-collapsed" :title="singleTask.name">{{ singleTask.name }}</span>
+        <span v-if="getTimeStr(singleTask)" class="collapsed-time">{{ getTimeStr(singleTask) }}</span>
       </div>
       <!-- Expanded: show full status text (same layout as multi-task) -->
       <div
@@ -590,26 +774,92 @@ watch([displayTasks, isCollapsed, isCollapseTransition], async () => {
         ]"
         :style="{ '--progress': getTimeProgress(singleTask) + '%' }"
         @dblclick="handleTaskDoubleClick(singleTask)"
+        @contextmenu="handleTaskContextMenu($event, singleTask)"
       >
         <span :class="['mini-status', `status-${singleTask.status}`]">
           {{ getStatusIcon(singleTask) }}
         </span>
-        <span class="task-name-mini">{{ getDisplayName(singleTask) }}</span>
+        <span class="task-name-mini" :title="getDisplayName(singleTask)">{{ getDisplayName(singleTask) }}</span>
         <span :class="['task-time-mini', { 'completed-time': singleTask.status === 'completed', 'armed-time': singleTask.status === 'armed' }]">
           {{ singleTask.status === 'completed' ? `✓ ${getTimeStr(singleTask)}` : getTimeStr(singleTask) }}
         </span>
-        <span v-if="singleTask.ide" class="ide-badge-mini">{{ singleTask.ide }}</span>
+        <span v-if="singleTask.ide || taskCustomTitles[singleTask.id]" :class="['ide-badge-mini', getIdeColorClass(singleTask.ide)]" :title="getTaskBadgeTitle(singleTask)">{{ getTaskBadgeTitle(singleTask) }}</span>
       </div>
     </template>
 
-    <!-- Context menu -->
-    <div v-if="showMenu" class="context-menu">
-      <div class="menu-item" @click="handleOpenSettings">
-        {{ t('menu.settings') }}
+    <!-- Task right-click context menu (teleported to body to avoid overflow clipping) -->
+    <Teleport to="body">
+      <div
+        v-if="contextMenu.show"
+        class="task-context-menu-overlay"
+        @mousedown.self="closeContextMenu"
+        @contextmenu.prevent="closeContextMenu"
+      >
+        <div
+          class="task-context-menu"
+          :style="{ left: contextMenu.x + 'px', top: contextMenu.y + 'px' }"
+          @click.stop
+          @mousedown.stop
+        >
+          <template v-if="!isRenamingIde">
+            <div
+              v-if="contextMenu.task && (contextMenu.task.status === 'running' || contextMenu.task.status === 'completed')"
+              class="menu-item cancel-item"
+              @click="handleCancelTask"
+            >
+              ✕ {{ t('contextMenu.cancelTask') }}
+            </div>
+            <div
+              class="menu-item"
+              @click="startRenameIde"
+            >
+              ✎ {{ t('contextMenu.renameIde') }}
+            </div>
+            <div
+              class="menu-item"
+              @click="handleHideTask"
+            >
+              ◌ {{ t('contextMenu.hideTask') }}
+            </div>
+          </template>
+          <template v-else>
+            <div class="rename-input-row">
+              <input
+                ref="renameInputRef"
+                v-model="renameIdeValue"
+                class="rename-input"
+                :placeholder="contextMenu.task?.ide || ''"
+                @keyup.enter="confirmRenameIde"
+                @keyup.escape="closeContextMenu"
+              />
+            </div>
+          </template>
+        </div>
       </div>
-      <div class="menu-item" @click="setShowMenu(false)">
-        {{ t('menu.closeMenu') }}
+    </Teleport>
+
+    <!-- Background right-click menu -->
+    <Teleport to="body">
+      <div
+        v-if="bgMenu.show"
+        class="task-context-menu-overlay"
+        @mousedown.self="closeBgMenu"
+        @contextmenu.prevent="closeBgMenu"
+      >
+        <div
+          class="task-context-menu"
+          :style="{ left: bgMenu.x + 'px', top: bgMenu.y + 'px' }"
+          @click.stop
+          @mousedown.stop
+        >
+          <div class="menu-item" @click="handleHideWindow">
+            ☾ {{ t('contextMenu.hideWindow') }}
+          </div>
+          <div v-if="hiddenTaskIds.size > 0" class="menu-item" @click="handleShowAllTasks">
+            ◉ {{ t('contextMenu.showAllTasks') }}
+          </div>
+        </div>
       </div>
-    </div>
+    </Teleport>
   </div>
 </template>

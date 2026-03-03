@@ -1,8 +1,14 @@
-import { invoke } from '@tauri-apps/api/core';
+const isTauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
+
+async function safeInvoke<T>(cmd: string, args?: Record<string, unknown>): Promise<T> {
+  if (!isTauri) throw new Error('Not in Tauri environment');
+  const { invoke } = await import('@tauri-apps/api/core');
+  return invoke<T>(cmd, args);
+}
 
 export async function enableAutoStart(): Promise<boolean> {
   try {
-    await invoke('enable_auto_start');
+    await safeInvoke('enable_auto_start');
     return true;
   } catch {
     return false;
@@ -11,7 +17,7 @@ export async function enableAutoStart(): Promise<boolean> {
 
 export async function disableAutoStart(): Promise<boolean> {
   try {
-    await invoke('disable_auto_start');
+    await safeInvoke('disable_auto_start');
     return true;
   } catch {
     return false;
@@ -20,7 +26,7 @@ export async function disableAutoStart(): Promise<boolean> {
 
 export async function isAutoStartEnabled(): Promise<boolean> {
   try {
-    return await invoke('is_auto_start_enabled');
+    return await safeInvoke('is_auto_start_enabled');
   } catch {
     return false;
   }
@@ -28,23 +34,23 @@ export async function isAutoStartEnabled(): Promise<boolean> {
 
 export async function getAppVersion(): Promise<string> {
   try {
-    return await invoke('get_app_version');
+    return await safeInvoke('get_app_version');
   } catch {
     return '0.1.0';
   }
 }
 
 export async function minimizeToTray(): Promise<void> {
-  await invoke('hide_window');
+  await safeInvoke('hide_window');
 }
 
 export async function quitApp(): Promise<void> {
-  await invoke('close_window');
+  await safeInvoke('close_window');
 }
 
 export async function openUrl(url: string): Promise<boolean> {
   try {
-    await invoke('open_url', { url });
+    await safeInvoke('open_url', { url });
     return true;
   } catch {
     return false;

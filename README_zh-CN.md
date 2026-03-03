@@ -17,7 +17,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/platform-macOS-blue" alt="Platform">
+  <img src="https://img.shields.io/badge/platform-macOS%20%7C%20Windows-blue" alt="Platform">
   <img src="https://img.shields.io/badge/built%20with-Tauri%20%2B%20Vue-green" alt="Built with">
   <img src="https://img.shields.io/badge/license-GPLv3-orange" alt="License">
 </p>
@@ -35,7 +35,7 @@
 
 **Vibe Process Bar** 解决了这些问题！它是一个轻量级的悬浮窗口，始终显示在屏幕顶层，让你随时掌握 AI 的工作状态。**双击任意任务即可瞬间跳转到对应的 IDE 窗口** — 再也不用在任务栏里翻找了！
 
-> ⚠️ **注意**：窗口跳转功能需要 macOS 辅助功能权限。请在 系统设置 → 隐私与安全性 → 辅助功能 中授权。
+> ⚠️ **注意**：在 macOS 上，窗口跳转功能需要辅助功能权限（系统设置 → 隐私与安全性 → 辅助功能）。Windows 平台开箱即用。
 
 ---
 
@@ -76,7 +76,7 @@
 
 - 半透明毛玻璃效果，不遮挡工作区
 - 支持拖拽移动到任意位置
-- **双击跳转到对应任务窗口**（需要 macOS 辅助功能权限）
+- **双击跳转到对应任务窗口**（macOS 需要辅助功能权限）
 - 自动置顶，始终可见
 
 ### 📊 多任务管理
@@ -107,6 +107,7 @@
 |:---|:---|
 | macOS (Apple Silicon) | `VibeProcessBar_x.x.x_aarch64.dmg` |
 | macOS (Intel) | `VibeProcessBar_x.x.x_x64.dmg` |
+| Windows (x64) | `VibeProcessbar_x.x.x_x64-setup.exe` 或 `.msi` |
 
 ### 方式二：从源码构建
 
@@ -123,13 +124,17 @@ npm run tauri dev
 
 # 4. 构建生产版本
 npm run tauri build
+# Windows 环境下也可以使用: .\build-windows.ps1
 ```
 
+> **Windows 用户**：请参阅 [Windows 快速开始](WINDOWS_QUICK_START.md) 或 [Windows 构建指南](BUILD_WINDOWS.md) 获取更详细的说明。
+
 **系统要求：**
-- macOS
+- macOS 或 Windows
 - Node.js 18+
 - Rust 1.70+
 - Tauri CLI (`npm install -D @tauri-apps/cli`)
+- **Windows 仅需**: Visual Studio Build Tools (包含 C++ 工作负载)
 
 ---
 

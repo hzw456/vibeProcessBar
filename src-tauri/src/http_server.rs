@@ -585,13 +585,15 @@ async fn mcp_handler(
                             0
                         };
                         
-                        // 进度完全由 elapsed / estimated 计算
+                        // 进度由 elapsed / effective_estimated 计算
+                        // 如果运行时间超过预估时间，预估时间跟随运行时间
                         let calculated_progress = if let Some(estimated) = t.estimated_duration {
                             if estimated > 0 {
                                 if t.status == "completed" {
                                     100
                                 } else {
-                                    ((elapsed_ms as f64 / estimated as f64) * 100.0).min(99.0) as u32
+                                    let effective_estimated = std::cmp::max(estimated, elapsed_ms);
+                                    ((elapsed_ms as f64 / effective_estimated as f64) * 100.0).min(99.0) as u32
                                 }
                             } else {
                                 if t.status == "completed" { 100 } else { 0 }

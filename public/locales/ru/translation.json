@@ -27,6 +27,13 @@
   "notification": {
     "taskCompleted": "{{taskName}} Завершено!"
   },
+  "contextMenu": {
+    "cancelTask": "Отменить задачу",
+    "renameIde": "Переименовать IDE",
+    "hideWindow": "Скрыть окно",
+    "hideTask": "Скрыть задачу",
+    "showAllTasks": "Показать все задачи"
+  },
   "settings": {
     "title": "Настройки",
     "tabs": {
@@ -41,7 +48,8 @@
       "alwaysOnTop": "Поверх всех окон",
       "httpPort": "HTTP API порт",
       "configManagement": "Экспорт/Импорт конфигурации",
-      "manage": "Управление"
+      "manage": "Управление",
+      "showOnlyWhenRunning": "Показывать только при выполнении задач"
     },
     "appearance": {
       "theme": "Тема",

@@ -27,7 +27,7 @@ const { t } = useI18n();
 
 const statusIcon = computed(() => {
   // Focused window shows eye icon (only icon changes, not other styles)
-  if (props.isFocused) return '👁';
+  if (props.isFocused) return '🎯';
   switch (props.status) {
     case 'idle': return '○';
     case 'armed': return '◎';

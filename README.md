@@ -17,7 +17,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/platform-macOS-blue" alt="Platform">
+  <img src="https://img.shields.io/badge/platform-macOS%20%7C%20Windows-blue" alt="Platform">
   <img src="https://img.shields.io/badge/built%20with-Tauri%20%2B%20Vue-green" alt="Built with">
   <img src="https://img.shields.io/badge/license-GPLv3-orange" alt="License">
 </p>
@@ -35,7 +35,7 @@ When using AI coding assistants like Cursor, Kiro, or Claude, do you often face 
 
 **Vibe Process Bar** solves these problems! It is a lightweight floating window that continuously stays on top, keeping you informed of the AI's working status at all times. **Double-click any task to instantly jump to its IDE window** — no more hunting through your taskbar!
 
-> ⚠️ **Note**: The window jump feature requires macOS Accessibility permission. Grant it in System Settings → Privacy & Security → Accessibility.
+> ⚠️ **Note**: On macOS, the window jump feature requires Accessibility permission (System Settings → Privacy & Security → Accessibility). On Windows, it works out of the box.
 
 ---
 
@@ -75,7 +75,7 @@ Fully supports mainstream AI coding tools and IDEs:
 
 - Translucent frosted glass effect, doesn't obstruct workspace
 - Draggable to any position
-- **Double-click to jump to the corresponding task window** (requires macOS Accessibility permission)
+- **Double-click to jump to the corresponding task window** (macOS requires Accessibility permission)
 - Always on top, always visible
 
 ### 📊 Multi-task Management
@@ -106,6 +106,7 @@ Download from the [Releases](https://github.com/hzw456/vibeProcessBar/releases) 
 |:---|:---|
 | macOS (Apple Silicon) | `VibeProcessBar_x.x.x_aarch64.dmg` |
 | macOS (Intel) | `VibeProcessBar_x.x.x_x64.dmg` |
+| Windows (x64) | `VibeProcessbar_x.x.x_x64-setup.exe` or `.msi` |
 
 ### Method 2: Build from Source
 
@@ -122,13 +123,17 @@ npm run tauri dev
 
 # 4. Build for production
 npm run tauri build
+# Alternatively on Windows: .\build-windows.ps1
 ```
 
+> **For Windows users**, please refer to the [Windows Quick Start](WINDOWS_QUICK_START.md) and [Windows Build Guide](BUILD_WINDOWS.md) for more detailed instructions.
+
 **System Requirements:**
-- macOS
+- macOS or Windows
 - Node.js 18+
 - Rust 1.70+
 - Tauri CLI (`npm install -D @tauri-apps/cli`)
+- **Windows Only**: Visual Studio Build Tools with C++ workload
 
 ---
 

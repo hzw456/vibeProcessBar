@@ -47,6 +47,7 @@ export interface AppSettings {
   blockPluginStatus: boolean;
   windowX: number | null;
   windowY: number | null;
+  showOnlyWhenRunning: boolean;
 }
 
 const defaultSettings: AppSettings = {
@@ -64,6 +65,7 @@ const defaultSettings: AppSettings = {
   blockPluginStatus: true,
   windowX: null,
   windowY: null,
+  showOnlyWhenRunning: false,
 };
 
 export const useProgressStore = defineStore('progress', () => {
@@ -315,6 +317,10 @@ export const useProgressStore = defineStore('progress', () => {
     updateSettingAndSync('blockPluginStatus', value);
   }
 
+  function setShowOnlyWhenRunning(value: boolean) {
+    updateSettingAndSync('showOnlyWhenRunning', value);
+  }
+
   function setWindowPosition(x: number, y: number) {
     settings.value.windowX = x;
     settings.value.windowY = y;
@@ -385,6 +391,7 @@ export const useProgressStore = defineStore('progress', () => {
     setHttpHost,
     setHttpPort,
     setBlockPluginStatus,
+    setShowOnlyWhenRunning,
     setWindowPosition,
     updateWindowPositionDisplay,
     saveWindowPositionToFile,

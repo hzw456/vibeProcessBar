@@ -27,6 +27,13 @@
   "notification": {
     "taskCompleted": "{{taskName}} 完了！"
   },
+  "contextMenu": {
+    "cancelTask": "タスクをキャンセル",
+    "renameIde": "IDE名を変更",
+    "hideWindow": "ウィンドウを隠す",
+    "hideTask": "タスクを非表示",
+    "showAllTasks": "すべてのタスクを表示"
+  },
   "settings": {
     "title": "設定",
     "tabs": {
@@ -41,7 +48,8 @@
       "alwaysOnTop": "常に最前面に表示",
       "httpPort": "HTTP API ポート",
       "configManagement": "設定のエクスポート/インポート",
-      "manage": "管理"
+      "manage": "管理",
+      "showOnlyWhenRunning": "タスク実行中のみ表示"
     },
     "appearance": {
       "theme": "テーマ",

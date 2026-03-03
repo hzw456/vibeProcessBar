@@ -27,6 +27,13 @@
   "notification": {
     "taskCompleted": "{{taskName}} 완료됨!"
   },
+  "contextMenu": {
+    "cancelTask": "작업 취소",
+    "renameIde": "사용자 지정 제목",
+    "hideWindow": "창 숨기기",
+    "hideTask": "항목 숨기기",
+    "showAllTasks": "모든 항목 표시"
+  },
   "settings": {
     "title": "설정",
     "tabs": {
@@ -41,7 +48,8 @@
       "alwaysOnTop": "항상 위에 표시",
       "httpPort": "HTTP API 포트",
       "configManagement": "구성 내보내기/가져오기",
-      "manage": "관리"
+      "manage": "관리",
+      "showOnlyWhenRunning": "작업 실행 중에만 표시"
     },
     "appearance": {
       "theme": "테마",

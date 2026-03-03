@@ -1,31 +1,37 @@
-import { invoke } from '@tauri-apps/api/core';
+const isTauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
+
+async function safeInvoke<T>(cmd: string, args?: Record<string, unknown>): Promise<T> {
+  if (!isTauri) throw new Error('Not in Tauri environment');
+  const { invoke } = await import('@tauri-apps/api/core');
+  return invoke<T>(cmd, args);
+}
 
 export async function toggleAlwaysOnTop(): Promise<boolean> {
-  return await invoke('toggle_window_always_on_top');
+  return await safeInvoke('toggle_window_always_on_top');
 }
 
 export async function hideWindow(): Promise<void> {
-  await invoke('hide_window');
+  await safeInvoke('hide_window');
 }
 
 export async function showWindow(): Promise<void> {
-  await invoke('show_window');
+  await safeInvoke('show_window');
 }
 
 export async function getWindowPosition(): Promise<{ x: number; y: number }> {
-  return await invoke('get_window_position');
+  return await safeInvoke('get_window_position');
 }
 
 export async function setWindowPosition(x: number, y: number): Promise<void> {
-  await invoke('set_window_position', { x, y });
+  await safeInvoke('set_window_position', { x, y });
 }
 
 export async function resizeWindow(width: number, height: number): Promise<void> {
-  await invoke('resize_window', { width, height });
+  await safeInvoke('resize_window', { width, height });
 }
 
 export async function getAllWindows(): Promise<Array<{ label: string; position: { x: number; y: number }; width: number; height: number }>> {
-  return await invoke('get_all_windows');
+  return await safeInvoke('get_all_windows');
 }
 
 export interface MonitorInfo {

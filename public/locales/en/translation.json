@@ -27,6 +27,13 @@
   "notification": {
     "taskCompleted": "{taskName} Completed!"
   },
+  "contextMenu": {
+    "cancelTask": "Cancel Task",
+    "renameIde": "Custom Title",
+    "hideWindow": "Hide Window",
+    "hideTask": "Hide Task",
+    "showAllTasks": "Show All Tasks"
+  },
   "settings": {
     "title": "Settings",
     "tabs": {
@@ -45,7 +52,8 @@
       "httpHost": "HTTP Listen Address",
       "httpPort": "HTTP API Port",
       "httpRestartHint": "Changes take effect after restart",
-      "blockPluginStatus": "Block plugin status reporting"
+      "blockPluginStatus": "Block plugin status reporting",
+      "showOnlyWhenRunning": "Show only when tasks running"
     },
     "appearance": {
       "theme": "Theme",

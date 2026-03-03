@@ -46,6 +46,7 @@ function handleResetDefaults() {
   store.setHttpHost('127.0.0.1');
   store.setHttpPort(31415);
   store.setBlockPluginStatus(true);
+  store.setShowOnlyWhenRunning(false);
 }
 
 function handleToggleWindow() {
@@ -125,6 +126,10 @@ function handlePositionChange(event: Event) {
         <div class="setting-item">
           <label>{{ t('settings.general.blockPluginStatus') }}</label>
           <input type="checkbox" :checked="store.settings.blockPluginStatus" @change="store.setBlockPluginStatus(($event.target as HTMLInputElement).checked)" />
+        </div>
+        <div class="setting-item">
+          <label>{{ t('settings.general.showOnlyWhenRunning') }}</label>
+          <input type="checkbox" :checked="store.settings.showOnlyWhenRunning" @change="store.setShowOnlyWhenRunning(($event.target as HTMLInputElement).checked)" />
         </div>
       </div>
 

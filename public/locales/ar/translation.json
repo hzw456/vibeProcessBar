@@ -27,6 +27,13 @@
   "notification": {
     "taskCompleted": "{{taskName}} اكتمل!"
   },
+  "contextMenu": {
+    "cancelTask": "إلغاء المهمة",
+    "renameIde": "إعادة تسمية IDE",
+    "hideWindow": "إخفاء النافذة",
+    "hideTask": "إخفاء المهمة",
+    "showAllTasks": "إظهار جميع المهام"
+  },
   "settings": {
     "title": "الإعدادات",
     "tabs": {
@@ -41,7 +48,8 @@
       "alwaysOnTop": "دائماً في المقدمة",
       "httpPort": "منفذ API HTTP",
       "configManagement": "تصدير/استيراد التكوين",
-      "manage": "إدارة"
+      "manage": "إدارة",
+      "showOnlyWhenRunning": "إظهار فقط عند تشغيل المهام"
     },
     "appearance": {
       "theme": "السمة",

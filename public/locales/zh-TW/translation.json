@@ -27,6 +27,13 @@
   "notification": {
     "taskCompleted": "{{taskName}} 已完成！"
   },
+  "contextMenu": {
+    "cancelTask": "取消任務",
+    "renameIde": "重新命名 IDE",
+    "hideWindow": "隱藏視窗",
+    "hideTask": "隱藏條目",
+    "showAllTasks": "顯示所有條目"
+  },
   "settings": {
     "title": "設置",
     "tabs": {
@@ -41,7 +48,8 @@
       "alwaysOnTop": "始終置頂",
       "httpPort": "HTTP API 端口",
       "configManagement": "導出/導入配置",
-      "manage": "管理"
+      "manage": "管理",
+      "showOnlyWhenRunning": "僅在有任務運行時顯示"
     },
     "appearance": {
       "theme": "主題",

@@ -27,6 +27,13 @@
   "notification": {
     "taskCompleted": "{{taskName}} Abgeschlossen!"
   },
+  "contextMenu": {
+    "cancelTask": "Aufgabe abbrechen",
+    "renameIde": "IDE umbenennen",
+    "hideWindow": "Fenster ausblenden",
+    "hideTask": "Aufgabe ausblenden",
+    "showAllTasks": "Alle Aufgaben anzeigen"
+  },
   "settings": {
     "title": "Einstellungen",
     "tabs": {
@@ -41,7 +48,8 @@
       "alwaysOnTop": "Immer im Vordergrund",
       "httpPort": "HTTP API Port",
       "configManagement": "Konfiguration Exportieren/Importieren",
-      "manage": "Verwalten"
+      "manage": "Verwalten",
+      "showOnlyWhenRunning": "Nur bei laufenden Aufgaben anzeigen"
     },
     "appearance": {
       "theme": "Design",
