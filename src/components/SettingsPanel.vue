@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { useProgressStore } from '../stores/progressStore';
+import { useAuthStore } from '../stores/auth';
 import LanguageSelector from './LanguageSelector.vue';
 import './SettingsPanel.css';
 import { ref, computed } from 'vue';
@@ -19,12 +20,17 @@ const emit = defineEmits<{
 }>();
 
 const store = useProgressStore();
+const authStore = useAuthStore();
 const { t } = useI18n();
 
 type TabType = 'general' | 'appearance';
 const activeTab = ref<TabType>('general');
 
 const themes = ['dark', 'purple', 'ocean', 'forest', 'midnight'] as const;
+const loginEmail = ref('');
+const loginPassword = ref('');
+const authError = ref('');
+const isLoggingIn = ref(false);
 
 // App version
 const appVersion = '1.0.1';
@@ -55,6 +61,26 @@ function handleToggleWindow() {
 
 function handleTestSound() {
   playSound(store.settings.soundVolume);
+}
+
+async function handleLogin() {
+  authError.value = '';
+  isLoggingIn.value = true;
+
+  try {
+    await authStore.login(loginEmail.value, loginPassword.value);
+    loginPassword.value = '';
+  } catch (error) {
+    authError.value = error instanceof Error ? error.message : 'Login failed';
+  } finally {
+    isLoggingIn.value = false;
+  }
+}
+
+function handleLogout() {
+  authStore.logout();
+  authError.value = '';
+  loginPassword.value = '';
 }
 
 function handlePositionChange(event: Event) {
@@ -130,6 +156,32 @@ function handlePositionChange(event: Event) {
         <div class="setting-item">
           <label>{{ t('settings.general.showOnlyWhenRunning') }}</label>
           <input type="checkbox" :checked="store.settings.showOnlyWhenRunning" @change="store.setShowOnlyWhenRunning(($event.target as HTMLInputElement).checked)" />
+        </div>
+        <div class="auth-section">
+          <div class="auth-section-header">Account</div>
+          <template v-if="!authStore.isAuthenticated">
+            <label class="auth-field">
+              <span>Email</span>
+              <input v-model="loginEmail" type="email" autocomplete="email" placeholder="you@example.com" />
+            </label>
+            <label class="auth-field">
+              <span>Password</span>
+              <input v-model="loginPassword" type="password" autocomplete="current-password" placeholder="Password" />
+            </label>
+            <p v-if="authError" class="auth-error">{{ authError }}</p>
+            <button class="action-btn auth-action" :disabled="isLoggingIn" @click="handleLogin">
+              {{ isLoggingIn ? 'Logging in...' : 'Login' }}
+            </button>
+          </template>
+          <template v-else>
+            <div class="auth-status">
+              <span class="auth-status-label">Logged in as</span>
+              <span class="auth-email">{{ authStore.user?.email }}</span>
+            </div>
+            <button class="action-btn danger auth-action" @click="handleLogout">
+              Logout
+            </button>
+          </template>
         </div>
       </div>
 
