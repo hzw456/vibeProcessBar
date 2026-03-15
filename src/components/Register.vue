@@ -2,6 +2,10 @@
 import { ref } from 'vue'
 import { useAuthStore } from '../stores/auth'
 
+const emit = defineEmits<{
+  (e: 'switch-to-login'): void
+}>()
+
 const authStore = useAuthStore()
 
 const email = ref('')
@@ -47,6 +51,11 @@ async function handleSubmit() {
     <button type="submit" :disabled="loading">
       {{ loading ? 'Creating account...' : 'Register' }}
     </button>
+    
+    <p class="auth-switch">
+      Already have an account? 
+      <a href="#" @click.prevent="emit('switch-to-login')">Login</a>
+    </p>
   </form>
 </template>
 
@@ -94,5 +103,19 @@ button {
 button:disabled {
   opacity: 0.7;
   cursor: wait;
+}
+
+.auth-switch {
+  text-align: center;
+  font-size: 0.875rem;
+}
+
+.auth-switch a {
+  color: #1d4ed8;
+  text-decoration: none;
+}
+
+.auth-switch a:hover {
+  text-decoration: underline;
 }
 </style>

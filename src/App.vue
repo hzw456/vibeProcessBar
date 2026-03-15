@@ -2,11 +2,18 @@
 import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useProgressStore, type ProgressTask } from './stores/progressStore';
+import { useAuthStore } from './stores/auth';
+import Login from './components/Login.vue';
+import Register from './components/Register.vue';
 import SettingsPanel from './components/SettingsPanel.vue';
 import { debug, error } from './utils/logger';
 import { playCompletionSound } from './utils/notifications';
 
 debug('App.vue loaded');
+
+// Auth
+const authStore = useAuthStore()
+const showRegister = ref(false)
 
 // Check if we're running in Tauri
 const isTauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
@@ -641,7 +648,10 @@ watch([displayTasks, () => store.settings.showOnlyWhenRunning], async () => {
   let settingsPollInterval: number;
   let unlistenMove: (() => void) | null = null;
 
-  onMounted(async () => {
+onMounted(async () => {
+    // Initialize auth
+    authStore.init();
+    
     // 初始化事件监听 (tasks-updated, settings-changed)
     await store.initEventListeners();
 
@@ -683,8 +693,14 @@ watch([displayTasks, () => store.settings.showOnlyWhenRunning], async () => {
 </script>
 
 <template>
+  <!-- Auth Container -->
+  <div v-if="!authStore.isAuthenticated" class="auth-container">
+    <Register v-if="showRegister" @switch-to-login="showRegister = false" />
+    <Login v-else @switch-to-register="showRegister = true" />
+  </div>
+
   <!-- Settings Window -->
-  <div v-if="isSettingsWindow" class="settings-window-container">
+  <div v-else-if="isSettingsWindow" class="settings-window-container">
     <SettingsPanel :is-standalone="true" />
   </div>
 
