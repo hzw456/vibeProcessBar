@@ -12,6 +12,9 @@ use tracing::{debug, error, info};
 
 lazy_static::lazy_static! {
     static ref SHARED_STATE: Arc<SharedState> = Arc::new(SharedState::new());
+    static ref BACKEND_EMAIL: Mutex<String> = Mutex::new("fulltest@vibe.app".to_string());
+static ref BACKEND_SERVER_URL: Mutex<String> = Mutex::new("http://localhost:3010".to_string());
+    static ref HTTP_CLIENT: reqwest::Client = reqwest::Client::new();
 }
 
 // ============================================================================
@@ -111,15 +114,27 @@ struct ApiResponse {
 
 impl ApiResponse {
     fn ok() -> Self {
-        Self { status: "ok".to_string(), reason: None, error: None }
+        Self {
+            status: "ok".to_string(),
+            reason: None,
+            error: None,
+        }
     }
 
     fn ignored(reason: &str) -> Self {
-        Self { status: "ignored".to_string(), reason: Some(reason.to_string()), error: None }
+        Self {
+            status: "ignored".to_string(),
+            reason: Some(reason.to_string()),
+            error: None,
+        }
     }
 
     fn error(msg: &str) -> Self {
-        Self { status: "error".to_string(), reason: None, error: Some(msg.to_string()) }
+        Self {
+            status: "error".to_string(),
+            reason: None,
+            error: Some(msg.to_string()),
+        }
     }
 }
 
@@ -152,6 +167,17 @@ pub fn set_block_plugin_status(block: bool) {
     let state = SHARED_STATE.clone();
     *state.block_plugin_status.lock().unwrap() = block;
     info!("Block plugin status set to: {}", block);
+}
+
+pub fn set_backend_email(email: String) {
+    let mut e = BACKEND_EMAIL.lock().unwrap();
+    *e = email;
+}
+
+pub fn set_backend_server_url(url: String) {
+    let normalized = url.trim_end_matches('/').to_string();
+    *BACKEND_SERVER_URL.lock().unwrap() = normalized.clone();
+    info!("Backend server URL set to: {}", normalized);
 }
 
 #[allow(dead_code)]
@@ -191,11 +217,102 @@ fn now_millis() -> u64 {
     chrono::Utc::now().timestamp_millis() as u64
 }
 
+#[derive(Serialize)]
+struct BackendUpdateStateRequest<'a> {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    user_email: Option<String>,
+    task_id: &'a str,
+    status: &'a str,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    current_stage: Option<&'a str>,
+}
+
+#[derive(Serialize)]
+struct BackendUpdateProgressRequest<'a> {
+    task_id: &'a str,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    estimated_duration_ms: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    current_stage: Option<&'a str>,
+}
+
+async fn sync_backend_state(task_id: &str, status: &str, current_stage: Option<&str>) {
+    let base_url = BACKEND_SERVER_URL.lock().unwrap().clone();
+    let url = format!("{}/api/sync/task", base_url);
+    let user_email = BACKEND_EMAIL.lock().unwrap().clone();
+    let payload = BackendUpdateStateRequest {
+        user_email: Some(user_email),
+        task_id,
+        status,
+        current_stage,
+    };
+
+    match HTTP_CLIENT.post(&url).json(&payload).send().await {
+        Ok(response) if response.status().is_success() => {
+            debug!(task_id = %task_id, status = %status, "Synced task state to backend");
+        }
+        Ok(response) => {
+            error!(
+                task_id = %task_id,
+                status = %status,
+                backend_url = %url,
+                http_status = %response.status(),
+                "Backend task state sync failed"
+            );
+        }
+        Err(err) => {
+            error!(
+                task_id = %task_id,
+                status = %status,
+                backend_url = %url,
+                error = %err,
+                "Backend task state sync request failed"
+            );
+        }
+    }
+}
+
+async fn sync_backend_progress(
+    task_id: &str,
+    estimated_duration_ms: Option<u64>,
+    current_stage: Option<&str>,
+) {
+    let base_url = BACKEND_SERVER_URL.lock().unwrap().clone();
+    let url = format!("{}/api/task/update_progress", base_url);
+    let payload = BackendUpdateProgressRequest {
+        task_id,
+        estimated_duration_ms,
+        current_stage,
+    };
+
+    match HTTP_CLIENT.post(&url).json(&payload).send().await {
+        Ok(response) if response.status().is_success() => {
+            debug!(task_id = %task_id, "Synced task progress to backend");
+        }
+        Ok(response) => {
+            error!(
+                task_id = %task_id,
+                backend_url = %url,
+                http_status = %response.status(),
+                "Backend task progress sync failed"
+            );
+        }
+        Err(err) => {
+            error!(
+                task_id = %task_id,
+                backend_url = %url,
+                error = %err,
+                "Backend task progress sync request failed"
+            );
+        }
+    }
+}
+
 /// 重置任务为 armed 状态
 pub fn reset_task_to_armed(task_id: &str) -> Result<(), String> {
     let state = SHARED_STATE.clone();
     let mut tasks = state.tasks.lock().unwrap();
-    
+
     if let Some(task) = tasks.iter_mut().find(|t| t.id == task_id) {
         task.status = "armed".to_string();
         task.start_time = 0;
@@ -219,7 +336,7 @@ pub fn get_merged_tasks() -> Vec<Task> {
     let now = now_millis();
 
     let state = SHARED_STATE.clone();
-    
+
     // Clean up stale tasks
     {
         let mut tasks = state.tasks.lock().unwrap();
@@ -261,48 +378,59 @@ async fn report_task(
     State(state): State<Arc<SharedState>>,
     Json(req): Json<ReportRequest>,
 ) -> (StatusCode, Json<ApiResponse>) {
-    let mut tasks = state.tasks.lock().unwrap();
-    let existing = tasks.iter_mut().find(|t| t.id == req.task_id);
+    let mut initial_state_sync: Option<(String, String, Option<String>)> = None;
+    {
+        let mut tasks = state.tasks.lock().unwrap();
+        let existing = tasks.iter_mut().find(|t| t.id == req.task_id);
 
-    if let Some(task) = existing {
-        task.last_heartbeat = now_millis();
-        task.is_focused = req.is_focused;
+        if let Some(task) = existing {
+            task.last_heartbeat = now_millis();
+            task.is_focused = req.is_focused;
 
-        if !can_update_source(&task.source, "plugin") {
-            debug!(task_id = %req.task_id, "Report ignored - lower priority source");
-            return (StatusCode::OK, Json(ApiResponse::ignored("lower_priority_source")));
+            if !can_update_source(&task.source, "plugin") {
+                debug!(task_id = %req.task_id, "Report ignored - lower priority source");
+                return (
+                    StatusCode::OK,
+                    Json(ApiResponse::ignored("lower_priority_source")),
+                );
+            }
+
+            task.name = req.name;
+            task.ide = req.ide;
+            task.window_title = req.window_title;
+            if let Some(path) = req.project_path {
+                task.project_path = Some(path);
+            }
+            if let Some(file) = req.active_file {
+                task.active_file = Some(file);
+            }
+
+            debug!(task_id = %req.task_id, is_focused = %req.is_focused, "Task report processed");
+        } else {
+            info!(task_id = %req.task_id, name = %req.name, ide = %req.ide, "Task auto-registered");
+            let task = Task {
+                id: req.task_id.clone(),
+                name: req.name,
+                status: "armed".to_string(),
+                is_focused: req.is_focused,
+                ide: req.ide,
+                window_title: req.window_title,
+                start_time: 0,
+                end_time: None,
+                project_path: req.project_path,
+                active_file: req.active_file,
+                source: "plugin".to_string(),
+                last_heartbeat: now_millis(),
+                estimated_duration: None,
+                current_stage: None,
+            };
+            tasks.push(task);
+            initial_state_sync = Some((req.task_id, "armed".to_string(), None));
         }
+    }
 
-        task.name = req.name;
-        task.ide = req.ide;
-        task.window_title = req.window_title;
-        if let Some(path) = req.project_path {
-            task.project_path = Some(path);
-        }
-        if let Some(file) = req.active_file {
-            task.active_file = Some(file);
-        }
-
-        debug!(task_id = %req.task_id, is_focused = %req.is_focused, "Task report processed");
-    } else {
-        info!(task_id = %req.task_id, name = %req.name, ide = %req.ide, "Task auto-registered");
-        let task = Task {
-            id: req.task_id.clone(),
-            name: req.name,
-            status: "armed".to_string(),
-            is_focused: req.is_focused,
-            ide: req.ide,
-            window_title: req.window_title,
-            start_time: 0,
-            end_time: None,
-            project_path: req.project_path,
-            active_file: req.active_file,
-            source: "plugin".to_string(),
-            last_heartbeat: now_millis(),
-            estimated_duration: None,
-            current_stage: None,
-        };
-        tasks.push(task);
+    if let Some((task_id, status, current_stage)) = initial_state_sync {
+        sync_backend_state(&task_id, &status, current_stage.as_deref()).await;
     }
 
     (StatusCode::OK, Json(ApiResponse::ok()))
@@ -313,86 +441,129 @@ async fn update_state(
     Json(req): Json<UpdateStateRequest>,
 ) -> (StatusCode, Json<ApiResponse>) {
     let request_source = req.source.as_deref().unwrap_or("plugin");
-    
+
     let valid_sources = ["hook", "mcp", "plugin"];
     if !valid_sources.contains(&request_source) {
-        return (StatusCode::BAD_REQUEST, Json(ApiResponse::error(&format!(
-            "Invalid source '{}'. Valid: {:?}", request_source, valid_sources
-        ))));
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(ApiResponse::error(&format!(
+                "Invalid source '{}'. Valid: {:?}",
+                request_source, valid_sources
+            ))),
+        );
     }
 
     if request_source == "plugin" && *state.block_plugin_status.lock().unwrap() {
         debug!(task_id = %req.task_id, "Ignoring plugin status update - blocked");
-        return (StatusCode::OK, Json(ApiResponse::ignored("plugin_status_blocked")));
+        return (
+            StatusCode::OK,
+            Json(ApiResponse::ignored("plugin_status_blocked")),
+        );
     }
 
-    let mut tasks = state.tasks.lock().unwrap();
-    let found = tasks.iter_mut().find(|t| t.id == req.task_id);
+    let mut state_sync: Option<(String, String, Option<String>)> = None;
+    let mut progress_sync: Option<(String, Option<u64>, Option<String>)> = None;
 
-    if let Some(task) = found {
-        if !can_update_source(&task.source, request_source) {
-            info!(task_id = %req.task_id, "Ignoring update_state - lower priority");
-            return (StatusCode::OK, Json(ApiResponse::ignored("lower_priority_source")));
-        }
+    {
+        let mut tasks = state.tasks.lock().unwrap();
+        let found = tasks.iter_mut().find(|t| t.id == req.task_id);
 
-        task.source = request_source.to_string();
-
-        if let Some(estimated_duration) = req.estimated_duration {
-            task.estimated_duration = Some(estimated_duration);
-        }
-
-        if let Some(ref current_stage) = req.current_stage {
-            task.current_stage = Some(current_stage.clone());
-        }
-
-        if let Some(ref status) = req.status {
-            let valid_statuses = ["armed", "running", "completed", "error", "cancelled"];
-            if !valid_statuses.contains(&status.as_str()) {
-                return (StatusCode::BAD_REQUEST, Json(ApiResponse::error(&format!(
-                    "Invalid status '{}'. Valid: {:?}", status, valid_statuses
-                ))));
+        if let Some(task) = found {
+            if !can_update_source(&task.source, request_source) {
+                info!(task_id = %req.task_id, "Ignoring update_state - lower priority");
+                return (
+                    StatusCode::OK,
+                    Json(ApiResponse::ignored("lower_priority_source")),
+                );
             }
 
-            let old_status = task.status.clone();
-            task.status = status.clone();
+            task.source = request_source.to_string();
 
-            // Reset start_time when transitioning from completed/error/cancelled to running
-            if status == "running" {
-                if old_status == "completed" || old_status == "error" || old_status == "cancelled" {
-                    task.start_time = now_millis();
-                    task.end_time = None;
+            if let Some(estimated_duration) = req.estimated_duration {
+                task.estimated_duration = Some(estimated_duration);
+            }
+
+            if let Some(ref current_stage) = req.current_stage {
+                task.current_stage = Some(current_stage.clone());
+            }
+
+            if let Some(ref status) = req.status {
+                let valid_statuses = ["armed", "running", "completed", "error", "cancelled"];
+                if !valid_statuses.contains(&status.as_str()) {
+                    return (
+                        StatusCode::BAD_REQUEST,
+                        Json(ApiResponse::error(&format!(
+                            "Invalid status '{}'. Valid: {:?}",
+                            status, valid_statuses
+                        ))),
+                    );
+                }
+
+                let old_status = task.status.clone();
+                task.status = status.clone();
+
+                if status == "running" {
+                    if old_status == "completed"
+                        || old_status == "error"
+                        || old_status == "cancelled"
+                    {
+                        task.start_time = now_millis();
+                        task.end_time = None;
+                        task.estimated_duration = None;
+                        task.current_stage = task.active_file.clone();
+                        info!(task_id = %req.task_id, "Task restarted from {}", old_status);
+                    } else if task.start_time == 0 {
+                        task.start_time = now_millis();
+                        info!(task_id = %req.task_id, "Task started");
+                    }
+                }
+
+                if status == "completed" || status == "error" || status == "cancelled" {
+                    task.end_time = Some(now_millis());
+                    if status == "completed" {
+                        task.current_stage = Some("__completed__".to_string());
+                    }
+                    info!(task_id = %req.task_id, new_status = %status, "Task ended");
+                }
+
+                if status == "armed" {
                     task.estimated_duration = None;
-                    // 重置 current_stage 为文件名
-                    task.current_stage = task.active_file.clone();
-                    info!(task_id = %req.task_id, "Task restarted from {}", old_status);
-                } else if task.start_time == 0 {
-                    task.start_time = now_millis();
-                    info!(task_id = %req.task_id, "Task started");
+                    task.current_stage = None;
+                    task.start_time = 0;
+                    task.end_time = None;
                 }
+
+                state_sync = Some((
+                    task.id.clone(),
+                    task.status.clone(),
+                    task.current_stage.clone(),
+                ));
             }
 
-            if status == "completed" || status == "error" || status == "cancelled" {
-                task.end_time = Some(now_millis());
-                if status == "completed" {
-                    // 设置特殊标记，前端会根据语言设置显示对应文案
-                    task.current_stage = Some("__completed__".to_string());
-                }
-                info!(task_id = %req.task_id, new_status = %status, "Task ended");
+            if req.estimated_duration.is_some() || req.current_stage.is_some() {
+                progress_sync = Some((
+                    task.id.clone(),
+                    task.estimated_duration,
+                    task.current_stage.clone(),
+                ));
             }
-
-            // 重置为 armed 时清空预估时间和阶段描述
-            if status == "armed" {
-                task.estimated_duration = None;
-                task.current_stage = None;
-                task.start_time = 0;
-                task.end_time = None;
-            }
+        } else {
+            return (
+                StatusCode::NOT_FOUND,
+                Json(ApiResponse::error("Task not found")),
+            );
         }
-
-        (StatusCode::OK, Json(ApiResponse::ok()))
-    } else {
-        (StatusCode::NOT_FOUND, Json(ApiResponse::error("Task not found")))
     }
+
+    if let Some((task_id, status, current_stage)) = state_sync {
+        sync_backend_state(&task_id, &status, current_stage.as_deref()).await;
+    }
+
+    if let Some((task_id, estimated_duration, current_stage)) = progress_sync {
+        sync_backend_progress(&task_id, estimated_duration, current_stage.as_deref()).await;
+    }
+
+    (StatusCode::OK, Json(ApiResponse::ok()))
 }
 
 async fn reset_tasks(
@@ -418,14 +589,17 @@ async fn delete_task(
 ) -> (StatusCode, Json<ApiResponse>) {
     let mut tasks = state.tasks.lock().unwrap();
     let before_count = tasks.len();
-    
+
     tasks.retain(|t| t.id != req.task_id);
-    
+
     if before_count - tasks.len() > 0 {
         info!(task_id = %req.task_id, "Task deleted");
         (StatusCode::OK, Json(ApiResponse::ok()))
     } else {
-        (StatusCode::NOT_FOUND, Json(ApiResponse::error("Task not found")))
+        (
+            StatusCode::NOT_FOUND,
+            Json(ApiResponse::error("Task not found")),
+        )
     }
 }
 
@@ -434,67 +608,96 @@ async fn update_state_by_path(
     Json(req): Json<UpdateStateByPathRequest>,
 ) -> (StatusCode, Json<ApiResponse>) {
     let request_source = req.source.as_deref().unwrap_or("hook");
-    
+
     let valid_sources = ["hook", "mcp", "plugin"];
     if !valid_sources.contains(&request_source) {
-        return (StatusCode::BAD_REQUEST, Json(ApiResponse::error(&format!(
-            "Invalid source '{}'. Valid: {:?}", request_source, valid_sources
-        ))));
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(ApiResponse::error(&format!(
+                "Invalid source '{}'. Valid: {:?}",
+                request_source, valid_sources
+            ))),
+        );
     }
 
-    let mut tasks = state.tasks.lock().unwrap();
-    
-    let found = tasks.iter_mut().find(|t| {
-        let path_match = t.project_path.as_ref().map_or(false, |p| p == &req.project_path);
-        let ide_match = req.ide.as_ref().map_or(true, |ide| &t.ide == ide);
-        path_match && ide_match
-    });
+    let state_sync = {
+        let mut tasks = state.tasks.lock().unwrap();
 
-    if let Some(task) = found {
-        if !can_update_source(&task.source, request_source) {
-            info!(project_path = %req.project_path, "Ignoring update_state_by_path - lower priority");
-            return (StatusCode::OK, Json(ApiResponse::ignored("lower_priority_source")));
-        }
+        let found = tasks.iter_mut().find(|t| {
+            let path_match = t
+                .project_path
+                .as_ref()
+                .map_or(false, |p| p == &req.project_path);
+            let ide_match = req.ide.as_ref().map_or(true, |ide| &t.ide == ide);
+            path_match && ide_match
+        });
 
-        task.source = request_source.to_string();
-
-        if let Some(ref status) = req.status {
-            let valid_statuses = ["armed", "running", "completed", "error", "cancelled"];
-            if !valid_statuses.contains(&status.as_str()) {
-                return (StatusCode::BAD_REQUEST, Json(ApiResponse::error(&format!(
-                    "Invalid status '{}'. Valid: {:?}", status, valid_statuses
-                ))));
+        if let Some(task) = found {
+            if !can_update_source(&task.source, request_source) {
+                info!(project_path = %req.project_path, "Ignoring update_state_by_path - lower priority");
+                return (
+                    StatusCode::OK,
+                    Json(ApiResponse::ignored("lower_priority_source")),
+                );
             }
 
-            let old_status = task.status.clone();
-            task.status = status.clone();
+            task.source = request_source.to_string();
 
-            // Reset start_time when transitioning from completed/error/cancelled to running
-            if status == "running" {
-                if old_status == "completed" || old_status == "error" || old_status == "cancelled" {
-                    task.start_time = now_millis();
-                    task.end_time = None;
-                    task.estimated_duration = None;
-                    // 重置 current_stage 为文件名
-                    task.current_stage = task.active_file.clone();
-                } else if task.start_time == 0 {
-                    task.start_time = now_millis();
+            if let Some(ref status) = req.status {
+                let valid_statuses = ["armed", "running", "completed", "error", "cancelled"];
+                if !valid_statuses.contains(&status.as_str()) {
+                    return (
+                        StatusCode::BAD_REQUEST,
+                        Json(ApiResponse::error(&format!(
+                            "Invalid status '{}'. Valid: {:?}",
+                            status, valid_statuses
+                        ))),
+                    );
+                }
+
+                let old_status = task.status.clone();
+                task.status = status.clone();
+
+                if status == "running" {
+                    if old_status == "completed"
+                        || old_status == "error"
+                        || old_status == "cancelled"
+                    {
+                        task.start_time = now_millis();
+                        task.end_time = None;
+                        task.estimated_duration = None;
+                        task.current_stage = task.active_file.clone();
+                    } else if task.start_time == 0 {
+                        task.start_time = now_millis();
+                    }
+                }
+
+                if status == "completed" || status == "error" || status == "cancelled" {
+                    task.end_time = Some(now_millis());
+                    if status == "completed" {
+                        task.current_stage = Some("__completed__".to_string());
+                    }
                 }
             }
 
-            if status == "completed" || status == "error" || status == "cancelled" {
-                task.end_time = Some(now_millis());
-                if status == "completed" {
-                    // 设置特殊标记，前端会根据语言设置显示对应文案
-                    task.current_stage = Some("__completed__".to_string());
-                }
-            }
+            Some((
+                task.id.clone(),
+                task.status.clone(),
+                task.current_stage.clone(),
+            ))
+        } else {
+            return (
+                StatusCode::NOT_FOUND,
+                Json(ApiResponse::error("Task not found for project_path")),
+            );
         }
+    };
 
-        (StatusCode::OK, Json(ApiResponse::ok()))
-    } else {
-        (StatusCode::NOT_FOUND, Json(ApiResponse::error("Task not found for project_path")))
+    if let Some((task_id, status, current_stage)) = state_sync {
+        sync_backend_state(&task_id, &status, current_stage.as_deref()).await;
     }
+
+    (StatusCode::OK, Json(ApiResponse::ok()))
 }
 
 // ============================================================================
@@ -527,11 +730,14 @@ async fn mcp_handler(
             })
         }
         "notifications/initialized" => {
-            return (StatusCode::OK, Json(serde_json::json!({
-                "jsonrpc": "2.0",
-                "result": {},
-                "id": req.id
-            })));
+            return (
+                StatusCode::OK,
+                Json(serde_json::json!({
+                    "jsonrpc": "2.0",
+                    "result": {},
+                    "id": req.id
+                })),
+            );
         }
         "tools/list" => {
             serde_json::json!({
@@ -572,48 +778,66 @@ async fn mcp_handler(
         "tools/call" => {
             let params = req.params.unwrap_or(serde_json::json!({}));
             let tool_name = params.get("name").and_then(|v| v.as_str()).unwrap_or("");
-            let arguments = params.get("arguments").cloned().unwrap_or(serde_json::json!({}));
+            let arguments = params
+                .get("arguments")
+                .cloned()
+                .unwrap_or(serde_json::json!({}));
 
             match tool_name {
                 "list_tasks" => {
                     let tasks_vec = get_merged_tasks();
                     let now = now_millis();
-                    let task_list: Vec<serde_json::Value> = tasks_vec.iter().map(|t| {
-                        let elapsed_ms = if t.start_time > 0 {
-                            now.saturating_sub(t.start_time)
-                        } else {
-                            0
-                        };
-                        
-                        // 进度由 elapsed / effective_estimated 计算
-                        // 如果运行时间超过预估时间，预估时间跟随运行时间
-                        let calculated_progress = if let Some(estimated) = t.estimated_duration {
-                            if estimated > 0 {
+                    let task_list: Vec<serde_json::Value> = tasks_vec
+                        .iter()
+                        .map(|t| {
+                            let elapsed_ms = if t.start_time > 0 {
+                                now.saturating_sub(t.start_time)
+                            } else {
+                                0
+                            };
+
+                            // 进度由 elapsed / effective_estimated 计算
+                            // 如果运行时间超过预估时间，预估时间跟随运行时间
+                            let calculated_progress = if let Some(estimated) = t.estimated_duration
+                            {
+                                if estimated > 0 {
+                                    if t.status == "completed" {
+                                        100
+                                    } else {
+                                        let effective_estimated =
+                                            std::cmp::max(estimated, elapsed_ms);
+                                        ((elapsed_ms as f64 / effective_estimated as f64) * 100.0)
+                                            .min(99.0)
+                                            as u32
+                                    }
+                                } else {
+                                    if t.status == "completed" {
+                                        100
+                                    } else {
+                                        0
+                                    }
+                                }
+                            } else {
                                 if t.status == "completed" {
                                     100
                                 } else {
-                                    let effective_estimated = std::cmp::max(estimated, elapsed_ms);
-                                    ((elapsed_ms as f64 / effective_estimated as f64) * 100.0).min(99.0) as u32
+                                    0
                                 }
-                            } else {
-                                if t.status == "completed" { 100 } else { 0 }
-                            }
-                        } else {
-                            if t.status == "completed" { 100 } else { 0 }
-                        };
-                        
-                        serde_json::json!({
-                            "id": t.id,
-                            "ide": t.ide,
-                            "window_title": t.window_title,
-                            "project_path": t.project_path,
-                            "active_file": t.active_file,
-                            "status": t.status,
-                            "progress": calculated_progress,
-                            "source": t.source,
-                            "current_stage": t.current_stage
+                            };
+
+                            serde_json::json!({
+                                "id": t.id,
+                                "ide": t.ide,
+                                "window_title": t.window_title,
+                                "project_path": t.project_path,
+                                "active_file": t.active_file,
+                                "status": t.status,
+                                "progress": calculated_progress,
+                                "source": t.source,
+                                "current_stage": t.current_stage
+                            })
                         })
-                    }).collect();
+                        .collect();
 
                     serde_json::json!({
                         "content": [{
@@ -623,122 +847,185 @@ async fn mcp_handler(
                     })
                 }
                 "update_task_status" => {
-                    let task_id = arguments.get("task_id").and_then(|v| v.as_str()).unwrap_or("");
-                    let status = arguments.get("status").and_then(|v| v.as_str()).unwrap_or("");
+                    let task_id = arguments
+                        .get("task_id")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("");
+                    let status = arguments
+                        .get("status")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("");
 
                     let valid_statuses = ["running", "completed", "error", "cancelled", "armed"];
                     if !valid_statuses.contains(&status) {
-                        return (StatusCode::OK, Json(serde_json::json!({
-                            "jsonrpc": "2.0",
-                            "error": {"code": -32602, "message": format!("Invalid status '{}'", status)},
-                            "id": req.id
-                        })));
-                    }
-
-                    let mut tasks = state.tasks.lock().unwrap();
-                    if let Some(task) = tasks.iter_mut().find(|t| t.id == task_id) {
-                        if !can_update_source(&task.source, "mcp") {
-                            return (StatusCode::OK, Json(serde_json::json!({
+                        return (
+                            StatusCode::OK,
+                            Json(serde_json::json!({
                                 "jsonrpc": "2.0",
-                                "result": {
-                                    "content": [{ "type": "text", "text": format!("Ignored: higher priority source") }]
-                                },
+                                "error": {"code": -32602, "message": format!("Invalid status '{}'", status)},
                                 "id": req.id
-                            })));
-                        }
-
-                        let old_status = task.status.clone();
-                        task.status = status.to_string();
-                        task.source = "mcp".to_string();
-
-                        // Reset start_time when transitioning from completed/error/cancelled to running
-                        if status == "running" {
-                            if ["completed", "error", "cancelled"].contains(&old_status.as_str()) {
-                                task.start_time = now_millis();
-                                task.end_time = None;
-                                task.estimated_duration = None;
-                                // 重置 current_stage 为文件名
-                                task.current_stage = task.active_file.clone();
-                            } else if task.start_time == 0 {
-                                task.start_time = now_millis();
-                            }
-                        } else if ["completed", "error", "cancelled"].contains(&status) {
-                            task.end_time = Some(now_millis());
-                            if status == "completed" {
-                                task.current_stage = Some("__completed__".to_string());
-                            }
-                        } else if status == "armed" {
-                            // 重置为 armed 时清空预估时间和阶段描述
-                            task.estimated_duration = None;
-                            task.current_stage = None;
-                            task.start_time = 0;
-                            task.end_time = None;
-                        }
-
-                        serde_json::json!({
-                            "content": [{ "type": "text", "text": format!("Task {} status: {} -> {}", task_id, old_status, status) }]
-                        })
-                    } else {
-                        return (StatusCode::OK, Json(serde_json::json!({
-                            "jsonrpc": "2.0",
-                            "error": {"code": -32602, "message": format!("Task not found: {}", task_id)},
-                            "id": req.id
-                        })));
+                            })),
+                        );
                     }
+
+                    let (old_status, sync_state_result) = {
+                        let mut tasks = state.tasks.lock().unwrap();
+                        if let Some(task) = tasks.iter_mut().find(|t| t.id == task_id) {
+                            if !can_update_source(&task.source, "mcp") {
+                                return (
+                                    StatusCode::OK,
+                                    Json(serde_json::json!({
+                                        "jsonrpc": "2.0",
+                                        "result": {
+                                            "content": [{ "type": "text", "text": format!("Ignored: higher priority source") }]
+                                        },
+                                        "id": req.id
+                                    })),
+                                );
+                            }
+
+                            let old_status = task.status.clone();
+                            task.status = status.to_string();
+                            task.source = "mcp".to_string();
+
+                            if status == "running" {
+                                if ["completed", "error", "cancelled"]
+                                    .contains(&old_status.as_str())
+                                {
+                                    task.start_time = now_millis();
+                                    task.end_time = None;
+                                    task.estimated_duration = None;
+                                    task.current_stage = task.active_file.clone();
+                                } else if task.start_time == 0 {
+                                    task.start_time = now_millis();
+                                }
+                            } else if ["completed", "error", "cancelled"].contains(&status) {
+                                task.end_time = Some(now_millis());
+                                if status == "completed" {
+                                    task.current_stage = Some("__completed__".to_string());
+                                }
+                            } else if status == "armed" {
+                                task.estimated_duration = None;
+                                task.current_stage = None;
+                                task.start_time = 0;
+                                task.end_time = None;
+                            }
+
+                            (
+                                old_status,
+                                Some((
+                                    task.id.clone(),
+                                    task.status.clone(),
+                                    task.current_stage.clone(),
+                                )),
+                            )
+                        } else {
+                            return (
+                                StatusCode::OK,
+                                Json(serde_json::json!({
+                                    "jsonrpc": "2.0",
+                                    "error": {"code": -32602, "message": format!("Task not found: {}", task_id)},
+                                    "id": req.id
+                                })),
+                            );
+                        }
+                    };
+
+                    if let Some((task_id, status, current_stage)) = sync_state_result {
+                        sync_backend_state(&task_id, &status, current_stage.as_deref()).await;
+                    }
+
+                    serde_json::json!({
+                        "content": [{ "type": "text", "text": format!("Task {} status: {} -> {}", task_id, old_status, status) }]
+                    })
                 }
                 "update_task_progress" => {
-                    let task_id = arguments.get("task_id").and_then(|v| v.as_str()).unwrap_or("");
-                    let estimated_duration = arguments.get("estimated_duration_ms").and_then(|v| v.as_u64());
+                    let task_id = arguments
+                        .get("task_id")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("");
+                    let estimated_duration = arguments
+                        .get("estimated_duration_ms")
+                        .and_then(|v| v.as_u64());
                     let current_stage = arguments.get("current_stage").and_then(|v| v.as_str());
-                    
-                    let mut tasks = state.tasks.lock().unwrap();
-                    if let Some(task) = tasks.iter_mut().find(|t| t.id == task_id) {
-                        // 不检查 source 优先级，任何来源都可以更新预估时间和阶段描述
-                        if let Some(est) = estimated_duration {
-                            task.estimated_duration = Some(est);
+
+                    let sync_progress_result = {
+                        let mut tasks = state.tasks.lock().unwrap();
+                        if let Some(task) = tasks.iter_mut().find(|t| t.id == task_id) {
+                            if let Some(est) = estimated_duration {
+                                task.estimated_duration = Some(est);
+                            }
+
+                            if let Some(stage) = current_stage {
+                                task.current_stage = Some(stage.to_string());
+                            }
+
+                            Some((
+                                task.id.clone(),
+                                task.estimated_duration,
+                                task.current_stage.clone(),
+                            ))
+                        } else {
+                            return (
+                                StatusCode::OK,
+                                Json(serde_json::json!({
+                                    "jsonrpc": "2.0",
+                                    "error": {"code": -32602, "message": format!("Task not found: {}", task_id)},
+                                    "id": req.id
+                                })),
+                            );
                         }
-                        
-                        if let Some(stage) = current_stage {
-                            task.current_stage = Some(stage.to_string());
-                        }
-                        
-                        serde_json::json!({
-                            "content": [{
-                                "type": "text",
-                                "text": format!("Updated task {}", task_id)
-                            }]
-                        })
-                    } else {
-                        return (StatusCode::OK, Json(serde_json::json!({
-                            "jsonrpc": "2.0",
-                            "error": {"code": -32602, "message": format!("Task not found: {}", task_id)},
-                            "id": req.id
-                        })));
+                    };
+
+                    if let Some((task_id, estimated_duration, current_stage)) = sync_progress_result
+                    {
+                        sync_backend_progress(
+                            &task_id,
+                            estimated_duration,
+                            current_stage.as_deref(),
+                        )
+                        .await;
                     }
+
+                    serde_json::json!({
+                        "content": [{
+                            "type": "text",
+                            "text": format!("Updated task {}", task_id)
+                        }]
+                    })
                 }
                 _ => {
-                    return (StatusCode::OK, Json(serde_json::json!({
-                        "jsonrpc": "2.0",
-                        "error": {"code": -32601, "message": format!("Unknown tool: {}", tool_name)},
-                        "id": req.id
-                    })));
+                    return (
+                        StatusCode::OK,
+                        Json(serde_json::json!({
+                            "jsonrpc": "2.0",
+                            "error": {"code": -32601, "message": format!("Unknown tool: {}", tool_name)},
+                            "id": req.id
+                        })),
+                    );
                 }
             }
         }
         _ => {
-            return (StatusCode::OK, Json(serde_json::json!({
-                "jsonrpc": "2.0",
-                "error": {"code": -32601, "message": format!("Method not found: {}", req.method)},
-                "id": req.id
-            })));
+            return (
+                StatusCode::OK,
+                Json(serde_json::json!({
+                    "jsonrpc": "2.0",
+                    "error": {"code": -32601, "message": format!("Method not found: {}", req.method)},
+                    "id": req.id
+                })),
+            );
         }
     };
 
-    (StatusCode::OK, Json(serde_json::json!({
-        "jsonrpc": "2.0",
-        "result": result,
-        "id": req.id
-    })))
+    (
+        StatusCode::OK,
+        Json(serde_json::json!({
+            "jsonrpc": "2.0",
+            "result": result,
+            "id": req.id
+        })),
+    )
 }
 
 // ============================================================================

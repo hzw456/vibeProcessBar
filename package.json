@@ -13,7 +13,7 @@
     "test:ui": "vitest ui"
   },
   "dependencies": {
-    "@tauri-apps/api": "^2",
+    "@tauri-apps/api": "^2.10.1",
     "@tauri-apps/plugin-shell": "^2",
     "@vitejs/plugin-vue": "^6.0.3",
     "i18next": "^25.7.3",

@@ -16,7 +16,6 @@ pub const IDE_BUNDLES: &[(&str, &str, &str)] = &[
     ("com.trae.app", "trae", "Trae"),
     ("com.tencent.codebuddycn", "codebuddycn", "CodeBuddy CN"),
     ("com.tencent.codebuddy", "codebuddy", "CodeBuddy"),
-
 ];
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -77,9 +76,9 @@ pub fn scan_ide_windows() -> Vec<IdeWindow> {
                 let win_names_str = parts[2];
 
                 // Match IDE from app path using IDE_BUNDLES
-                let ide_info = IDE_BUNDLES.iter().find(|(_, _, app_name)| {
-                    app_path.contains(app_name)
-                });
+                let ide_info = IDE_BUNDLES
+                    .iter()
+                    .find(|(_, _, app_name)| app_path.contains(app_name));
 
                 if let Some((bundle_id, ide, app_name)) = ide_info {
                     let win_names: Vec<&str> = win_names_str.split("|||").collect();
@@ -108,9 +107,9 @@ pub fn scan_ide_windows() -> Vec<IdeWindow> {
 #[cfg(target_os = "windows")]
 pub fn scan_ide_windows() -> Vec<IdeWindow> {
     use std::process::{Command, Stdio};
-    
+
     let mut all_windows = Vec::new();
-    
+
     // Use PowerShell with EnumWindows to get ALL windows (not just MainWindowHandle)
     let script = r#"
         Add-Type @"
@@ -169,7 +168,7 @@ pub fn scan_ide_windows() -> Vec<IdeWindow> {
             $ideProcesses -contains [int]$parts[1]
         }
     "#;
-    
+
     let output = Command::new("powershell")
         .args(&["-NoProfile", "-WindowStyle", "Hidden", "-Command", script])
         .creation_flags(0x08000000) // CREATE_NO_WINDOW
@@ -177,31 +176,33 @@ pub fn scan_ide_windows() -> Vec<IdeWindow> {
         .stdout(Stdio::piped())
         .stderr(Stdio::null())
         .output();
-    
+
     if let Ok(result) = output {
         if result.status.success() {
             let stdout = String::from_utf8_lossy(&result.stdout);
-            
+
             for line in stdout.lines() {
                 let line = line.trim();
                 if line.is_empty() {
                     continue;
                 }
-                
+
                 let parts: Vec<&str> = line.splitn(3, '|').collect();
                 if parts.len() != 3 {
                     continue;
                 }
-                
+
                 let hwnd = parts[0];
                 let pid = parts[1];
                 let window_title = parts[2];
-                
+
                 // Match IDE from window title
                 let ide_info = IDE_BUNDLES.iter().find(|(_, _, app_name)| {
-                    window_title.to_lowercase().contains(&app_name.to_lowercase())
+                    window_title
+                        .to_lowercase()
+                        .contains(&app_name.to_lowercase())
                 });
-                
+
                 if let Some((bundle_id, ide, app_name)) = ide_info {
                     all_windows.push(IdeWindow {
                         bundle_id: bundle_id.to_string(),
@@ -215,7 +216,7 @@ pub fn scan_ide_windows() -> Vec<IdeWindow> {
             }
         }
     }
-    
+
     info!("Scanned {} IDE windows on Windows", all_windows.len());
     all_windows
 }
@@ -236,18 +237,27 @@ pub struct MatchCriteria {
 /// Find the best matching window based on criteria
 /// Priority: ide > workspace > file
 /// 当同一IDE有多个窗口时，优先匹配workspace，然后file
-pub fn find_best_match<'a>(windows: &'a [IdeWindow], criteria: &MatchCriteria) -> Option<&'a IdeWindow> {
+pub fn find_best_match<'a>(
+    windows: &'a [IdeWindow],
+    criteria: &MatchCriteria,
+) -> Option<&'a IdeWindow> {
     let mut candidates: Vec<(&IdeWindow, u32)> = Vec::new();
 
     info!("=== Window Matching Debug ===");
-    info!("Criteria: ide={:?}, workspace={:?}, file={:?}", criteria.ide, criteria.workspace, criteria.file);
+    info!(
+        "Criteria: ide={:?}, workspace={:?}, file={:?}",
+        criteria.ide, criteria.workspace, criteria.file
+    );
     info!("Available windows: {}", windows.len());
 
     for window in windows {
         let mut score = 0u32;
         let mut match_reasons: Vec<String> = Vec::new();
 
-        info!("  Checking window: ide={}, title=\"{}\"", window.ide, window.window_title);
+        info!(
+            "  Checking window: ide={}, title=\"{}\"",
+            window.ide, window.window_title
+        );
 
         // IDE match (required if specified)
         if let Some(ref ide) = criteria.ide {
@@ -262,8 +272,11 @@ pub fn find_best_match<'a>(windows: &'a [IdeWindow], criteria: &MatchCriteria) -
 
         // Workspace/window_title match (high priority)
         if let Some(ref workspace) = criteria.workspace {
-            info!("    Comparing workspace \"{}\" with window_title \"{}\"", workspace, window.window_title);
-            
+            info!(
+                "    Comparing workspace \"{}\" with window_title \"{}\"",
+                workspace, window.window_title
+            );
+
             // 精确匹配窗口标题
             if window.window_title == *workspace {
                 score += 80;
@@ -329,18 +342,26 @@ pub fn find_best_match<'a>(windows: &'a [IdeWindow], criteria: &MatchCriteria) -
             score_cmp
         }
     });
-    
+
     info!("=== Candidates (sorted) ===");
     for (i, (window, score)) in candidates.iter().enumerate() {
-        info!("  {}: \"{}\" (score: {})", i + 1, window.window_title, score);
+        info!(
+            "  {}: \"{}\" (score: {})",
+            i + 1,
+            window.window_title,
+            score
+        );
     }
-    
+
     if let Some((window, score)) = candidates.first() {
-        info!("=== Best match: \"{}\" (score: {}) ===", window.window_title, score);
+        info!(
+            "=== Best match: \"{}\" (score: {}) ===",
+            window.window_title, score
+        );
     } else {
         info!("=== No match found ===");
     }
-    
+
     candidates.first().map(|(w, _)| *w)
 }
 
@@ -415,7 +436,7 @@ pub fn activate_ide_by_name(ide: &str) -> Result<(), String> {
 #[cfg(target_os = "windows")]
 pub fn activate_ide_window(window: &IdeWindow) -> Result<(), String> {
     use std::process::{Command, Stdio};
-    
+
     // Parse PID:HWND format
     let parts: Vec<&str> = window.pid.split(':').collect();
     let hwnd = if parts.len() == 2 {
@@ -423,7 +444,7 @@ pub fn activate_ide_window(window: &IdeWindow) -> Result<(), String> {
     } else {
         return Err("Invalid window handle format".to_string());
     };
-    
+
     // Use PowerShell with direct HWND to activate the specific window
     let script = format!(
         r#"
@@ -494,7 +515,7 @@ pub fn activate_ide_window(window: &IdeWindow) -> Result<(), String> {
         "#,
         hwnd
     );
-    
+
     let output = Command::new("powershell")
         .args(&["-NoProfile", "-WindowStyle", "Hidden", "-Command", &script])
         .creation_flags(0x08000000) // CREATE_NO_WINDOW
@@ -503,25 +524,25 @@ pub fn activate_ide_window(window: &IdeWindow) -> Result<(), String> {
         .stderr(Stdio::null())
         .output()
         .map_err(|e| e.to_string())?;
-    
+
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
         return Err(stderr.to_string());
     }
-    
+
     Ok(())
 }
 
 #[cfg(target_os = "windows")]
 pub fn activate_ide_by_name(ide: &str) -> Result<(), String> {
     use std::process::{Command, Stdio};
-    
+
     let app_name = IDE_BUNDLES
         .iter()
         .find(|(_, id, _)| id.to_lowercase() == ide.to_lowercase())
         .map(|(_, _, name)| *name)
         .unwrap_or(ide);
-    
+
     // Try to start the application if not running
     let _ = Command::new("cmd")
         .args(&["/C", "start", "", app_name])
@@ -530,7 +551,7 @@ pub fn activate_ide_by_name(ide: &str) -> Result<(), String> {
         .stdout(Stdio::null())
         .stderr(Stdio::null())
         .spawn();
-    
+
     Ok(())
 }
 

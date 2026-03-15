@@ -75,7 +75,7 @@ fn open_settings_window<R: Runtime>(app: tauri::AppHandle<R>) -> Result<(), Stri
         .focused(true)
         .build()
         .map_err(|e| e.to_string())?;
-        
+
         // 确保窗口显示并聚焦
         let _ = window.show();
         let _ = window.set_focus();
@@ -97,9 +97,7 @@ async fn get_tasks() -> Result<Vec<http_server::Task>, String> {
 // ============================================================================
 
 #[tauri::command]
-async fn get_app_settings(
-    state: tauri::State<'_, SettingsState>,
-) -> Result<AppSettings, String> {
+async fn get_app_settings(state: tauri::State<'_, SettingsState>) -> Result<AppSettings, String> {
     Ok(state.get_settings())
 }
 
@@ -111,6 +109,8 @@ async fn update_app_settings<R: Runtime>(
 ) -> Result<(), String> {
     // 更新 HTTP server 的屏蔽设置
     http_server::set_block_plugin_status(new_settings.block_plugin_status);
+    http_server::set_backend_email(new_settings.backend_email.clone());
+    http_server::set_backend_server_url(new_settings.backend_server_url.clone());
 
     // 保存设置
     state.update_settings(new_settings.clone())?;
@@ -123,9 +123,7 @@ async fn update_app_settings<R: Runtime>(
 }
 
 #[tauri::command]
-async fn get_window_visibility(
-    state: tauri::State<'_, SettingsState>,
-) -> Result<bool, String> {
+async fn get_window_visibility(state: tauri::State<'_, SettingsState>) -> Result<bool, String> {
     Ok(state.get_settings().window_visible)
 }
 
@@ -175,7 +173,9 @@ async fn set_always_on_top<R: Runtime>(
     always_on_top: bool,
 ) -> Result<(), String> {
     if let Some(window) = app.get_webview_window("main") {
-        window.set_always_on_top(always_on_top).map_err(|e| e.to_string())?;
+        window
+            .set_always_on_top(always_on_top)
+            .map_err(|e| e.to_string())?;
     }
     Ok(())
 }
@@ -186,7 +186,7 @@ async fn set_auto_start(enabled: bool) -> Result<(), String> {
     {
         use std::process::Command;
         let app_path = "/Applications/vibe-process-bar.app";
-        
+
         if enabled {
             let script = format!(
                 r#"tell application "System Events" to make login item at end with properties {{path:"{}", hidden:false}}"#,
@@ -197,30 +197,31 @@ async fn set_auto_start(enabled: bool) -> Result<(), String> {
                 .output()
                 .map_err(|e| e.to_string())?;
         } else {
-            let script = r#"tell application "System Events" to delete login item "vibe-process-bar""#;
+            let script =
+                r#"tell application "System Events" to delete login item "vibe-process-bar""#;
             let _ = Command::new("osascript").args(&["-e", script]).output();
         }
     }
-    
+
     #[cfg(target_os = "windows")]
     {
         use std::process::Command;
-        
+
         // Get the current executable path
         let exe_path = std::env::current_exe()
             .map_err(|e| e.to_string())?
             .to_string_lossy()
             .to_string();
-        
+
         let app_name = "VibeProcessBar";
-        
+
         if enabled {
             // Add to Windows startup using registry
             let script = format!(
                 r#"New-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Run" -Name "{}" -Value '"{}"' -PropertyType String -Force"#,
                 app_name, exe_path
             );
-            
+
             Command::new("powershell")
                 .args(&["-NoProfile", "-Command", &script])
                 .output()
@@ -231,18 +232,18 @@ async fn set_auto_start(enabled: bool) -> Result<(), String> {
                 r#"Remove-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Run" -Name "{}" -ErrorAction SilentlyContinue"#,
                 app_name
             );
-            
+
             let _ = Command::new("powershell")
                 .args(&["-NoProfile", "-Command", &script])
                 .output();
         }
     }
-    
+
     #[cfg(not(any(target_os = "macos", target_os = "windows")))]
     {
         let _ = enabled;
     }
-    
+
     Ok(())
 }
 
@@ -277,9 +278,15 @@ fn set_window_position(window: tauri::Window, x: f64, y: f64) {
 }
 
 #[tauri::command]
-async fn set_main_window_position<R: Runtime>(app: tauri::AppHandle<R>, x: f64, y: f64) -> Result<(), String> {
+async fn set_main_window_position<R: Runtime>(
+    app: tauri::AppHandle<R>,
+    x: f64,
+    y: f64,
+) -> Result<(), String> {
     if let Some(window) = app.get_webview_window("main") {
-        window.set_position(tauri::LogicalPosition::new(x, y)).map_err(|e| e.to_string())?;
+        window
+            .set_position(tauri::LogicalPosition::new(x, y))
+            .map_err(|e| e.to_string())?;
     }
     Ok(())
 }
@@ -293,16 +300,23 @@ fn resize_window(window: tauri::Window, width: f64, height: f64) {
 async fn toggle_window_always_on_top<R: Runtime>(window: tauri::Window<R>) -> Result<bool, String> {
     let current = window.is_always_on_top().map_err(|e| e.to_string())?;
     let new_value = !current;
-    window.set_always_on_top(new_value).map_err(|e| e.to_string())?;
+    window
+        .set_always_on_top(new_value)
+        .map_err(|e| e.to_string())?;
     Ok(new_value)
 }
 
 #[tauri::command]
-async fn get_all_windows<R: Runtime>(app: tauri::AppHandle<R>) -> Result<serde_json::Value, String> {
+async fn get_all_windows<R: Runtime>(
+    app: tauri::AppHandle<R>,
+) -> Result<serde_json::Value, String> {
     let windows = app.webview_windows();
     let mut result = Vec::new();
     for (label, win) in windows {
-        let position = win.inner_position().ok().map(|p| json!({"x": p.x, "y": p.y}));
+        let position = win
+            .inner_position()
+            .ok()
+            .map(|p| json!({"x": p.x, "y": p.y}));
         let size = win.inner_size().map_err(|e| e.to_string())?;
         result.push(json!({
             "label": label,
@@ -361,14 +375,17 @@ lazy_static::lazy_static! {
 }
 
 fn get_tray_translations_internal() -> TrayTranslations {
-    TRAY_TRANSLATIONS.lock().map(|t| t.clone()).unwrap_or_else(|_| TrayTranslations {
-        show_window: "Show/Hide".to_string(),
-        hide_window: "Show/Hide".to_string(),
-        settings: "Settings".to_string(),
-        quit: "Quit".to_string(),
-        no_tasks: "No tasks".to_string(),
-        tasks: "Tasks".to_string(),
-    })
+    TRAY_TRANSLATIONS
+        .lock()
+        .map(|t| t.clone())
+        .unwrap_or_else(|_| TrayTranslations {
+            show_window: "Show/Hide".to_string(),
+            hide_window: "Show/Hide".to_string(),
+            settings: "Settings".to_string(),
+            quit: "Quit".to_string(),
+            no_tasks: "No tasks".to_string(),
+            tasks: "Tasks".to_string(),
+        })
 }
 
 #[tauri::command]
@@ -387,17 +404,17 @@ async fn update_tray_translations<R: Runtime>(
 }
 
 #[tauri::command]
-async fn get_current_language(
-    state: tauri::State<'_, SettingsState>,
-) -> Result<String, String> {
+async fn get_current_language(state: tauri::State<'_, SettingsState>) -> Result<String, String> {
     Ok(state.get_settings().language)
 }
 
 fn update_tray_menu<R: Runtime>(app: &tauri::AppHandle<R>) {
     let trans = get_tray_translations_internal();
 
-    let window_toggle = MenuItem::with_id(app, "toggle-window", &trans.show_window, true, None::<&str>).ok();
-    let settings_item = MenuItem::with_id(app, "settings", &trans.settings, true, None::<&str>).ok();
+    let window_toggle =
+        MenuItem::with_id(app, "toggle-window", &trans.show_window, true, None::<&str>).ok();
+    let settings_item =
+        MenuItem::with_id(app, "settings", &trans.settings, true, None::<&str>).ok();
     let quit_item = MenuItem::with_id(app, "quit", &trans.quit, true, None::<&str>).ok();
 
     if let (Some(w), Some(s), Some(q)) = (window_toggle, settings_item, quit_item) {
@@ -509,6 +526,8 @@ fn main() {
 
             // 初始化 HTTP server 的屏蔽设置
             http_server::set_block_plugin_status(current_settings.block_plugin_status);
+            http_server::set_backend_email(current_settings.backend_email.clone());
+            http_server::set_backend_server_url(current_settings.backend_server_url.clone());
 
             // 启动 HTTP server
             http_server::start_server_background(

@@ -17,6 +17,10 @@ pub struct AppSettings {
     pub sound_volume: f64,
     pub http_host: String,
     pub http_port: u16,
+    #[serde(default = "default_backend_email")]
+    pub backend_email: String,
+    #[serde(default = "default_backend_server_url")]
+    pub backend_server_url: String,
     pub window_visible: bool,
     pub language: String,
     pub block_plugin_status: bool,
@@ -26,6 +30,14 @@ pub struct AppSettings {
     pub window_y: Option<f64>,
     #[serde(default)]
     pub show_only_when_running: bool,
+}
+
+fn default_backend_server_url() -> String {
+    "http://localhost:3010".to_string()
+}
+
+fn default_backend_email() -> String {
+    "fulltest@vibe.app".to_string()
 }
 
 impl Default for AppSettings {
@@ -40,6 +52,8 @@ impl Default for AppSettings {
             sound_volume: 0.7,
             http_host: "127.0.0.1".to_string(),
             http_port: 31415,
+            backend_email: default_backend_email(),
+            backend_server_url: default_backend_server_url(),
             window_visible: true,
             language: "en".to_string(),
             block_plugin_status: true,
