@@ -5,7 +5,7 @@ import './StatusText.css';
 
 interface Props {
   name: string;
-  status: 'armed' | 'running' | 'completed' | 'idle';
+  status: 'armed' | 'running' | 'completed';
   isFocused?: boolean;
   tokens?: number;
   ide?: string;
@@ -29,7 +29,6 @@ const statusIcon = computed(() => {
   // Focused window shows eye icon (only icon changes, not other styles)
   if (props.isFocused) return '🎯';
   switch (props.status) {
-    case 'idle': return '○';
     case 'armed': return '◎';
     case 'running': return '◉';
     case 'completed': return '✓';
@@ -39,14 +38,13 @@ const statusIcon = computed(() => {
 
 const statusText = computed(() => {
   switch (props.status) {
-    case 'idle': return t('status.idle');
     case 'armed': return props.name || t('status.armed');
     case 'running': return props.name || t('status.running');
     case 'completed':
       return props.elapsedTime
         ? t('status.completedWithTime', { taskName: props.name, elapsedTime: props.elapsedTime })
         : props.name || t('status.completed');
-    default: return t('status.idle');
+    default: return t('status.running');
   }
 });
 

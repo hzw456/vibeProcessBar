@@ -4,7 +4,6 @@
     "icon": "◆"
   },
   "status": {
-    "idle": "就绪",
     "armed": "等待中...",
     "active": "活动中",
     "running": "运行中...",

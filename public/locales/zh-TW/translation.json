@@ -4,7 +4,6 @@
     "icon": "◆"
   },
   "status": {
-    "idle": "就緒",
     "armed": "等待中...",
     "active": "活動中",
     "running": "運行中...",

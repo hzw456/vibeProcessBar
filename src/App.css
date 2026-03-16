@@ -190,10 +190,6 @@
   text-shadow: 0 0 6px rgba(34, 197, 94, 0.5);
 }
 
-.mini-status.status-idle {
-  color: var(--text-secondary);
-}
-
 .task-name-mini {
   flex: 1;
   font-size: 12px;

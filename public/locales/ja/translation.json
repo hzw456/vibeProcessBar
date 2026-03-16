@@ -4,7 +4,6 @@
     "icon": "◆"
   },
   "status": {
-    "idle": "準備完了",
     "armed": "待機中...",
     "active": "アクティブ",
     "running": "実行中...",

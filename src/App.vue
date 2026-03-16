@@ -124,7 +124,7 @@ const displayTasks = computed(() => {
         name: win.window_title,
         progress: 0,
         tokens: 0,
-        status: 'idle',
+        status: 'armed',
         startTime: 0,
         ide: win.ide,
         window_title: win.window_title,
@@ -143,7 +143,7 @@ const displayTasks = computed(() => {
   });
 
   return items.filter(t =>
-    ['completed', 'running', 'idle'].includes(t.status) &&
+    ['completed', 'running'].includes(t.status) &&
     !hiddenTaskIds.value.has(t.id) &&
     (store.settings.showOnlyWhenRunning ? t.status !== 'armed' : true)
   );

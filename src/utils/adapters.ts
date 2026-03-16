@@ -7,7 +7,7 @@ export interface AdapterConfig {
 export interface TaskInfo {
   id: string;
   name: string;
-  status: 'idle' | 'running' | 'completed' | 'error';
+  status: 'running' | 'completed' | 'error';
   startTime: number;
   endTime?: number;
   adapter: string;

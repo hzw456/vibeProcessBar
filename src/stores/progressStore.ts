@@ -19,7 +19,7 @@ export interface ProgressTask {
   id: string;
   name: string;
   tokens: number;
-  status: 'armed' | 'running' | 'completed' | 'idle' | 'error' | 'cancelled';
+  status: 'armed' | 'running' | 'completed' | 'error' | 'cancelled';
   is_focused?: boolean;
   start_time: number;
   end_time?: number;

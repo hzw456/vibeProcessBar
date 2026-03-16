@@ -13,10 +13,6 @@
   line-height: 1;
 }
 
-.status-icon.status-idle {
-  color: var(--text-secondary);
-}
-
 .status-icon.status-running {
   color: var(--primary-color);
   animation: pulse 1.5s infinite;
@@ -57,10 +53,6 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.status-text.status-idle {
-  color: var(--text-secondary);
 }
 
 .status-text.status-running {

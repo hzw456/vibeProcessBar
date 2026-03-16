@@ -4,7 +4,6 @@
     "icon": "◆"
   },
   "status": {
-    "idle": "Pronto",
     "armed": "Armado...",
     "active": "Ativo",
     "running": "Em execução...",
