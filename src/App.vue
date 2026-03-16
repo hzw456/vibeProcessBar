@@ -680,21 +680,9 @@ onMounted(async () => {
         // Initial scan
         await scanIdeWindows();
         
-        // Only sync tasks if user is logged in
-        const authData = localStorage.getItem('auth');
-        if (authData) {
-          try {
-            const parsed = JSON.parse(authData);
-            if (parsed.token) {
-              await store.fetchTasks();
-              syncInterval = window.setInterval(() => store.fetchTasks(), 1000);
-            }
-          } catch (e) {
-            debug('Failed to parse auth data', { error: String(e) });
-          }
-        } else {
-          debug('User not logged in, skipping task sync');
-        }
+        // Always fetch tasks (login is optional for viewing)
+        await store.fetchTasks();
+        syncInterval = window.setInterval(() => store.fetchTasks(), 1000);
 
         scanInterval = window.setInterval(scanIdeWindows, 5000);
         
