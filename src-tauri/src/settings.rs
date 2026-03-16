@@ -33,7 +33,7 @@ pub struct AppSettings {
 }
 
 fn default_backend_server_url() -> String {
-    "http://localhost:3010".to_string()
+    "http://192.168.1.28:3010".to_string()
 }
 
 fn default_backend_email() -> String {

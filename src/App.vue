@@ -103,6 +103,7 @@ const windowOpacity = computed(() => store.settings.opacity);
 // Computed
 const displayTasks = computed(() => {
   const items = [...store.tasks];
+  debug('displayTasks: store.tasks', { count: store.tasks.length, tasks: store.tasks.map(t => ({ id: t.id, status: t.status, name: t.name })) });
   
   ideWindows.value.forEach(win => {
     const winTitleParts = win.window_title.split(' — ');
@@ -157,8 +158,10 @@ async function scanIdeWindows() {
   try {
     const windows = await safeInvoke<IdeWindow[]>('get_ide_windows');
     if (windows) {
-      debug('Scanned IDE windows', { count: windows.length });
+      debug('Scanned IDE windows', { count: windows.length, windows: windows.map(w => ({ ide: w.ide, title: w.window_title })) });
       ideWindows.value = windows;
+    } else {
+      debug('No IDE windows found');
     }
   } catch (err) {
     error('Failed to scan IDE windows', { error: String(err) });
