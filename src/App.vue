@@ -326,33 +326,9 @@ async function handleCancelTask() {
   const task = contextMenu.value.task;
   if (!task) return;
   
-  // Check if logged in
-  const authData = localStorage.getItem('auth');
-  if (!authData) {
-    debug('User not logged in, cannot cancel task');
-    return;
-  }
-  
-  try {
-    const parsed = JSON.parse(authData);
-    if (!parsed.token) {
-      debug('No auth token, cannot cancel task');
-      return;
-    }
-  } catch (e) {
-    debug('Invalid auth data', { error: String(e) });
-    return;
-  }
-  
   closeContextMenu();
   try {
-    const port = store.settings.httpPort || 31415;
-    const host = store.settings.httpHost || '127.0.0.1';
-    await fetch(`http://${host}:${port}/api/task/update_state`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ task_id: task.id, status: 'armed', source: 'hook' })
-    });
+    await safeInvoke('reset_task_to_armed', { taskId: task.id });
     debug('Task reset to armed', { taskId: task.id });
   } catch (err) {
     error('Failed to cancel task', { error: String(err) });
