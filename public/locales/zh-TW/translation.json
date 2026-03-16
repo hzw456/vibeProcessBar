@@ -50,7 +50,7 @@
       "httpPort": "HTTP API 端口",
       "configManagement": "導出/導入配置",
       "manage": "管理",
-      "showOnlyWhenRunning": "僅在有任務運行時顯示"
+      "showOnlyWhenRunning": "僅顯示運行中任務"
     },
     "appearance": {
       "theme": "主題",

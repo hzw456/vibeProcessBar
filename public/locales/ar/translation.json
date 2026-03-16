@@ -50,7 +50,7 @@
       "httpPort": "منفذ API HTTP",
       "configManagement": "تصدير/استيراد التكوين",
       "manage": "إدارة",
-      "showOnlyWhenRunning": "إظهار فقط عند تشغيل المهام"
+      "showOnlyWhenRunning": "إظهار المهام قيد التشغيل فقط"
     },
     "appearance": {
       "theme": "السمة",

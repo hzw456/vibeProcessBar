@@ -144,7 +144,8 @@ const displayTasks = computed(() => {
 
   return items.filter(t =>
     ['completed', 'running', 'idle'].includes(t.status) &&
-    !hiddenTaskIds.value.has(t.id)
+    !hiddenTaskIds.value.has(t.id) &&
+    (store.settings.showOnlyWhenRunning ? t.status !== 'armed' : true)
   );
 });
 

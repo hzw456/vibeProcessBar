@@ -50,7 +50,7 @@
       "httpPort": "HTTP API порт",
       "configManagement": "Экспорт/Импорт конфигурации",
       "manage": "Управление",
-      "showOnlyWhenRunning": "Показывать только при выполнении задач"
+      "showOnlyWhenRunning": "Показывать только выполняемые задачи"
     },
     "appearance": {
       "theme": "Тема",

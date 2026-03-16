@@ -50,7 +50,7 @@
       "httpPort": "Porta API HTTP",
       "configManagement": "Exportar/Importar Configuração",
       "manage": "Gerenciar",
-      "showOnlyWhenRunning": "Mostrar apenas com tarefas em execução"
+      "showOnlyWhenRunning": "Mostrar apenas tarefas em execução"
     },
     "appearance": {
       "theme": "Tema",

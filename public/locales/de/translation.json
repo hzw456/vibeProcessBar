@@ -50,7 +50,7 @@
       "httpPort": "HTTP API Port",
       "configManagement": "Konfiguration Exportieren/Importieren",
       "manage": "Verwalten",
-      "showOnlyWhenRunning": "Nur bei laufenden Aufgaben anzeigen"
+      "showOnlyWhenRunning": "Nur laufende Aufgaben anzeigen"
     },
     "appearance": {
       "theme": "Design",

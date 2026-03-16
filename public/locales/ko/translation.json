@@ -50,7 +50,7 @@
       "httpPort": "HTTP API 포트",
       "configManagement": "구성 내보내기/가져오기",
       "manage": "관리",
-      "showOnlyWhenRunning": "작업 실행 중에만 표시"
+      "showOnlyWhenRunning": "실행 중인 작업만 표시"
     },
     "appearance": {
       "theme": "테마",

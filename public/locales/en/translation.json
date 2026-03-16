@@ -54,7 +54,7 @@
       "httpPort": "HTTP API Port",
       "httpRestartHint": "Changes take effect after restart",
       "blockPluginStatus": "Block plugin status reporting",
-      "showOnlyWhenRunning": "Show only when tasks running"
+      "showOnlyWhenRunning": "Show only running tasks"
     },
     "appearance": {
       "theme": "Theme",

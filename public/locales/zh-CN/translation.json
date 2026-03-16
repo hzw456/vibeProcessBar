@@ -54,7 +54,7 @@
       "httpPort": "HTTP API 端口",
       "httpRestartHint": "修改后需重启应用生效",
       "blockPluginStatus": "屏蔽插件状态上报",
-      "showOnlyWhenRunning": "仅在有任务运行时显示"
+      "showOnlyWhenRunning": "仅显示运行中任务"
     },
     "appearance": {
       "theme": "主题",

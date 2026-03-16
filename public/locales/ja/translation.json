@@ -50,7 +50,7 @@
       "httpPort": "HTTP API ポート",
       "configManagement": "設定のエクスポート/インポート",
       "manage": "管理",
-      "showOnlyWhenRunning": "タスク実行中のみ表示"
+      "showOnlyWhenRunning": "実行中のタスクのみ表示"
     },
     "appearance": {
       "theme": "テーマ",
