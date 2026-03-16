@@ -29,7 +29,7 @@ onMounted(() => {
 
 const { t } = useI18n();
 
-type TabType = 'general' | 'appearance';
+type TabType = 'general' | 'appearance' | 'account';
 const activeTab = ref<TabType>('general');
 
 const themes = ['dark', 'purple', 'ocean', 'forest', 'midnight'] as const;
@@ -117,6 +117,9 @@ function handlePositionChange(event: Event) {
       <button :class="['tab', { active: activeTab === 'appearance' }]" @click="activeTab = 'appearance'">
         {{ t('settings.tabs.appearance') }}
       </button>
+      <button :class="['tab', { active: activeTab === 'account' }]" @click="activeTab = 'account'">
+        Account
+      </button>
     </div>
 
     <!-- Content -->
@@ -163,32 +166,6 @@ function handlePositionChange(event: Event) {
           <label>{{ t('settings.general.showOnlyWhenRunning') }}</label>
           <input type="checkbox" :checked="store.settings.showOnlyWhenRunning" @change="store.setShowOnlyWhenRunning(($event.target as HTMLInputElement).checked)" />
         </div>
-        <div class="auth-section">
-          <div class="auth-section-header">Account</div>
-          <template v-if="!authStore.isAuthenticated">
-            <label class="auth-field">
-              <span>Email</span>
-              <input v-model="loginEmail" type="email" autocomplete="email" placeholder="you@example.com" />
-            </label>
-            <label class="auth-field">
-              <span>Password</span>
-              <input v-model="loginPassword" type="password" autocomplete="current-password" placeholder="Password" />
-            </label>
-            <p v-if="authError" class="auth-error">{{ authError }}</p>
-            <button class="action-btn auth-action" :disabled="isLoggingIn" @click="handleLogin">
-              {{ isLoggingIn ? 'Logging in...' : 'Login' }}
-            </button>
-          </template>
-          <template v-else>
-            <div class="auth-status">
-              <span class="auth-status-label">Logged in as</span>
-              <span class="auth-email">{{ authStore.user?.email }}</span>
-            </div>
-            <button class="action-btn danger auth-action" @click="handleLogout">
-              Logout
-            </button>
-          </template>
-        </div>
       </div>
 
       <!-- Appearance Tab -->
@@ -219,6 +196,36 @@ function handlePositionChange(event: Event) {
           </div>
         </div>
         <div class="setting-hint">{{ t('settings.appearance.windowPositionHint') }}</div>
+      </div>
+
+      <!-- Account Tab -->
+      <div v-if="activeTab === 'account'" class="settings-section">
+        <div class="auth-section">
+          <div class="auth-section-header">Account</div>
+          <template v-if="!authStore.isAuthenticated">
+            <label class="auth-field">
+              <span>Email</span>
+              <input v-model="loginEmail" type="email" autocomplete="email" placeholder="you@example.com" />
+            </label>
+            <label class="auth-field">
+              <span>Password</span>
+              <input v-model="loginPassword" type="password" autocomplete="current-password" placeholder="Password" />
+            </label>
+            <p v-if="authError" class="auth-error">{{ authError }}</p>
+            <button class="action-btn auth-action" :disabled="isLoggingIn" @click="handleLogin">
+              {{ isLoggingIn ? 'Logging in...' : 'Login' }}
+            </button>
+          </template>
+          <template v-else>
+            <div class="auth-status">
+              <span class="auth-status-label">Logged in as</span>
+              <span class="auth-email">{{ authStore.user?.email }}</span>
+            </div>
+            <button class="action-btn danger auth-action" @click="handleLogout">
+              Logout
+            </button>
+          </template>
+        </div>
       </div>
     </div>
 
