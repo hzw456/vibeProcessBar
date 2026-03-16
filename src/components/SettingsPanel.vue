@@ -3,7 +3,7 @@ import { useProgressStore } from '../stores/progressStore';
 import { useAuthStore } from '../stores/auth';
 import LanguageSelector from './LanguageSelector.vue';
 import './SettingsPanel.css';
-import { ref, computed } from 'vue';
+import { ref, computed, onMounted } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { playSound } from '../utils/notifications';
 
@@ -21,6 +21,12 @@ const emit = defineEmits<{
 
 const store = useProgressStore();
 const authStore = useAuthStore();
+
+// Initialize auth when settings panel mounts
+onMounted(() => {
+  authStore.init();
+});
+
 const { t } = useI18n();
 
 type TabType = 'general' | 'appearance';

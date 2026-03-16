@@ -2,17 +2,12 @@
 import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useProgressStore, type ProgressTask } from './stores/progressStore';
-import { useAuthStore } from './stores/auth';
 import SettingsPanel from './components/SettingsPanel.vue';
 import { debug, error } from './utils/logger';
 import { playCompletionSound } from './utils/notifications';
 
 debug('App.vue loaded');
 
-// Auth
-const authStore = useAuthStore()
-
-// Check if we're running in Tauri
 const isTauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
 
 // Safe wrappers for Tauri APIs
@@ -646,9 +641,6 @@ watch([displayTasks, () => store.settings.showOnlyWhenRunning], async () => {
   let unlistenMove: (() => void) | null = null;
 
 onMounted(async () => {
-    // Initialize auth
-    authStore.init();
-    
     // 初始化事件监听 (tasks-updated, settings-changed)
     await store.initEventListeners();
 
