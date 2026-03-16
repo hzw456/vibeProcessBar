@@ -125,7 +125,7 @@ const displayTasks = computed(() => {
         progress: 0,
         tokens: 0,
         status: 'armed',
-        startTime: 0,
+        start_time: 0,
         ide: win.ide,
         window_title: win.window_title,
       };
