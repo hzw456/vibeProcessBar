@@ -321,6 +321,25 @@ function handleShowAllTasks() {
 async function handleCancelTask() {
   const task = contextMenu.value.task;
   if (!task) return;
+  
+  // Check if logged in
+  const authData = localStorage.getItem('auth');
+  if (!authData) {
+    debug('User not logged in, cannot cancel task');
+    return;
+  }
+  
+  try {
+    const parsed = JSON.parse(authData);
+    if (!parsed.token) {
+      debug('No auth token, cannot cancel task');
+      return;
+    }
+  } catch (e) {
+    debug('Invalid auth data', { error: String(e) });
+    return;
+  }
+  
   closeContextMenu();
   try {
     const port = store.settings.httpPort || 31415;
@@ -659,10 +678,23 @@ onMounted(async () => {
 
         // Initial scan
         await scanIdeWindows();
-        await store.fetchTasks();
+        
+        // Only sync tasks if user is logged in
+        const authData = localStorage.getItem('auth');
+        if (authData) {
+          try {
+            const parsed = JSON.parse(authData);
+            if (parsed.token) {
+              await store.fetchTasks();
+              syncInterval = window.setInterval(() => store.fetchTasks(), 1000);
+            }
+          } catch (e) {
+            debug('Failed to parse auth data', { error: String(e) });
+          }
+        } else {
+          debug('User not logged in, skipping task sync');
+        }
 
-        // Set up intervals - 使用 fetchTasks 替代 syncFromHttpApi
-        syncInterval = window.setInterval(() => store.fetchTasks(), 1000);
         scanInterval = window.setInterval(scanIdeWindows, 5000);
         
         // Poll settings every 2 seconds to ensure sync across windows even if events are missed
