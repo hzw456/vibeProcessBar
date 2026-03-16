@@ -41,7 +41,8 @@
       "appearance": "外觀",
       "notifications": "通知",
       "tasks": "任務",
-      "shortcuts": "快捷鍵"
+      "shortcuts": "快捷鍵",
+      "account": "帳號"
     },
     "general": {
       "autoStart": "登錄時自動啟動",
@@ -100,6 +101,17 @@
     "footer": {
       "version": "Vibe 進度條 v{{version}}",
       "resetDefaults": "重置為默認"
+    },
+    "account": {
+      "title": "帳號",
+      "email": "郵箱",
+      "emailPlaceholder": "you@example.com",
+      "password": "密碼",
+      "passwordPlaceholder": "輸入密碼",
+      "login": "登入",
+      "loggingIn": "登入中...",
+      "loggedInAs": "已登入",
+      "logout": "登出"
     }
   },
   "time": {

@@ -41,7 +41,8 @@
       "appearance": "Apparence",
       "notifications": "Notifications",
       "tasks": "Tâches",
-      "shortcuts": "Raccourcis"
+      "shortcuts": "Raccourcis",
+      "account": "Compte"
     },
     "general": {
       "autoStart": "Démarrage automatique",
@@ -100,6 +101,17 @@
     "footer": {
       "version": "Barre de Progression Vibe v{{version}}",
       "resetDefaults": "Réinitialiser les paramètres par défaut"
+    },
+    "account": {
+      "title": "Compte",
+      "email": "E-mail",
+      "emailPlaceholder": "you@example.com",
+      "password": "Mot de passe",
+      "passwordPlaceholder": "Mot de passe",
+      "login": "Connexion",
+      "loggingIn": "Connexion...",
+      "loggedInAs": "Connecté en tant que",
+      "logout": "Déconnexion"
     }
   },
   "time": {

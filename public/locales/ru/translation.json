@@ -41,7 +41,8 @@
       "appearance": "Внешний вид",
       "notifications": "Уведомления",
       "tasks": "Задачи",
-      "shortcuts": "Горячие клавиши"
+      "shortcuts": "Горячие клавиши",
+      "account": "Аккаунт"
     },
     "general": {
       "autoStart": "Автозапуск при входе",
@@ -100,6 +101,17 @@
     "footer": {
       "version": "Vibe Индикатор прогресса v{{version}}",
       "resetDefaults": "Сбросить настройки"
+    },
+    "account": {
+      "title": "Аккаунт",
+      "email": "Электронная почта",
+      "emailPlaceholder": "you@example.com",
+      "password": "Пароль",
+      "passwordPlaceholder": "Пароль",
+      "login": "Войти",
+      "loggingIn": "Вход...",
+      "loggedInAs": "Вход выполнен как",
+      "logout": "Выйти"
     }
   },
   "time": {

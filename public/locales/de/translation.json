@@ -41,7 +41,8 @@
       "appearance": "Erscheinungsbild",
       "notifications": "Benachrichtigungen",
       "tasks": "Aufgaben",
-      "shortcuts": "Tastenkürzel"
+      "shortcuts": "Tastenkürzel",
+      "account": "Konto"
     },
     "general": {
       "autoStart": "Autostart bei Anmeldung",
@@ -100,6 +101,17 @@
     "footer": {
       "version": "Vibe Fortschrittsleiste v{{version}}",
       "resetDefaults": "Auf Standardwerte zurücksetzen"
+    },
+    "account": {
+      "title": "Konto",
+      "email": "E-Mail",
+      "emailPlaceholder": "you@example.com",
+      "password": "Passwort",
+      "passwordPlaceholder": "Passwort",
+      "login": "Anmelden",
+      "loggingIn": "Anmeldung...",
+      "loggedInAs": "Angemeldet als",
+      "logout": "Abmelden"
     }
   },
   "time": {

@@ -41,7 +41,8 @@
       "appearance": "外観",
       "notifications": "通知",
       "tasks": "タスク",
-      "shortcuts": "ショートカット"
+      "shortcuts": "ショートカット",
+      "account": "アカウント"
     },
     "general": {
       "autoStart": "ログイン時に自動起動",
@@ -100,6 +101,17 @@
     "footer": {
       "version": "Vibe プロセンバー v{{version}}",
       "resetDefaults": "デフォルトにリセット"
+    },
+    "account": {
+      "title": "アカウント",
+      "email": "メールアドレス",
+      "emailPlaceholder": "you@example.com",
+      "password": "パスワード",
+      "passwordPlaceholder": "パスワード",
+      "login": "ログイン",
+      "loggingIn": "ログイン中...",
+      "loggedInAs": "ログイン中",
+      "logout": "ログアウト"
     }
   },
   "time": {

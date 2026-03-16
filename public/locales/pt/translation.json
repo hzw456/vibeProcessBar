@@ -41,7 +41,8 @@
       "appearance": "Aparência",
       "notifications": "Notificações",
       "tasks": "Tarefas",
-      "shortcuts": "Atalhos"
+      "shortcuts": "Atalhos",
+      "account": "Conta"
     },
     "general": {
       "autoStart": "Iniciar automaticamente ao登录",
@@ -100,6 +101,17 @@
     "footer": {
       "version": "Vibe Barra de Progresso v{{version}}",
       "resetDefaults": "Restaurar padrões"
+    },
+    "account": {
+      "title": "Conta",
+      "email": "E-mail",
+      "emailPlaceholder": "you@example.com",
+      "password": "Senha",
+      "passwordPlaceholder": "Senha",
+      "login": "Entrar",
+      "loggingIn": "Entrando...",
+      "loggedInAs": "Conectado como",
+      "logout": "Sair"
     }
   },
   "time": {

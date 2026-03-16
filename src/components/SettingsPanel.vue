@@ -118,7 +118,7 @@ function handlePositionChange(event: Event) {
         {{ t('settings.tabs.appearance') }}
       </button>
       <button :class="['tab', { active: activeTab === 'account' }]" @click="activeTab = 'account'">
-        Account
+        {{ t('settings.tabs.account') }}
       </button>
     </div>
 
@@ -201,28 +201,28 @@ function handlePositionChange(event: Event) {
       <!-- Account Tab -->
       <div v-if="activeTab === 'account'" class="settings-section">
         <div class="auth-section">
-          <div class="auth-section-header">Account</div>
+          <div class="auth-section-header">{{ t('settings.account.title') }}</div>
           <template v-if="!authStore.isAuthenticated">
             <label class="auth-field">
-              <span>Email</span>
-              <input v-model="loginEmail" type="email" autocomplete="email" placeholder="you@example.com" />
+              <span>{{ t('settings.account.email') }}</span>
+              <input v-model="loginEmail" type="email" autocomplete="email" :placeholder="t('settings.account.emailPlaceholder')" />
             </label>
             <label class="auth-field">
-              <span>Password</span>
-              <input v-model="loginPassword" type="password" autocomplete="current-password" placeholder="Password" />
+              <span>{{ t('settings.account.password') }}</span>
+              <input v-model="loginPassword" type="password" autocomplete="current-password" :placeholder="t('settings.account.passwordPlaceholder')" />
             </label>
             <p v-if="authError" class="auth-error">{{ authError }}</p>
             <button class="action-btn auth-action" :disabled="isLoggingIn" @click="handleLogin">
-              {{ isLoggingIn ? 'Logging in...' : 'Login' }}
+              {{ isLoggingIn ? t('settings.account.loggingIn') : t('settings.account.login') }}
             </button>
           </template>
           <template v-else>
             <div class="auth-status">
-              <span class="auth-status-label">Logged in as</span>
+              <span class="auth-status-label">{{ t('settings.account.loggedInAs') }}</span>
               <span class="auth-email">{{ authStore.user?.email }}</span>
             </div>
             <button class="action-btn danger auth-action" @click="handleLogout">
-              Logout
+              {{ t('settings.account.logout') }}
             </button>
           </template>
         </div>

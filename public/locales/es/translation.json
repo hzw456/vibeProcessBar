@@ -41,7 +41,8 @@
       "appearance": "Apariencia",
       "notifications": "Notificaciones",
       "tasks": "Tareas",
-      "shortcuts": "Atajos"
+      "shortcuts": "Atajos",
+      "account": "Cuenta"
     },
     "general": {
       "autoStart": "Auto-iniciar al登录",
@@ -100,6 +101,17 @@
     "footer": {
       "version": "Barra de Proceso Vibe v{{version}}",
       "resetDefaults": "Restablecer valores predeterminados"
+    },
+    "account": {
+      "title": "Cuenta",
+      "email": "Correo electrónico",
+      "emailPlaceholder": "you@example.com",
+      "password": "Contraseña",
+      "passwordPlaceholder": "Contraseña",
+      "login": "Iniciar sesión",
+      "loggingIn": "Iniciando...",
+      "loggedInAs": "Sesión iniciada como",
+      "logout": "Cerrar sesión"
     }
   },
   "time": {

@@ -41,7 +41,8 @@
       "appearance": "Appearance",
       "notifications": "Notifications",
       "tasks": "Tasks",
-      "shortcuts": "Shortcuts"
+      "shortcuts": "Shortcuts",
+      "account": "Account"
     },
     "general": {
       "language": "Language",
@@ -102,6 +103,17 @@
     "footer": {
       "version": "Vibe Progress Bar v{version}",
       "resetDefaults": "Reset to defaults"
+    },
+    "account": {
+      "title": "Account",
+      "email": "Email",
+      "emailPlaceholder": "you@example.com",
+      "password": "Password",
+      "passwordPlaceholder": "Password",
+      "login": "Login",
+      "loggingIn": "Logging in...",
+      "loggedInAs": "Logged in as",
+      "logout": "Logout"
     }
   },
   "time": {

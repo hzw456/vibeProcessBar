@@ -41,7 +41,8 @@
       "appearance": "외관",
       "notifications": "알림",
       "tasks": "작업",
-      "shortcuts": "단축키"
+      "shortcuts": "단축키",
+      "account": "계정"
     },
     "general": {
       "autoStart": "로그인 시 자동 시작",
@@ -100,6 +101,17 @@
     "footer": {
       "version": "Vibe 진행 표시줄 v{{version}}",
       "resetDefaults": "기본값으로 재설정"
+    },
+    "account": {
+      "title": "계정",
+      "email": "이메일",
+      "emailPlaceholder": "you@example.com",
+      "password": "비밀번호",
+      "passwordPlaceholder": "비밀번호",
+      "login": "로그인",
+      "loggingIn": "로그인 중...",
+      "loggedInAs": "로그인됨",
+      "logout": "로그아웃"
     }
   },
   "time": {
