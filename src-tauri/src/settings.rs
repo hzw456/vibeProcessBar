@@ -21,8 +21,8 @@ pub struct AppSettings {
     pub backend_email: String,
     #[serde(default = "default_backend_server_url")]
     pub backend_server_url: String,
-    #[serde(default = "default_report_api_url")]
-    pub report_api_url: String,
+    #[serde(default)]
+    pub api_key: String,
     pub window_visible: bool,
     pub language: String,
     pub block_plugin_status: bool,
@@ -35,11 +35,7 @@ pub struct AppSettings {
 }
 
 fn default_backend_server_url() -> String {
-    "http://192.168.1.28:3010".to_string()
-}
-
-fn default_report_api_url() -> String {
-    "http://localhost:31415".to_string()
+    "http://localhost:3010".to_string()
 }
 
 fn default_backend_email() -> String {
@@ -60,7 +56,7 @@ impl Default for AppSettings {
             http_port: 31415,
             backend_email: default_backend_email(),
             backend_server_url: default_backend_server_url(),
-            report_api_url: default_report_api_url(),
+            api_key: String::new(),
             window_visible: true,
             language: "en".to_string(),
             block_plugin_status: true,

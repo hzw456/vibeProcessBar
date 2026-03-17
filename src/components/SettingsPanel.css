@@ -101,6 +101,18 @@
   gap: 8px;
 }
 
+.settings-subsection {
+  padding-top: 8px;
+}
+
+.settings-subsection-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
 .setting-item {
   display: flex;
   justify-content: space-between;
@@ -111,12 +123,6 @@
 
 .setting-item:last-child {
   border-bottom: none;
-}
-
-.setting-item-column {
-  align-items: flex-start;
-  flex-direction: column;
-  gap: 8px;
 }
 
 .setting-item.indent {
@@ -171,7 +177,7 @@
 
 .host-input,
 .port-input,
-.url-input {
+.api-key-input {
   padding: 6px 12px;
   border-radius: 6px;
   border: 1px solid var(--border-color);
@@ -184,14 +190,23 @@
 
 .host-input:focus,
 .port-input:focus,
-.url-input:focus {
+.api-key-input:focus {
   outline: none;
   border-color: var(--primary-color);
 }
 
-.url-input {
+.account-setting-item {
+  align-items: flex-start;
+}
+
+.account-setting-item label {
+  padding-top: 8px;
+}
+
+.api-key-input {
+  width: 220px;
   text-align: left;
-  width: 100%;
+  font-family: ui-monospace, SFMono-Regular, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
 }
 
 .position-inputs {
@@ -226,80 +241,6 @@
   color: var(--text-secondary);
   padding: 4px 0 8px 0;
   opacity: 0.7;
-}
-
-.auth-section {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  margin-top: 12px;
-  padding: 14px;
-  border: 1px solid var(--border-color);
-  border-radius: 10px;
-  background: rgba(255, 255, 255, 0.04);
-}
-
-.auth-section-header {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text-color);
-}
-
-.auth-field {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.auth-field span {
-  font-size: 12px;
-  color: var(--text-secondary);
-}
-
-.auth-field input {
-  padding: 8px 10px;
-  border-radius: 6px;
-  border: 1px solid var(--border-color);
-  background: rgba(255, 255, 255, 0.08);
-  color: var(--text-color);
-  font-size: 13px;
-}
-
-.auth-field input:focus {
-  outline: none;
-  border-color: var(--primary-color);
-}
-
-.auth-error {
-  margin: 0;
-  font-size: 12px;
-  color: var(--error-color);
-}
-
-.auth-action {
-  align-self: flex-start;
-}
-
-.auth-action:disabled {
-  opacity: 0.7;
-  cursor: wait;
-}
-
-.auth-status {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.auth-status-label {
-  font-size: 12px;
-  color: var(--text-secondary);
-}
-
-.auth-email {
-  font-size: 13px;
-  color: var(--text-color);
-  word-break: break-word;
 }
 
 .vscode-help {

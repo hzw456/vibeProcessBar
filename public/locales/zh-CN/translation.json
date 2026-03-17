@@ -57,6 +57,12 @@
       "blockPluginStatus": "屏蔽插件状态上报",
       "showOnlyWhenRunning": "仅显示运行中任务"
     },
+    "account": {
+      "title": "账户",
+      "apiKey": "API Key",
+      "apiKeyPlaceholder": "输入你的 API Key",
+      "apiKeyHint": "填写 API Key 后可直接使用，无需登录。"
+    },
     "appearance": {
       "theme": "主题",
       "themes": {

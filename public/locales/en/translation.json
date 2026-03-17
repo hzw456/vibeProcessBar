@@ -57,6 +57,12 @@
       "blockPluginStatus": "Block plugin status reporting",
       "showOnlyWhenRunning": "Show only running tasks"
     },
+    "account": {
+      "title": "Account",
+      "apiKey": "API Key",
+      "apiKeyPlaceholder": "Enter your API Key",
+      "apiKeyHint": "After entering an API Key, you can use the app directly without logging in."
+    },
     "appearance": {
       "theme": "Theme",
       "themes": {

@@ -3,6 +3,7 @@ import { ref } from 'vue';
 import { debug, error } from '../utils/logger';
 import type { SupportedLanguage } from '../utils/i18n';
 import { setLanguage as setI18nLanguage } from '../utils/i18n';
+import { useAuthStore } from './auth';
 
 const isTauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
 
@@ -19,7 +20,7 @@ export interface ProgressTask {
   id: string;
   name: string;
   tokens: number;
-  status: 'armed' | 'running' | 'completed' | 'error' | 'cancelled';
+  status: 'armed' | 'running' | 'completed' | 'idle' | 'error' | 'cancelled';
   is_focused?: boolean;
   start_time: number;
   end_time?: number;
@@ -43,7 +44,7 @@ export interface AppSettings {
   soundVolume: number;
   httpHost: string;
   httpPort: number;
-  reportApiUrl: string;
+  apiKey: string;
   windowVisible: boolean;
   blockPluginStatus: boolean;
   windowX: number | null;
@@ -62,7 +63,7 @@ const defaultSettings: AppSettings = {
   soundVolume: 0.7,
   httpHost: '127.0.0.1',
   httpPort: 31415,
-  reportApiUrl: 'http://localhost:31415',
+  apiKey: '',
   windowVisible: true,
   blockPluginStatus: true,
   windowX: null,
@@ -141,7 +142,9 @@ export const useProgressStore = defineStore('progress', () => {
   // 应用设置
   function applySettings(newSettings: AppSettings) {
     const oldLanguage = settings.value.language;
+    const authStore = useAuthStore();
     settings.value = newSettings;
+    authStore.setApiKey(newSettings.apiKey);
 
     setI18nLanguage(newSettings.language);
     document.documentElement.setAttribute('data-theme', newSettings.theme);
@@ -315,8 +318,10 @@ export const useProgressStore = defineStore('progress', () => {
     updateSettingAndSync('httpPort', Math.max(1024, Math.min(65535, value)));
   }
 
-  function setReportApiUrl(value: string) {
-    updateSettingAndSync('reportApiUrl', value.trim());
+  function setApiKey(value: string) {
+    const normalized = value.trim();
+    useAuthStore().setApiKey(normalized);
+    updateSettingAndSync('apiKey', normalized);
   }
 
   function setBlockPluginStatus(value: boolean) {
@@ -396,7 +401,7 @@ export const useProgressStore = defineStore('progress', () => {
     setSoundVolume,
     setHttpHost,
     setHttpPort,
-    setReportApiUrl,
+    setApiKey,
     setBlockPluginStatus,
     setShowOnlyWhenRunning,
     setWindowPosition,

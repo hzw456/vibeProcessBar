@@ -2,12 +2,21 @@
 import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useProgressStore, type ProgressTask } from './stores/progressStore';
+import { useAuthStore } from './stores/auth';
+import Login from './components/Login.vue';
+import Register from './components/Register.vue';
 import SettingsPanel from './components/SettingsPanel.vue';
 import { debug, error } from './utils/logger';
 import { playCompletionSound } from './utils/notifications';
 
 debug('App.vue loaded');
 
+// Auth
+const authStore = useAuthStore()
+const showRegister = ref(false)
+const authReady = ref(false)
+
+// Check if we're running in Tauri
 const isTauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
 
 // Safe wrappers for Tauri APIs
@@ -103,7 +112,6 @@ const windowOpacity = computed(() => store.settings.opacity);
 // Computed
 const displayTasks = computed(() => {
   const items = [...store.tasks];
-  debug('displayTasks: store.tasks', { count: store.tasks.length, tasks: store.tasks.map(t => ({ id: t.id, status: t.status, name: t.name })) });
   
   ideWindows.value.forEach(win => {
     const winTitleParts = win.window_title.split(' — ');
@@ -125,8 +133,8 @@ const displayTasks = computed(() => {
         name: win.window_title,
         progress: 0,
         tokens: 0,
-        status: 'armed',
-        start_time: 0,
+        status: 'idle',
+        startTime: 0,
         ide: win.ide,
         window_title: win.window_title,
       };
@@ -144,9 +152,8 @@ const displayTasks = computed(() => {
   });
 
   return items.filter(t =>
-    ['completed', 'running', 'armed'].includes(t.status) &&
-    !hiddenTaskIds.value.has(t.id) &&
-    (store.settings.showOnlyWhenRunning ? t.status === 'running' : true)
+    ['completed', 'running', 'armed', 'idle'].includes(t.status) &&
+    !hiddenTaskIds.value.has(t.id)
   );
 });
 
@@ -158,10 +165,8 @@ async function scanIdeWindows() {
   try {
     const windows = await safeInvoke<IdeWindow[]>('get_ide_windows');
     if (windows) {
-      debug('Scanned IDE windows', { count: windows.length, windows: windows.map(w => ({ ide: w.ide, title: w.window_title })) });
+      debug('Scanned IDE windows', { count: windows.length });
       ideWindows.value = windows;
-    } else {
-      debug('No IDE windows found');
     }
   } catch (err) {
     error('Failed to scan IDE windows', { error: String(err) });
@@ -325,10 +330,15 @@ function handleShowAllTasks() {
 async function handleCancelTask() {
   const task = contextMenu.value.task;
   if (!task) return;
-  
   closeContextMenu();
   try {
-    await safeInvoke('reset_task_to_armed', { taskId: task.id });
+    const port = store.settings.httpPort || 31415;
+    const host = store.settings.httpHost || '127.0.0.1';
+    await fetch(`http://${host}:${port}/api/task/update_state`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ task_id: task.id, status: 'armed', source: 'hook' })
+    });
     debug('Task reset to armed', { taskId: task.id });
   } catch (err) {
     error('Failed to cancel task', { error: String(err) });
@@ -616,7 +626,22 @@ watch([displayTasks, isCollapsed, isCollapseTransition], async () => {
   }
 });
 
-// Window always stays visible (user can manually hide via context menu)
+// Auto show/hide window when "show only when running" is enabled
+watch([displayTasks, () => store.settings.showOnlyWhenRunning], async () => {
+  if (isSettingsWindow.value) return;
+  if (!store.settings.showOnlyWhenRunning) return;
+
+  const hasRunning = store.tasks.some(t => t.status === 'running');
+  try {
+    if (hasRunning) {
+      await safeInvoke('show_window');
+    } else {
+      await safeInvoke('hide_window');
+    }
+  } catch (e) {
+    error('Failed to auto show/hide window', { error: String(e) });
+  }
+});
 
   // Intervals
   let syncInterval: number;
@@ -625,11 +650,15 @@ watch([displayTasks, isCollapsed, isCollapseTransition], async () => {
   let unlistenMove: (() => void) | null = null;
 
 onMounted(async () => {
+    // Initialize auth
+    authStore.init();
+    
     // 初始化事件监听 (tasks-updated, settings-changed)
     await store.initEventListeners();
 
     // Always load settings to apply theme
     await store.loadSettings();
+    authReady.value = true;
 
     // The rest is only for Main Window
     if (!isSettingsWindow.value) {
@@ -643,11 +672,10 @@ onMounted(async () => {
 
         // Initial scan
         await scanIdeWindows();
-        
-        // Always fetch tasks (login is optional for viewing)
         await store.fetchTasks();
-        syncInterval = window.setInterval(() => store.fetchTasks(), 1000);
 
+        // Set up intervals - 使用 fetchTasks 替代 syncFromHttpApi
+        syncInterval = window.setInterval(() => store.fetchTasks(), 1000);
         scanInterval = window.setInterval(scanIdeWindows, 5000);
         
         // Poll settings every 2 seconds to ensure sync across windows even if events are missed
@@ -667,9 +695,17 @@ onMounted(async () => {
 </script>
 
 <template>
+  <div v-if="!authReady && !isSettingsWindow" class="auth-container"></div>
+
   <!-- Settings Window -->
-  <div v-if="isSettingsWindow" class="settings-window-container">
+  <div v-else-if="isSettingsWindow" class="settings-window-container">
     <SettingsPanel :is-standalone="true" />
+  </div>
+
+  <!-- Auth Container -->
+  <div v-else-if="!authStore.isAuthenticated" class="auth-container">
+    <Register v-if="showRegister" @switch-to-login="showRegister = false" />
+    <Login v-else @switch-to-register="showRegister = true" />
   </div>
 
   <!-- Main Window -->

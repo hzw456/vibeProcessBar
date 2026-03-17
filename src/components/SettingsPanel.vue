@@ -1,9 +1,8 @@
 <script setup lang="ts">
 import { useProgressStore } from '../stores/progressStore';
-import { useAuthStore } from '../stores/auth';
 import LanguageSelector from './LanguageSelector.vue';
 import './SettingsPanel.css';
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { playSound } from '../utils/notifications';
 
@@ -20,23 +19,12 @@ const emit = defineEmits<{
 }>();
 
 const store = useProgressStore();
-const authStore = useAuthStore();
-
-// Initialize auth when settings panel mounts
-onMounted(() => {
-  authStore.init();
-});
-
 const { t } = useI18n();
 
-type TabType = 'general' | 'appearance' | 'account';
+type TabType = 'general' | 'appearance';
 const activeTab = ref<TabType>('general');
 
 const themes = ['dark', 'purple', 'ocean', 'forest', 'midnight'] as const;
-const loginEmail = ref('');
-const loginPassword = ref('');
-const authError = ref('');
-const isLoggingIn = ref(false);
 
 // App version
 const appVersion = '1.0.1';
@@ -57,7 +45,7 @@ function handleResetDefaults() {
   store.setSoundVolume(0.7);
   store.setHttpHost('127.0.0.1');
   store.setHttpPort(31415);
-  store.setReportApiUrl('http://localhost:31415');
+  store.setApiKey('');
   store.setBlockPluginStatus(true);
   store.setShowOnlyWhenRunning(false);
 }
@@ -68,26 +56,6 @@ function handleToggleWindow() {
 
 function handleTestSound() {
   playSound(store.settings.soundVolume);
-}
-
-async function handleLogin() {
-  authError.value = '';
-  isLoggingIn.value = true;
-
-  try {
-    await authStore.login(loginEmail.value, loginPassword.value);
-    loginPassword.value = '';
-  } catch (error) {
-    authError.value = error instanceof Error ? error.message : 'Login failed';
-  } finally {
-    isLoggingIn.value = false;
-  }
-}
-
-function handleLogout() {
-  authStore.logout();
-  authError.value = '';
-  loginPassword.value = '';
 }
 
 function handlePositionChange(event: Event) {
@@ -117,9 +85,6 @@ function handlePositionChange(event: Event) {
       </button>
       <button :class="['tab', { active: activeTab === 'appearance' }]" @click="activeTab = 'appearance'">
         {{ t('settings.tabs.appearance') }}
-      </button>
-      <button :class="['tab', { active: activeTab === 'account' }]" @click="activeTab = 'account'">
-        {{ t('settings.tabs.account') }}
       </button>
     </div>
 
@@ -159,18 +124,6 @@ function handlePositionChange(event: Event) {
           <input type="number" :value="store.settings.httpPort" @change="store.setHttpPort(parseInt(($event.target as HTMLInputElement).value))" min="1024" max="65535" class="port-input" />
         </div>
         <div class="setting-hint">{{ t('settings.general.httpRestartHint') }}</div>
-        <div class="setting-item setting-item-column">
-          <label for="report-api-url">{{ t('settings.general.reportApiUrl') }}</label>
-          <input
-            id="report-api-url"
-            type="url"
-            :value="store.settings.reportApiUrl"
-            @change="store.setReportApiUrl(($event.target as HTMLInputElement).value)"
-            class="url-input"
-            placeholder="http://localhost:31415"
-          />
-        </div>
-        <div class="setting-hint">{{ t('settings.general.reportApiUrlHint') }}</div>
         <div class="setting-item">
           <label>{{ t('settings.general.blockPluginStatus') }}</label>
           <input type="checkbox" :checked="store.settings.blockPluginStatus" @change="store.setBlockPluginStatus(($event.target as HTMLInputElement).checked)" />
@@ -178,6 +131,22 @@ function handlePositionChange(event: Event) {
         <div class="setting-item">
           <label>{{ t('settings.general.showOnlyWhenRunning') }}</label>
           <input type="checkbox" :checked="store.settings.showOnlyWhenRunning" @change="store.setShowOnlyWhenRunning(($event.target as HTMLInputElement).checked)" />
+        </div>
+        <div class="settings-subsection">
+          <div class="settings-subsection-title">{{ t('settings.account.title') }}</div>
+          <div class="setting-item account-setting-item">
+            <label>{{ t('settings.account.apiKey') }}</label>
+            <input
+              type="password"
+              :value="store.settings.apiKey"
+              @change="store.setApiKey(($event.target as HTMLInputElement).value)"
+              class="api-key-input"
+              :placeholder="t('settings.account.apiKeyPlaceholder')"
+              autocomplete="off"
+              spellcheck="false"
+            />
+          </div>
+          <div class="setting-hint">{{ t('settings.account.apiKeyHint') }}</div>
         </div>
       </div>
 
@@ -209,36 +178,6 @@ function handlePositionChange(event: Event) {
           </div>
         </div>
         <div class="setting-hint">{{ t('settings.appearance.windowPositionHint') }}</div>
-      </div>
-
-      <!-- Account Tab -->
-      <div v-if="activeTab === 'account'" class="settings-section">
-        <div class="auth-section">
-          <div class="auth-section-header">{{ t('settings.account.title') }}</div>
-          <template v-if="!authStore.isAuthenticated">
-            <label class="auth-field">
-              <span>{{ t('settings.account.email') }}</span>
-              <input v-model="loginEmail" type="email" autocomplete="email" :placeholder="t('settings.account.emailPlaceholder')" />
-            </label>
-            <label class="auth-field">
-              <span>{{ t('settings.account.password') }}</span>
-              <input v-model="loginPassword" type="password" autocomplete="current-password" :placeholder="t('settings.account.passwordPlaceholder')" />
-            </label>
-            <p v-if="authError" class="auth-error">{{ authError }}</p>
-            <button class="action-btn auth-action" :disabled="isLoggingIn" @click="handleLogin">
-              {{ isLoggingIn ? t('settings.account.loggingIn') : t('settings.account.login') }}
-            </button>
-          </template>
-          <template v-else>
-            <div class="auth-status">
-              <span class="auth-status-label">{{ t('settings.account.loggedInAs') }}</span>
-              <span class="auth-email">{{ authStore.user?.email }}</span>
-            </div>
-            <button class="action-btn danger auth-action" @click="handleLogout">
-              {{ t('settings.account.logout') }}
-            </button>
-          </template>
-        </div>
       </div>
     </div>
 

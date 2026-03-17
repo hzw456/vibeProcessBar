@@ -18,7 +18,7 @@ export const useAuthStore = defineStore('auth', () => {
   const apiKey = ref('')
   const user = ref<AuthUser>(null)
 
-  const isAuthenticated = computed(() => Boolean(token.value))
+  const isAuthenticated = computed(() => Boolean(token.value || apiKey.value))
 
   function persist() {
     localStorage.setItem(
@@ -35,6 +35,11 @@ export const useAuthStore = defineStore('auth', () => {
     token.value = data.token ?? ''
     apiKey.value = data.apiKey ?? ''
     user.value = data.user ?? null
+    persist()
+  }
+
+  function setApiKey(value: string) {
+    apiKey.value = value.trim()
     persist()
   }
 
@@ -93,6 +98,7 @@ export const useAuthStore = defineStore('auth', () => {
     apiKey,
     user,
     isAuthenticated,
+    setApiKey,
     login,
     register,
     logout,
