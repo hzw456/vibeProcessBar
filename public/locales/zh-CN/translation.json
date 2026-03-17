@@ -61,7 +61,15 @@
       "title": "账户",
       "apiKey": "API Key",
       "apiKeyPlaceholder": "输入你的 API Key",
-      "apiKeyHint": "填写 API Key 后可直接使用，无需登录。"
+      "apiKeyHint": "填写 API Key 后可直接使用，无需登录。",
+      "email": "邮箱",
+      "emailPlaceholder": "you@example.com",
+      "password": "密码",
+      "passwordPlaceholder": "输入密码",
+      "login": "登录",
+      "loggingIn": "登录中...",
+      "loggedInAs": "已登录",
+      "logout": "退出登录"
     },
     "appearance": {
       "theme": "主题",
@@ -110,17 +118,6 @@
     "footer": {
       "version": "Vibe 进度条 v{version}",
       "resetDefaults": "重置为默认"
-    },
-    "account": {
-      "title": "账号",
-      "email": "邮箱",
-      "emailPlaceholder": "you@example.com",
-      "password": "密码",
-      "passwordPlaceholder": "输入密码",
-      "login": "登录",
-      "loggingIn": "登录中...",
-      "loggedInAs": "已登录",
-      "logout": "退出登录"
     }
   },
   "time": {

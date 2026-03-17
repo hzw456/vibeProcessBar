@@ -325,6 +325,12 @@ export const useProgressStore = defineStore('progress', () => {
     updateSettingAndSync('httpPort', Math.max(1024, Math.min(65535, value)));
   }
 
+  function setBackendServerUrl(value: string) {
+    const normalized = value.trim() || defaultSettings.backendServerUrl;
+    setApiBaseUrl(normalized);
+    updateSettingAndSync('backendServerUrl', normalized);
+  }
+
   function setApiKey(value: string) {
     const normalized = value.trim();
     useAuthStore().setApiKey(normalized);
@@ -408,6 +414,7 @@ export const useProgressStore = defineStore('progress', () => {
     setSoundVolume,
     setHttpHost,
     setHttpPort,
+    setBackendServerUrl,
     setApiKey,
     setBlockPluginStatus,
     setShowOnlyWhenRunning,

@@ -131,10 +131,9 @@ const displayTasks = computed(() => {
       const virtualTask: ProgressTask = {
         id: `ide_${win.ide}_${win.window_index}`,
         name: win.window_title,
-        progress: 0,
         tokens: 0,
         status: 'idle',
-        startTime: 0,
+        start_time: 0,
         ide: win.ide,
         window_title: win.window_title,
       };
@@ -634,7 +633,7 @@ watch([displayTasks, () => store.settings.showOnlyWhenRunning], async () => {
   const hasRunning = store.tasks.some(t => t.status === 'running');
   try {
     if (hasRunning) {
-      await safeInvoke('show_window');
+      await safeInvoke('show_window_without_focus');
     } else {
       await safeInvoke('hide_window');
     }

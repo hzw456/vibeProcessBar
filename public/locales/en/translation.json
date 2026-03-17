@@ -61,7 +61,15 @@
       "title": "Account",
       "apiKey": "API Key",
       "apiKeyPlaceholder": "Enter your API Key",
-      "apiKeyHint": "After entering an API Key, you can use the app directly without logging in."
+      "apiKeyHint": "After entering an API Key, you can use the app directly without logging in.",
+      "email": "Email",
+      "emailPlaceholder": "you@example.com",
+      "password": "Password",
+      "passwordPlaceholder": "Password",
+      "login": "Login",
+      "loggingIn": "Logging in...",
+      "loggedInAs": "Logged in as",
+      "logout": "Logout"
     },
     "appearance": {
       "theme": "Theme",
@@ -110,17 +118,6 @@
     "footer": {
       "version": "Vibe Progress Bar v{version}",
       "resetDefaults": "Reset to defaults"
-    },
-    "account": {
-      "title": "Account",
-      "email": "Email",
-      "emailPlaceholder": "you@example.com",
-      "password": "Password",
-      "passwordPlaceholder": "Password",
-      "login": "Login",
-      "loggingIn": "Logging in...",
-      "loggedInAs": "Logged in as",
-      "logout": "Logout"
     }
   },
   "time": {

@@ -260,6 +260,11 @@ fn show_window(window: tauri::Window) {
 }
 
 #[tauri::command]
+fn show_window_without_focus(window: tauri::Window) {
+    let _ = window.show();
+}
+
+#[tauri::command]
 fn hide_window(window: tauri::Window) {
     let _ = window.hide();
 }
@@ -467,6 +472,7 @@ fn main() {
             set_window_opacity,
             set_window_transparency,
             show_window,
+            show_window_without_focus,
             hide_window,
             get_window_position,
             set_window_position,

@@ -35,7 +35,7 @@ pub struct AppSettings {
 }
 
 fn default_backend_server_url() -> String {
-    "http://localhost:3010".to_string()
+    "https://home.haozw.top:3010".to_string()
 }
 
 fn default_backend_email() -> String {

@@ -21,10 +21,11 @@ const emit = defineEmits<{
 const store = useProgressStore();
 const { t } = useI18n();
 
-type TabType = 'general' | 'appearance';
+type TabType = 'general' | 'appearance' | 'account';
 const activeTab = ref<TabType>('general');
 
 const themes = ['dark', 'purple', 'ocean', 'forest', 'midnight'] as const;
+const defaultBackendServerUrl = 'https://home.haozw.top:3010';
 
 // App version
 const appVersion = '1.0.1';
@@ -45,6 +46,7 @@ function handleResetDefaults() {
   store.setSoundVolume(0.7);
   store.setHttpHost('127.0.0.1');
   store.setHttpPort(31415);
+  store.setBackendServerUrl(defaultBackendServerUrl);
   store.setApiKey('');
   store.setBlockPluginStatus(true);
   store.setShowOnlyWhenRunning(false);
@@ -86,6 +88,9 @@ function handlePositionChange(event: Event) {
       <button :class="['tab', { active: activeTab === 'appearance' }]" @click="activeTab = 'appearance'">
         {{ t('settings.tabs.appearance') }}
       </button>
+      <button :class="['tab', { active: activeTab === 'account' }]" @click="activeTab = 'account'">
+        {{ t('settings.tabs.account') }}
+      </button>
     </div>
 
     <!-- Content -->
@@ -125,28 +130,25 @@ function handlePositionChange(event: Event) {
         </div>
         <div class="setting-hint">{{ t('settings.general.httpRestartHint') }}</div>
         <div class="setting-item">
+          <label>{{ t('settings.general.reportApiUrl') }}</label>
+          <input
+            type="url"
+            :value="store.settings.backendServerUrl"
+            @change="store.setBackendServerUrl(($event.target as HTMLInputElement).value)"
+            class="server-url-input"
+            :placeholder="defaultBackendServerUrl"
+            autocomplete="off"
+            spellcheck="false"
+          />
+        </div>
+        <div class="setting-hint">{{ t('settings.general.reportApiUrlHint') }}</div>
+        <div class="setting-item">
           <label>{{ t('settings.general.blockPluginStatus') }}</label>
           <input type="checkbox" :checked="store.settings.blockPluginStatus" @change="store.setBlockPluginStatus(($event.target as HTMLInputElement).checked)" />
         </div>
         <div class="setting-item">
           <label>{{ t('settings.general.showOnlyWhenRunning') }}</label>
           <input type="checkbox" :checked="store.settings.showOnlyWhenRunning" @change="store.setShowOnlyWhenRunning(($event.target as HTMLInputElement).checked)" />
-        </div>
-        <div class="settings-subsection">
-          <div class="settings-subsection-title">{{ t('settings.account.title') }}</div>
-          <div class="setting-item account-setting-item">
-            <label>{{ t('settings.account.apiKey') }}</label>
-            <input
-              type="password"
-              :value="store.settings.apiKey"
-              @change="store.setApiKey(($event.target as HTMLInputElement).value)"
-              class="api-key-input"
-              :placeholder="t('settings.account.apiKeyPlaceholder')"
-              autocomplete="off"
-              spellcheck="false"
-            />
-          </div>
-          <div class="setting-hint">{{ t('settings.account.apiKeyHint') }}</div>
         </div>
       </div>
 
@@ -178,6 +180,23 @@ function handlePositionChange(event: Event) {
           </div>
         </div>
         <div class="setting-hint">{{ t('settings.appearance.windowPositionHint') }}</div>
+      </div>
+
+      <!-- Account Tab -->
+      <div v-if="activeTab === 'account'" class="settings-section">
+        <div class="setting-item account-setting-item">
+          <label>{{ t('settings.account.apiKey') }}</label>
+          <input
+            type="password"
+            :value="store.settings.apiKey"
+            @change="store.setApiKey(($event.target as HTMLInputElement).value)"
+            class="api-key-input"
+            :placeholder="t('settings.account.apiKeyPlaceholder')"
+            autocomplete="off"
+            spellcheck="false"
+          />
+        </div>
+        <div class="setting-hint">{{ t('settings.account.apiKeyHint') }}</div>
       </div>
     </div>
 
