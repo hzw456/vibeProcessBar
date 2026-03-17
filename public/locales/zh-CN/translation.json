@@ -52,6 +52,8 @@
       "httpHost": "HTTP 监听地址",
       "httpPort": "HTTP API 端口",
       "httpRestartHint": "修改后需重启应用生效",
+      "reportApiUrl": "上报 API 地址",
+      "reportApiUrlHint": "Agent Hook 脚本会向这个地址上报任务状态",
       "blockPluginStatus": "屏蔽插件状态上报",
       "showOnlyWhenRunning": "仅显示运行中任务"
     },
