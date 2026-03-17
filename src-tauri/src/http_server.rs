@@ -69,6 +69,10 @@ pub struct UpdateStateRequest {
     pub status: Option<String>,
     #[serde(default)]
     pub source: Option<String>,
+    #[serde(default)]
+    pub project_path: Option<String>,
+    #[serde(default)]
+    pub active_file: Option<String>,
     /// 预估总时长（毫秒）
     #[serde(default)]
     pub estimated_duration: Option<u64>,
@@ -224,6 +228,10 @@ struct BackendUpdateStateRequest<'a> {
     task_id: &'a str,
     status: &'a str,
     #[serde(skip_serializing_if = "Option::is_none")]
+    project_path: Option<&'a str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    active_file: Option<&'a str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     current_stage: Option<&'a str>,
 }
 
@@ -236,7 +244,13 @@ struct BackendUpdateProgressRequest<'a> {
     current_stage: Option<&'a str>,
 }
 
-async fn sync_backend_state(task_id: &str, status: &str, current_stage: Option<&str>) {
+async fn sync_backend_state(
+    task_id: &str,
+    status: &str,
+    project_path: Option<&str>,
+    active_file: Option<&str>,
+    current_stage: Option<&str>,
+) {
     let base_url = BACKEND_SERVER_URL.lock().unwrap().clone();
     let url = format!("{}/api/sync/task", base_url);
     let user_email = BACKEND_EMAIL.lock().unwrap().clone();
@@ -244,6 +258,8 @@ async fn sync_backend_state(task_id: &str, status: &str, current_stage: Option<&
         user_email: Some(user_email),
         task_id,
         status,
+        project_path,
+        active_file,
         current_stage,
     };
 
@@ -378,7 +394,7 @@ async fn report_task(
     State(state): State<Arc<SharedState>>,
     Json(req): Json<ReportRequest>,
 ) -> (StatusCode, Json<ApiResponse>) {
-    let mut initial_state_sync: Option<(String, String, Option<String>)> = None;
+    let mut initial_state_sync: Option<(String, String, Option<String>, Option<String>, Option<String>)> = None;
     {
         let mut tasks = state.tasks.lock().unwrap();
         let existing = tasks.iter_mut().find(|t| t.id == req.task_id);
@@ -408,6 +424,8 @@ async fn report_task(
             debug!(task_id = %req.task_id, is_focused = %req.is_focused, "Task report processed");
         } else {
             info!(task_id = %req.task_id, name = %req.name, ide = %req.ide, "Task auto-registered");
+            let project_path = req.project_path.clone();
+            let active_file = req.active_file.clone();
             let task = Task {
                 id: req.task_id.clone(),
                 name: req.name,
@@ -425,12 +443,25 @@ async fn report_task(
                 current_stage: None,
             };
             tasks.push(task);
-            initial_state_sync = Some((req.task_id, "armed".to_string(), None));
+            initial_state_sync = Some((
+                req.task_id,
+                "armed".to_string(),
+                project_path,
+                active_file,
+                None,
+            ));
         }
     }
 
-    if let Some((task_id, status, current_stage)) = initial_state_sync {
-        sync_backend_state(&task_id, &status, current_stage.as_deref()).await;
+    if let Some((task_id, status, project_path, active_file, current_stage)) = initial_state_sync {
+        sync_backend_state(
+            &task_id,
+            &status,
+            project_path.as_deref(),
+            active_file.as_deref(),
+            current_stage.as_deref(),
+        )
+        .await;
     }
 
     (StatusCode::OK, Json(ApiResponse::ok()))
@@ -461,7 +492,7 @@ async fn update_state(
         );
     }
 
-    let mut state_sync: Option<(String, String, Option<String>)> = None;
+    let mut state_sync: Option<(String, String, Option<String>, Option<String>, Option<String>)> = None;
     let mut progress_sync: Option<(String, Option<u64>, Option<String>)> = None;
 
     {
@@ -478,6 +509,14 @@ async fn update_state(
             }
 
             task.source = request_source.to_string();
+
+            if let Some(ref project_path) = req.project_path {
+                task.project_path = Some(project_path.clone());
+            }
+
+            if let Some(ref active_file) = req.active_file {
+                task.active_file = Some(active_file.clone());
+            }
 
             if let Some(estimated_duration) = req.estimated_duration {
                 task.estimated_duration = Some(estimated_duration);
@@ -536,6 +575,8 @@ async fn update_state(
                 state_sync = Some((
                     task.id.clone(),
                     task.status.clone(),
+                    task.project_path.clone(),
+                    task.active_file.clone(),
                     task.current_stage.clone(),
                 ));
             }
@@ -555,8 +596,15 @@ async fn update_state(
         }
     }
 
-    if let Some((task_id, status, current_stage)) = state_sync {
-        sync_backend_state(&task_id, &status, current_stage.as_deref()).await;
+    if let Some((task_id, status, project_path, active_file, current_stage)) = state_sync {
+        sync_backend_state(
+            &task_id,
+            &status,
+            project_path.as_deref(),
+            active_file.as_deref(),
+            current_stage.as_deref(),
+        )
+        .await;
     }
 
     if let Some((task_id, estimated_duration, current_stage)) = progress_sync {
@@ -683,6 +731,8 @@ async fn update_state_by_path(
             Some((
                 task.id.clone(),
                 task.status.clone(),
+                task.project_path.clone(),
+                task.active_file.clone(),
                 task.current_stage.clone(),
             ))
         } else {
@@ -693,8 +743,15 @@ async fn update_state_by_path(
         }
     };
 
-    if let Some((task_id, status, current_stage)) = state_sync {
-        sync_backend_state(&task_id, &status, current_stage.as_deref()).await;
+    if let Some((task_id, status, project_path, active_file, current_stage)) = state_sync {
+        sync_backend_state(
+            &task_id,
+            &status,
+            project_path.as_deref(),
+            active_file.as_deref(),
+            current_stage.as_deref(),
+        )
+        .await;
     }
 
     (StatusCode::OK, Json(ApiResponse::ok()))
@@ -916,6 +973,8 @@ async fn mcp_handler(
                                 Some((
                                     task.id.clone(),
                                     task.status.clone(),
+                                    task.project_path.clone(),
+                                    task.active_file.clone(),
                                     task.current_stage.clone(),
                                 )),
                             )
@@ -931,8 +990,17 @@ async fn mcp_handler(
                         }
                     };
 
-                    if let Some((task_id, status, current_stage)) = sync_state_result {
-                        sync_backend_state(&task_id, &status, current_stage.as_deref()).await;
+                    if let Some((task_id, status, project_path, active_file, current_stage)) =
+                        sync_state_result
+                    {
+                        sync_backend_state(
+                            &task_id,
+                            &status,
+                            project_path.as_deref(),
+                            active_file.as_deref(),
+                            current_stage.as_deref(),
+                        )
+                        .await;
                     }
 
                     serde_json::json!({
