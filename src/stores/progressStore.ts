@@ -341,8 +341,13 @@ export const useProgressStore = defineStore('progress', () => {
     updateSettingAndSync('blockPluginStatus', value);
   }
 
-  function setShowOnlyWhenRunning(value: boolean) {
-    updateSettingAndSync('showOnlyWhenRunning', value);
+  async function setShowOnlyWhenRunning(value: boolean) {
+    settings.value.showOnlyWhenRunning = value;
+    try {
+      await safeInvoke('update_app_settings', { newSettings: settings.value });
+    } catch (err) {
+      error('Failed to update showOnlyWhenRunning', { error: String(err) });
+    }
   }
 
   function setWindowPosition(x: number, y: number) {

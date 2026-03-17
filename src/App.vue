@@ -8,6 +8,7 @@ import Register from './components/Register.vue';
 import SettingsPanel from './components/SettingsPanel.vue';
 import { debug, error } from './utils/logger';
 import { playCompletionSound } from './utils/notifications';
+import { shouldDisplayTask } from './utils/taskFilters';
 
 debug('App.vue loaded');
 
@@ -150,9 +151,12 @@ const displayTasks = computed(() => {
     return nameA.localeCompare(nameB);
   });
 
-  return items.filter(t =>
-    ['completed', 'running', 'armed', 'idle'].includes(t.status) &&
-    !hiddenTaskIds.value.has(t.id)
+  return items.filter(task =>
+    shouldDisplayTask(
+      task,
+      hiddenTaskIds.value,
+      store.settings.showOnlyWhenRunning,
+    )
   );
 });
 
@@ -624,7 +628,6 @@ watch([displayTasks, isCollapsed, isCollapseTransition], async () => {
     error('Failed to resize window', { error: String(e) });
   }
 });
-
 
   // Intervals
   let syncInterval: number;
