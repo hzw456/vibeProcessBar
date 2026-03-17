@@ -1,8 +1,22 @@
 #!/bin/bash
 # Kiro Hook: Agent Complete - 当Kiro执行完成时通知Vibe Process Bar
 
-VIBE_API="http://localhost:31415"
 PROJECT_PATH="$(pwd)"
+
+resolve_vibe_api() {
+  local config_file="${HOME}/Library/Application Support/com.vibe.process-bar/settings.json"
+
+  if [ -f "$config_file" ]; then
+    local configured_url
+    configured_url=$(ruby -rjson -e 'path = ARGV[0]; data = JSON.parse(File.read(path)); value = data["report_api_url"] || data["reportApiUrl"]; puts(value) if value.is_a?(String) && !value.strip.empty?' "$config_file" 2>/dev/null)
+    if [ -n "$configured_url" ]; then
+      echo "${configured_url%/}"
+      return
+    fi
+  fi
+
+  echo "http://localhost:31415"
+}
 
 # 自动检测 IDE - 使用 __CFBundleIdentifier (macOS)
 detect_ide() {
@@ -21,6 +35,7 @@ detect_ide() {
 }
 
 IDE=$(detect_ide)
+VIBE_API=$(resolve_vibe_api)
 
 if [ -n "$PROJECT_PATH" ]; then
   curl -s -X POST "$VIBE_API/api/task/update_state_by_path" \

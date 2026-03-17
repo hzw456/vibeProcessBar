@@ -43,6 +43,7 @@ export interface AppSettings {
   soundVolume: number;
   httpHost: string;
   httpPort: number;
+  reportApiUrl: string;
   windowVisible: boolean;
   blockPluginStatus: boolean;
   windowX: number | null;
@@ -61,6 +62,7 @@ const defaultSettings: AppSettings = {
   soundVolume: 0.7,
   httpHost: '127.0.0.1',
   httpPort: 31415,
+  reportApiUrl: 'http://localhost:31415',
   windowVisible: true,
   blockPluginStatus: true,
   windowX: null,
@@ -313,6 +315,10 @@ export const useProgressStore = defineStore('progress', () => {
     updateSettingAndSync('httpPort', Math.max(1024, Math.min(65535, value)));
   }
 
+  function setReportApiUrl(value: string) {
+    updateSettingAndSync('reportApiUrl', value.trim());
+  }
+
   function setBlockPluginStatus(value: boolean) {
     updateSettingAndSync('blockPluginStatus', value);
   }
@@ -390,6 +396,7 @@ export const useProgressStore = defineStore('progress', () => {
     setSoundVolume,
     setHttpHost,
     setHttpPort,
+    setReportApiUrl,
     setBlockPluginStatus,
     setShowOnlyWhenRunning,
     setWindowPosition,

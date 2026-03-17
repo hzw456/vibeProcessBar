@@ -52,6 +52,8 @@
       "httpHost": "HTTP Listen Address",
       "httpPort": "HTTP API Port",
       "httpRestartHint": "Changes take effect after restart",
+      "reportApiUrl": "Report API URL",
+      "reportApiUrlHint": "Agent hook scripts send task status updates to this address",
       "blockPluginStatus": "Block plugin status reporting",
       "showOnlyWhenRunning": "Show only when tasks running"
     },

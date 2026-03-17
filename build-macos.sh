@@ -9,6 +9,7 @@ echo ""
 # Set environment variables to disable resource forks
 export COPYFILE_DISABLE=1
 export COPY_EXTENDED_ATTRIBUTES_DISABLE=1
+export LTO=thin
 
 # Navigate to project directory (where script is located)
 cd "$(dirname "$0")"

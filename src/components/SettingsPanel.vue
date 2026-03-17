@@ -45,6 +45,7 @@ function handleResetDefaults() {
   store.setSoundVolume(0.7);
   store.setHttpHost('127.0.0.1');
   store.setHttpPort(31415);
+  store.setReportApiUrl('http://localhost:31415');
   store.setBlockPluginStatus(true);
   store.setShowOnlyWhenRunning(false);
 }
@@ -123,6 +124,18 @@ function handlePositionChange(event: Event) {
           <input type="number" :value="store.settings.httpPort" @change="store.setHttpPort(parseInt(($event.target as HTMLInputElement).value))" min="1024" max="65535" class="port-input" />
         </div>
         <div class="setting-hint">{{ t('settings.general.httpRestartHint') }}</div>
+        <div class="setting-item setting-item-column">
+          <label for="report-api-url">{{ t('settings.general.reportApiUrl') }}</label>
+          <input
+            id="report-api-url"
+            type="url"
+            :value="store.settings.reportApiUrl"
+            @change="store.setReportApiUrl(($event.target as HTMLInputElement).value)"
+            class="url-input"
+            placeholder="http://localhost:31415"
+          />
+        </div>
+        <div class="setting-hint">{{ t('settings.general.reportApiUrlHint') }}</div>
         <div class="setting-item">
           <label>{{ t('settings.general.blockPluginStatus') }}</label>
           <input type="checkbox" :checked="store.settings.blockPluginStatus" @change="store.setBlockPluginStatus(($event.target as HTMLInputElement).checked)" />
