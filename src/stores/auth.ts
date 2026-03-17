@@ -26,7 +26,8 @@ export const useAuthStore = defineStore('auth', () => {
   const apiKey = ref('')
   const user = ref<AuthUser>(null)
 
-  const isAuthenticated = computed(() => Boolean(token.value || apiKey.value))
+  // Always authenticated - API key is optional for remote reporting
+  const isAuthenticated = computed(() => true)
 
   function persist() {
     localStorage.setItem(
