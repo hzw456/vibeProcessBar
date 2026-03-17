@@ -625,22 +625,6 @@ watch([displayTasks, isCollapsed, isCollapseTransition], async () => {
   }
 });
 
-// Auto show/hide window when "show only when running" is enabled
-watch([displayTasks, () => store.settings.showOnlyWhenRunning], async () => {
-  if (isSettingsWindow.value) return;
-  if (!store.settings.showOnlyWhenRunning) return;
-
-  const hasRunning = store.tasks.some(t => t.status === 'running');
-  try {
-    if (hasRunning) {
-      await safeInvoke('show_window_without_focus');
-    } else {
-      await safeInvoke('hide_window');
-    }
-  } catch (e) {
-    error('Failed to auto show/hide window', { error: String(e) });
-  }
-});
 
   // Intervals
   let syncInterval: number;
