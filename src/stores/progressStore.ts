@@ -3,7 +3,7 @@ import { ref } from 'vue';
 import { debug, error } from '../utils/logger';
 import type { SupportedLanguage } from '../utils/i18n';
 import { setLanguage as setI18nLanguage } from '../utils/i18n';
-import { useAuthStore } from './auth';
+import { useAuthStore, setApiBaseUrl } from './auth';
 
 const isTauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
 
@@ -45,6 +45,7 @@ export interface AppSettings {
   httpHost: string;
   httpPort: number;
   apiKey: string;
+  backendServerUrl: string;
   windowVisible: boolean;
   blockPluginStatus: boolean;
   windowX: number | null;
@@ -64,6 +65,7 @@ const defaultSettings: AppSettings = {
   httpHost: '127.0.0.1',
   httpPort: 31415,
   apiKey: '',
+  backendServerUrl: 'https://home.haozw.top:3010',
   windowVisible: true,
   blockPluginStatus: true,
   windowX: null,
@@ -145,6 +147,11 @@ export const useProgressStore = defineStore('progress', () => {
     const authStore = useAuthStore();
     settings.value = newSettings;
     authStore.setApiKey(newSettings.apiKey);
+    
+    // Update API base URL for auth requests
+    if (newSettings.backendServerUrl) {
+      setApiBaseUrl(newSettings.backendServerUrl);
+    }
 
     setI18nLanguage(newSettings.language);
     document.documentElement.setAttribute('data-theme', newSettings.theme);

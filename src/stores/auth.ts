@@ -1,7 +1,15 @@
 import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
 
-const API_BASE_URL = 'http://192.168.1.28:3010'
+// API URL - can be updated from settings
+let apiBaseUrl = 'https://home.haozw.top:3010';
+
+export const setApiBaseUrl = (url: string) => {
+  apiBaseUrl = url;
+};
+
+const getApiBaseUrl = () => apiBaseUrl;
+
 const AUTH_STORAGE_KEY = 'auth'
 
 type AuthUser = Record<string, unknown> | null
@@ -44,7 +52,7 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   async function requestAuth(path: string, email: string, password: string) {
-    const response = await fetch(`${API_BASE_URL}${path}`, {
+    const response = await fetch(`${getApiBaseUrl()}${path}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
