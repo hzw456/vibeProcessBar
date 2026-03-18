@@ -552,7 +552,7 @@ async fn update_state(
     }
 
     let mut state_sync: Option<(String, String, Option<String>, Option<String>, Option<String>)> = None;
-    let mut progress_sync: Option<(String, Option<u64>, Option<String>)> = None;
+    let mut progress_sync: Option<(String, Option<u64>, Option<String>, Option<String>, Option<String>)> = None;
 
     {
         let mut tasks = state.tasks.lock().unwrap();
@@ -639,6 +639,8 @@ async fn update_state(
                     task.id.clone(),
                     task.estimated_duration,
                     task.current_stage.clone(),
+                    task.active_file.clone(),
+                    Some(task.window_title.clone()),
                 ));
             }
         } else {
@@ -662,8 +664,15 @@ async fn update_state(
         .await;
     }
 
-    if let Some((task_id, estimated_duration, current_stage)) = progress_sync {
-        sync_backend_progress(&task_id, estimated_duration, current_stage.as_deref(), None, None, Some(false)).await;
+    if let Some((task_id, estimated_duration, current_stage, active_file, window_title)) = progress_sync {
+        sync_backend_progress(
+            &task_id, 
+            estimated_duration, 
+            current_stage.as_deref(), 
+            active_file.as_deref(), 
+            window_title.as_deref(), 
+            Some(false)
+        ).await;
     }
 
     (StatusCode::OK, Json(ApiResponse::ok()))
@@ -1137,6 +1146,8 @@ async fn mcp_handler(
                                 task.id.clone(),
                                 task.estimated_duration,
                                 task.current_stage.clone(),
+                                task.active_file.clone(),
+                                Some(task.window_title.clone()),
                             ))
                         } else {
                             return (
@@ -1150,14 +1161,14 @@ async fn mcp_handler(
                         }
                     };
 
-                    if let Some((task_id, estimated_duration, current_stage)) = sync_progress_result
+                    if let Some((task_id, estimated_duration, current_stage, active_file, window_title)) = sync_progress_result
                     {
                         sync_backend_progress(
                             &task_id,
                             estimated_duration,
                             current_stage.as_deref(),
-                            None,
-                            None,
+                            active_file.as_deref(),
+                            window_title.as_deref(),
                             Some(false),
                         )
                         .await;
