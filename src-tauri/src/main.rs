@@ -111,6 +111,7 @@ async fn update_app_settings<R: Runtime>(
     http_server::set_block_plugin_status(new_settings.block_plugin_status);
     http_server::set_backend_email(new_settings.backend_email.clone());
     http_server::set_backend_server_url(new_settings.backend_server_url.clone());
+    http_server::set_backend_api_key(new_settings.api_key.clone());
 
     // 保存设置
     state.update_settings(new_settings.clone())?;
@@ -534,6 +535,7 @@ fn main() {
             http_server::set_block_plugin_status(current_settings.block_plugin_status);
             http_server::set_backend_email(current_settings.backend_email.clone());
             http_server::set_backend_server_url(current_settings.backend_server_url.clone());
+            http_server::set_backend_api_key(current_settings.api_key.clone());
 
             // 启动 HTTP server
             http_server::start_server_background(

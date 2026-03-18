@@ -13,7 +13,8 @@ use tracing::{debug, error, info};
 lazy_static::lazy_static! {
     static ref SHARED_STATE: Arc<SharedState> = Arc::new(SharedState::new());
     static ref BACKEND_EMAIL: Mutex<String> = Mutex::new("fulltest@vibe.app".to_string());
-static ref BACKEND_SERVER_URL: Mutex<String> = Mutex::new("http://localhost:3010".to_string());
+    static ref BACKEND_SERVER_URL: Mutex<String> = Mutex::new("http://localhost:3010".to_string());
+    static ref BACKEND_API_KEY: Mutex<String> = Mutex::new(String::new());
     static ref HTTP_CLIENT: reqwest::Client = reqwest::Client::new();
 }
 
@@ -69,6 +70,10 @@ pub struct UpdateStateRequest {
     pub status: Option<String>,
     #[serde(default)]
     pub source: Option<String>,
+    #[serde(default)]
+    pub window_title: Option<String>,
+    #[serde(default)]
+    pub is_focused: Option<bool>,
     #[serde(default)]
     pub project_path: Option<String>,
     #[serde(default)]
@@ -182,6 +187,10 @@ pub fn set_backend_server_url(url: String) {
     let normalized = url.trim_end_matches('/').to_string();
     *BACKEND_SERVER_URL.lock().unwrap() = normalized.clone();
     info!("Backend server URL set to: {}", normalized);
+}
+
+pub fn set_backend_api_key(api_key: String) {
+    *BACKEND_API_KEY.lock().unwrap() = api_key;
 }
 
 #[allow(dead_code)]
@@ -299,6 +308,7 @@ async fn sync_backend_state(
     is_focused: Option<bool>,
 ) {
     let base_url = BACKEND_SERVER_URL.lock().unwrap().clone();
+    let api_key = BACKEND_API_KEY.lock().unwrap().clone();
     let url = format!("{}/api/task/update_state", base_url);
     let user_email = BACKEND_EMAIL.lock().unwrap().clone();
     let payload = BackendUpdateStateRequest {
@@ -312,7 +322,14 @@ async fn sync_backend_state(
         is_focused,
     };
 
-    match HTTP_CLIENT.post(&url).json(&payload).send().await {
+    let request = HTTP_CLIENT.post(&url).json(&payload);
+    let request = if api_key.is_empty() {
+        request
+    } else {
+        request.header("x-api-key", api_key)
+    };
+
+    match request.send().await {
         Ok(response) if response.status().is_success() => {
             debug!(task_id = %task_id, status = %status, "Synced task state to backend");
         }
@@ -346,6 +363,7 @@ async fn sync_backend_progress(
     is_focused: Option<bool>,
 ) {
     let base_url = BACKEND_SERVER_URL.lock().unwrap().clone();
+    let api_key = BACKEND_API_KEY.lock().unwrap().clone();
     let url = format!("{}/api/task/update_progress", base_url);
     let payload = BackendUpdateProgressRequest {
         task_id,
@@ -356,7 +374,14 @@ async fn sync_backend_progress(
         is_focused,
     };
 
-    match HTTP_CLIENT.post(&url).json(&payload).send().await {
+    let request = HTTP_CLIENT.post(&url).json(&payload);
+    let request = if api_key.is_empty() {
+        request
+    } else {
+        request.header("x-api-key", api_key)
+    };
+
+    match request.send().await {
         Ok(response) if response.status().is_success() => {
             debug!(task_id = %task_id, "Synced task progress to backend");
         }
@@ -449,7 +474,15 @@ async fn report_task(
     State(state): State<Arc<SharedState>>,
     Json(req): Json<ReportRequest>,
 ) -> (StatusCode, Json<ApiResponse>) {
-    let mut initial_state_sync: Option<(String, String, Option<String>, Option<String>, Option<String>)> = None;
+    let mut initial_state_sync: Option<(
+        String,
+        String,
+        Option<String>,
+        Option<String>,
+        Option<String>,
+        Option<String>,
+        Option<bool>,
+    )> = None;
     {
         let mut tasks = state.tasks.lock().unwrap();
         let existing = tasks.iter_mut().find(|t| t.id == req.task_id);
@@ -481,13 +514,15 @@ async fn report_task(
             info!(task_id = %req.task_id, name = %req.name, ide = %req.ide, "Task auto-registered");
             let project_path = req.project_path.clone();
             let active_file = req.active_file.clone();
+            let window_title = req.window_title.clone();
+            let is_focused = req.is_focused;
             let task = Task {
                 id: req.task_id.clone(),
                 name: req.name,
                 status: "armed".to_string(),
-                is_focused: req.is_focused,
+                is_focused,
                 ide: req.ide,
-                window_title: req.window_title,
+                window_title: window_title.clone(),
                 start_time: 0,
                 end_time: None,
                 project_path: req.project_path,
@@ -504,19 +539,30 @@ async fn report_task(
                 project_path,
                 active_file,
                 None,
+                Some(window_title),
+                Some(is_focused),
             ));
         }
     }
 
-    if let Some((task_id, status, project_path, active_file, current_stage)) = initial_state_sync {
+    if let Some((
+        task_id,
+        status,
+        project_path,
+        active_file,
+        current_stage,
+        window_title,
+        is_focused,
+    )) = initial_state_sync
+    {
         sync_backend_state(
             &task_id,
             &status,
             project_path.as_deref(),
             active_file.as_deref(),
             current_stage.as_deref(),
-            None,
-            Some(false),
+            window_title.as_deref(),
+            is_focused,
         )
         .await;
     }
@@ -551,8 +597,23 @@ async fn update_state(
         );
     }
 
-    let mut state_sync: Option<(String, String, Option<String>, Option<String>, Option<String>)> = None;
-    let mut progress_sync: Option<(String, Option<u64>, Option<String>, Option<String>, Option<String>)> = None;
+    let mut state_sync: Option<(
+        String,
+        String,
+        Option<String>,
+        Option<String>,
+        Option<String>,
+        Option<String>,
+        Option<bool>,
+    )> = None;
+    let mut progress_sync: Option<(
+        String,
+        Option<u64>,
+        Option<String>,
+        Option<String>,
+        Option<String>,
+        Option<bool>,
+    )> = None;
 
     {
         let mut tasks = state.tasks.lock().unwrap();
@@ -575,6 +636,12 @@ async fn update_state(
 
             if let Some(ref active_file) = req.active_file {
                 task.active_file = Some(active_file.clone());
+            }
+            if let Some(ref window_title) = req.window_title {
+                task.window_title = window_title.clone();
+            }
+            if let Some(is_focused) = req.is_focused {
+                task.is_focused = is_focused;
             }
 
             if let Some(ref status) = req.status {
@@ -631,6 +698,8 @@ async fn update_state(
                     task.project_path.clone(),
                     task.active_file.clone(),
                     task.current_stage.clone(),
+                    Some(task.window_title.clone()),
+                    Some(task.is_focused),
                 ));
             }
 
@@ -641,6 +710,7 @@ async fn update_state(
                     task.current_stage.clone(),
                     task.active_file.clone(),
                     Some(task.window_title.clone()),
+                    Some(task.is_focused),
                 ));
             }
         } else {
@@ -651,28 +721,46 @@ async fn update_state(
         }
     }
 
-    if let Some((task_id, status, project_path, active_file, current_stage)) = state_sync {
+    if let Some((
+        task_id,
+        status,
+        project_path,
+        active_file,
+        current_stage,
+        window_title,
+        is_focused,
+    )) = state_sync
+    {
         sync_backend_state(
             &task_id,
             &status,
             project_path.as_deref(),
             active_file.as_deref(),
             current_stage.as_deref(),
-            None,
-            Some(false),
+            window_title.as_deref(),
+            is_focused,
         )
         .await;
     }
 
-    if let Some((task_id, estimated_duration, current_stage, active_file, window_title)) = progress_sync {
+    if let Some((
+        task_id,
+        estimated_duration,
+        current_stage,
+        active_file,
+        window_title,
+        is_focused,
+    )) = progress_sync
+    {
         sync_backend_progress(
-            &task_id, 
-            estimated_duration, 
-            current_stage.as_deref(), 
-            active_file.as_deref(), 
-            window_title.as_deref(), 
-            Some(false)
-        ).await;
+            &task_id,
+            estimated_duration,
+            current_stage.as_deref(),
+            active_file.as_deref(),
+            window_title.as_deref(),
+            is_focused,
+        )
+        .await;
     }
 
     (StatusCode::OK, Json(ApiResponse::ok()))
@@ -844,6 +932,8 @@ async fn update_state_by_path(
                 task.project_path.clone(),
                 task.active_file.clone(),
                 task.current_stage.clone(),
+                Some(task.window_title.clone()),
+                Some(task.is_focused),
             ))
         } else {
             return (
@@ -853,15 +943,24 @@ async fn update_state_by_path(
         }
     };
 
-    if let Some((task_id, status, project_path, active_file, current_stage)) = state_sync {
+    if let Some((
+        task_id,
+        status,
+        project_path,
+        active_file,
+        current_stage,
+        window_title,
+        is_focused,
+    )) = state_sync
+    {
         sync_backend_state(
             &task_id,
             &status,
             project_path.as_deref(),
             active_file.as_deref(),
             current_stage.as_deref(),
-            None,
-            Some(false),
+            window_title.as_deref(),
+            is_focused,
         )
         .await;
     }
@@ -1088,6 +1187,8 @@ async fn mcp_handler(
                                     task.project_path.clone(),
                                     task.active_file.clone(),
                                     task.current_stage.clone(),
+                                    Some(task.window_title.clone()),
+                                    Some(task.is_focused),
                                 )),
                             )
                         } else {
@@ -1102,8 +1203,15 @@ async fn mcp_handler(
                         }
                     };
 
-                    if let Some((task_id, status, project_path, active_file, current_stage)) =
-                        sync_state_result
+                    if let Some((
+                        task_id,
+                        status,
+                        project_path,
+                        active_file,
+                        current_stage,
+                        window_title,
+                        is_focused,
+                    )) = sync_state_result
                     {
                         sync_backend_state(
                             &task_id,
@@ -1111,8 +1219,8 @@ async fn mcp_handler(
                             project_path.as_deref(),
                             active_file.as_deref(),
                             current_stage.as_deref(),
-                            None,
-                            Some(false),
+                            window_title.as_deref(),
+                            is_focused,
                         )
                         .await;
                     }
@@ -1148,6 +1256,7 @@ async fn mcp_handler(
                                 task.current_stage.clone(),
                                 task.active_file.clone(),
                                 Some(task.window_title.clone()),
+                                Some(task.is_focused),
                             ))
                         } else {
                             return (
@@ -1161,7 +1270,14 @@ async fn mcp_handler(
                         }
                     };
 
-                    if let Some((task_id, estimated_duration, current_stage, active_file, window_title)) = sync_progress_result
+                    if let Some((
+                        task_id,
+                        estimated_duration,
+                        current_stage,
+                        active_file,
+                        window_title,
+                        is_focused,
+                    )) = sync_progress_result
                     {
                         sync_backend_progress(
                             &task_id,
@@ -1169,7 +1285,7 @@ async fn mcp_handler(
                             current_stage.as_deref(),
                             active_file.as_deref(),
                             window_title.as_deref(),
-                            Some(false),
+                            is_focused,
                         )
                         .await;
                     }
