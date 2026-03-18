@@ -230,6 +230,14 @@ fn now_millis() -> u64 {
     chrono::Utc::now().timestamp_millis() as u64
 }
 
+fn should_sync_backend_state_for_update(req: &UpdateStateRequest) -> bool {
+    req.status.is_some()
+        || req.project_path.is_some()
+        || req.active_file.is_some()
+        || req.window_title.is_some()
+        || req.is_focused.is_some()
+}
+
 fn apply_running_transition_defaults(
     task: &mut Task,
     old_status: &str,
@@ -334,11 +342,17 @@ async fn sync_backend_state(
             debug!(task_id = %task_id, status = %status, "Synced task state to backend");
         }
         Ok(response) => {
+            let http_status = response.status();
+            let response_body = response
+                .text()
+                .await
+                .unwrap_or_else(|err| format!("<failed to read response body: {}>", err));
             error!(
                 task_id = %task_id,
                 status = %status,
                 backend_url = %url,
-                http_status = %response.status(),
+                http_status = %http_status,
+                response_body = %response_body,
                 "Backend task state sync failed"
             );
         }
@@ -386,10 +400,16 @@ async fn sync_backend_progress(
             debug!(task_id = %task_id, "Synced task progress to backend");
         }
         Ok(response) => {
+            let http_status = response.status();
+            let response_body = response
+                .text()
+                .await
+                .unwrap_or_else(|err| format!("<failed to read response body: {}>", err));
             error!(
                 task_id = %task_id,
                 backend_url = %url,
-                http_status = %response.status(),
+                http_status = %http_status,
+                response_body = %response_body,
                 "Backend task progress sync failed"
             );
         }
@@ -691,7 +711,7 @@ async fn update_state(
                 task.current_stage = Some(current_stage.clone());
             }
 
-            if req.status.is_some() {
+            if should_sync_backend_state_for_update(&req) {
                 state_sync = Some((
                     task.id.clone(),
                     task.status.clone(),
@@ -768,7 +788,10 @@ async fn update_state(
 
 #[cfg(test)]
 mod tests {
-    use super::{apply_running_transition_defaults, Task};
+    use super::{
+        apply_running_transition_defaults, should_sync_backend_state_for_update, Task,
+        UpdateStateRequest,
+    };
 
     fn sample_task(status: &str) -> Task {
         Task {
@@ -809,6 +832,40 @@ mod tests {
         assert_eq!(task.end_time, None);
         assert_eq!(task.estimated_duration, None);
         assert_eq!(task.current_stage.as_deref(), Some("src/main.rs"));
+    }
+
+    #[test]
+    fn metadata_only_update_triggers_backend_state_sync() {
+        let req = UpdateStateRequest {
+            task_id: "task-1".to_string(),
+            status: None,
+            source: Some("hook".to_string()),
+            window_title: Some("main.rs".to_string()),
+            is_focused: Some(true),
+            project_path: None,
+            active_file: Some("src/main.rs".to_string()),
+            estimated_duration: None,
+            current_stage: None,
+        };
+
+        assert!(should_sync_backend_state_for_update(&req));
+    }
+
+    #[test]
+    fn progress_only_update_does_not_trigger_state_sync() {
+        let req = UpdateStateRequest {
+            task_id: "task-1".to_string(),
+            status: None,
+            source: Some("mcp".to_string()),
+            window_title: None,
+            is_focused: None,
+            project_path: None,
+            active_file: None,
+            estimated_duration: Some(5_000),
+            current_stage: Some("Analyzing code".to_string()),
+        };
+
+        assert!(!should_sync_backend_state_for_update(&req));
     }
 }
 
