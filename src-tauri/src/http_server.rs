@@ -233,6 +233,10 @@ struct BackendUpdateStateRequest<'a> {
     active_file: Option<&'a str>,
     #[serde(skip_serializing_if = "Option::is_none")]
     current_stage: Option<&'a str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    window_title: Option<&'a str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    is_focused: Option<bool>,
 }
 
 #[derive(Serialize)]
@@ -242,6 +246,12 @@ struct BackendUpdateProgressRequest<'a> {
     estimated_duration_ms: Option<u64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     current_stage: Option<&'a str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    active_file: Option<&'a str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    window_title: Option<&'a str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    is_focused: Option<bool>,
 }
 
 async fn sync_backend_state(
@@ -250,9 +260,11 @@ async fn sync_backend_state(
     project_path: Option<&str>,
     active_file: Option<&str>,
     current_stage: Option<&str>,
+    window_title: Option<&str>,
+    is_focused: Option<bool>,
 ) {
     let base_url = BACKEND_SERVER_URL.lock().unwrap().clone();
-    let url = format!("{}/api/sync/task", base_url);
+    let url = format!("{}/api/task/update_state", base_url);
     let user_email = BACKEND_EMAIL.lock().unwrap().clone();
     let payload = BackendUpdateStateRequest {
         user_email: Some(user_email),
@@ -261,6 +273,8 @@ async fn sync_backend_state(
         project_path,
         active_file,
         current_stage,
+        window_title,
+        is_focused,
     };
 
     match HTTP_CLIENT.post(&url).json(&payload).send().await {
@@ -292,6 +306,9 @@ async fn sync_backend_progress(
     task_id: &str,
     estimated_duration_ms: Option<u64>,
     current_stage: Option<&str>,
+    active_file: Option<&str>,
+    window_title: Option<&str>,
+    is_focused: Option<bool>,
 ) {
     let base_url = BACKEND_SERVER_URL.lock().unwrap().clone();
     let url = format!("{}/api/task/update_progress", base_url);
@@ -299,6 +316,9 @@ async fn sync_backend_progress(
         task_id,
         estimated_duration_ms,
         current_stage,
+        active_file,
+        window_title,
+        is_focused,
     };
 
     match HTTP_CLIENT.post(&url).json(&payload).send().await {
@@ -460,6 +480,8 @@ async fn report_task(
             project_path.as_deref(),
             active_file.as_deref(),
             current_stage.as_deref(),
+            None,
+            Some(false),
         )
         .await;
     }
@@ -603,12 +625,14 @@ async fn update_state(
             project_path.as_deref(),
             active_file.as_deref(),
             current_stage.as_deref(),
+            None,
+            Some(false),
         )
         .await;
     }
 
     if let Some((task_id, estimated_duration, current_stage)) = progress_sync {
-        sync_backend_progress(&task_id, estimated_duration, current_stage.as_deref()).await;
+        sync_backend_progress(&task_id, estimated_duration, current_stage.as_deref(), None, None, Some(false)).await;
     }
 
     (StatusCode::OK, Json(ApiResponse::ok()))
@@ -750,6 +774,8 @@ async fn update_state_by_path(
             project_path.as_deref(),
             active_file.as_deref(),
             current_stage.as_deref(),
+            None,
+            Some(false),
         )
         .await;
     }
@@ -999,6 +1025,8 @@ async fn mcp_handler(
                             project_path.as_deref(),
                             active_file.as_deref(),
                             current_stage.as_deref(),
+                            None,
+                            Some(false),
                         )
                         .await;
                     }
@@ -1051,6 +1079,9 @@ async fn mcp_handler(
                             &task_id,
                             estimated_duration,
                             current_stage.as_deref(),
+                            None,
+                            None,
+                            Some(false),
                         )
                         .await;
                     }
