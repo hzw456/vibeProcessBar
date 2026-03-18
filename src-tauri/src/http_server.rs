@@ -424,18 +424,55 @@ async fn sync_backend_progress(
     }
 }
 
-/// 重置任务为 armed 状态
-pub fn reset_task_to_armed(task_id: &str) -> Result<(), String> {
+/// 重置任务为 armed 状态，并同步到后端
+pub async fn reset_task_to_armed(task_id: &str) -> Result<(), String> {
     let state = SHARED_STATE.clone();
-    let mut tasks = state.tasks.lock().unwrap();
+    let state_sync = {
+        let mut tasks = state.tasks.lock().unwrap();
 
-    if let Some(task) = tasks.iter_mut().find(|t| t.id == task_id) {
-        task.status = "armed".to_string();
-        task.start_time = 0;
-        task.end_time = None;
-        task.estimated_duration = None;
-        task.current_stage = None;
-        info!(task_id = %task_id, "Task reset to armed");
+        if let Some(task) = tasks.iter_mut().find(|t| t.id == task_id) {
+            task.status = "armed".to_string();
+            task.start_time = 0;
+            task.end_time = None;
+            task.estimated_duration = None;
+            task.current_stage = None;
+            info!(task_id = %task_id, "Task reset to armed");
+
+            Some((
+                task.id.clone(),
+                task.status.clone(),
+                task.project_path.clone(),
+                task.active_file.clone(),
+                task.current_stage.clone(),
+                Some(task.window_title.clone()),
+                Some(task.is_focused),
+            ))
+        } else {
+            None
+        }
+    };
+
+    if let Some((
+        task_id,
+        status,
+        project_path,
+        active_file,
+        current_stage,
+        window_title,
+        is_focused,
+    )) = state_sync
+    {
+        sync_backend_state(
+            &task_id,
+            &status,
+            project_path.as_deref(),
+            active_file.as_deref(),
+            current_stage.as_deref(),
+            window_title.as_deref(),
+            is_focused,
+        )
+        .await;
+
         Ok(())
     } else {
         Err(format!("Task not found: {}", task_id))

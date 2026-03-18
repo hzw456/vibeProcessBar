@@ -43,7 +43,7 @@ async fn activate_ide_window<R: Runtime>(
 
 #[tauri::command]
 async fn reset_task_to_armed(task_id: String) -> Result<(), String> {
-    http_server::reset_task_to_armed(&task_id)
+    http_server::reset_task_to_armed(&task_id).await
 }
 
 #[tauri::command]
