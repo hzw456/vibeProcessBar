@@ -221,6 +221,41 @@ fn now_millis() -> u64 {
     chrono::Utc::now().timestamp_millis() as u64
 }
 
+fn apply_running_transition_defaults(
+    task: &mut Task,
+    old_status: &str,
+    new_status: &str,
+    has_explicit_estimated_duration: bool,
+    has_explicit_current_stage: bool,
+) {
+    if new_status != "running" {
+        return;
+    }
+
+    if old_status == "completed" || old_status == "error" || old_status == "cancelled" {
+        task.start_time = now_millis();
+        task.end_time = None;
+
+        if !has_explicit_estimated_duration {
+            task.estimated_duration = None;
+        }
+
+        if !has_explicit_current_stage {
+            task.current_stage = task.active_file.clone();
+        }
+
+        info!(task_id = %task.id, "Task restarted from {}", old_status);
+    } else if task.start_time == 0 {
+        task.start_time = now_millis();
+
+        if !has_explicit_current_stage && task.current_stage.is_none() {
+            task.current_stage = task.active_file.clone();
+        }
+
+        info!(task_id = %task.id, "Task started");
+    }
+}
+
 #[derive(Serialize)]
 struct BackendUpdateStateRequest<'a> {
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -494,6 +529,8 @@ async fn update_state(
     Json(req): Json<UpdateStateRequest>,
 ) -> (StatusCode, Json<ApiResponse>) {
     let request_source = req.source.as_deref().unwrap_or("plugin");
+    let has_explicit_estimated_duration = req.estimated_duration.is_some();
+    let has_explicit_current_stage = req.current_stage.is_some();
 
     let valid_sources = ["hook", "mcp", "plugin"];
     if !valid_sources.contains(&request_source) {
@@ -540,14 +577,6 @@ async fn update_state(
                 task.active_file = Some(active_file.clone());
             }
 
-            if let Some(estimated_duration) = req.estimated_duration {
-                task.estimated_duration = Some(estimated_duration);
-            }
-
-            if let Some(ref current_stage) = req.current_stage {
-                task.current_stage = Some(current_stage.clone());
-            }
-
             if let Some(ref status) = req.status {
                 let valid_statuses = ["armed", "running", "completed", "error", "cancelled"];
                 if !valid_statuses.contains(&status.as_str()) {
@@ -563,21 +592,13 @@ async fn update_state(
                 let old_status = task.status.clone();
                 task.status = status.clone();
 
-                if status == "running" {
-                    if old_status == "completed"
-                        || old_status == "error"
-                        || old_status == "cancelled"
-                    {
-                        task.start_time = now_millis();
-                        task.end_time = None;
-                        task.estimated_duration = None;
-                        task.current_stage = task.active_file.clone();
-                        info!(task_id = %req.task_id, "Task restarted from {}", old_status);
-                    } else if task.start_time == 0 {
-                        task.start_time = now_millis();
-                        info!(task_id = %req.task_id, "Task started");
-                    }
-                }
+                apply_running_transition_defaults(
+                    task,
+                    &old_status,
+                    status,
+                    has_explicit_estimated_duration,
+                    has_explicit_current_stage,
+                );
 
                 if status == "completed" || status == "error" || status == "cancelled" {
                     task.end_time = Some(now_millis());
@@ -593,7 +614,17 @@ async fn update_state(
                     task.start_time = 0;
                     task.end_time = None;
                 }
+            }
 
+            if let Some(estimated_duration) = req.estimated_duration {
+                task.estimated_duration = Some(estimated_duration);
+            }
+
+            if let Some(ref current_stage) = req.current_stage {
+                task.current_stage = Some(current_stage.clone());
+            }
+
+            if req.status.is_some() {
                 state_sync = Some((
                     task.id.clone(),
                     task.status.clone(),
@@ -636,6 +667,52 @@ async fn update_state(
     }
 
     (StatusCode::OK, Json(ApiResponse::ok()))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{apply_running_transition_defaults, Task};
+
+    fn sample_task(status: &str) -> Task {
+        Task {
+            id: "task-1".to_string(),
+            name: "Test Task".to_string(),
+            is_focused: false,
+            ide: "cursor".to_string(),
+            window_title: "main.rs".to_string(),
+            project_path: Some("/tmp/project".to_string()),
+            active_file: Some("src/main.rs".to_string()),
+            status: status.to_string(),
+            source: "hook".to_string(),
+            start_time: 1,
+            end_time: Some(2),
+            last_heartbeat: 0,
+            estimated_duration: Some(10_000),
+            current_stage: Some("__completed__".to_string()),
+        }
+    }
+
+    #[test]
+    fn running_restart_keeps_explicit_progress_fields() {
+        let mut task = sample_task("completed");
+
+        apply_running_transition_defaults(&mut task, "completed", "running", true, true);
+
+        assert_eq!(task.end_time, None);
+        assert_eq!(task.estimated_duration, Some(10_000));
+        assert_eq!(task.current_stage.as_deref(), Some("__completed__"));
+    }
+
+    #[test]
+    fn running_restart_falls_back_to_active_file_without_explicit_stage() {
+        let mut task = sample_task("completed");
+
+        apply_running_transition_defaults(&mut task, "completed", "running", false, false);
+
+        assert_eq!(task.end_time, None);
+        assert_eq!(task.estimated_duration, None);
+        assert_eq!(task.current_stage.as_deref(), Some("src/main.rs"));
+    }
 }
 
 async fn reset_tasks(
