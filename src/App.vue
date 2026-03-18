@@ -329,20 +329,14 @@ function handleShowAllTasks() {
   saveHiddenTaskIds();
 }
 
-// Cancel a running/completed task -> reset to armed
+// Cancel a running/completed task -> keep cancelled state visible
 async function handleCancelTask() {
   const task = contextMenu.value.task;
   if (!task) return;
   closeContextMenu();
   try {
-    const port = store.settings.httpPort || 31415;
-    const host = store.settings.httpHost || '127.0.0.1';
-    await fetch(`http://${host}:${port}/api/task/update_state`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ task_id: task.id, status: 'armed', source: 'hook' })
-    });
-    debug('Task reset to armed', { taskId: task.id });
+    await safeInvoke('cancel_task', { taskId: task.id });
+    debug('Task cancelled', { taskId: task.id });
   } catch (err) {
     error('Failed to cancel task', { error: String(err) });
   }
@@ -456,7 +450,7 @@ async function updatePositionDisplay() {
 function getTimeStr(task: ProgressTask): string {
   // Focused state does NOT affect time display - only the icon changes
   if (task.status === 'armed') return '';
-  if (task.status === 'completed' && task.start_time > 0) {
+  if ((task.status === 'completed' || task.status === 'cancelled') && task.start_time > 0) {
     const elapsed = (task.end_time || Date.now()) - task.start_time;
     const minutes = Math.floor(elapsed / 60000);
     const seconds = Math.floor((elapsed % 60000) / 1000);
@@ -501,6 +495,7 @@ function getStatusIcon(task: ProgressTask): string {
   switch (task.status) {
     case 'running': return '◉';
     case 'completed': return '✓';
+    case 'cancelled': return '✕';
     case 'armed': return '◎';
     default: return '○';
   }
@@ -725,6 +720,7 @@ onMounted(async () => {
           'task-row',
           { completed: task.status === 'completed' && !clickedCompletedTasks.has(task.id) },
           { 'completed-clicked': clickedCompletedTasks.has(task.id) },
+          { cancelled: task.status === 'cancelled' },
           { armed: task.status === 'armed' },
           { 'focused-state': task.is_focused }
         ]"
@@ -744,8 +740,8 @@ onMounted(async () => {
         <!-- Expanded: show task name without IDE prefix -->
         <template v-else>
           <span class="task-name-mini" :title="getDisplayName(task)">{{ getDisplayName(task) }}</span>
-          <span :class="['task-time-mini', { 'completed-time': task.status === 'completed', 'armed-time': task.status === 'armed' }]">
-            {{ task.status === 'completed' ? `✓ ${getTimeStr(task)}` : getTimeStr(task) }}
+          <span :class="['task-time-mini', { 'completed-time': task.status === 'completed', 'cancelled-time': task.status === 'cancelled', 'armed-time': task.status === 'armed' }]">
+            {{ task.status === 'completed' ? `✓ ${getTimeStr(task)}` : task.status === 'cancelled' ? `✕ ${getTimeStr(task)}` : getTimeStr(task) }}
           </span>
           <span v-if="task.ide || taskCustomTitles[task.id]" :class="['ide-badge-mini', getIdeColorClass(task.ide)]" :title="getTaskBadgeTitle(task)">{{ getTaskBadgeTitle(task) }}</span>
         </template>
@@ -775,6 +771,7 @@ onMounted(async () => {
           'single-task-row',
           { completed: singleTask.status === 'completed' && !clickedCompletedTasks.has(singleTask.id) },
           { 'completed-clicked': clickedCompletedTasks.has(singleTask.id) },
+          { cancelled: singleTask.status === 'cancelled' },
           { armed: singleTask.status === 'armed' },
           { 'focused-state': singleTask.is_focused }
         ]"
@@ -786,8 +783,8 @@ onMounted(async () => {
           {{ getStatusIcon(singleTask) }}
         </span>
         <span class="task-name-mini" :title="getDisplayName(singleTask)">{{ getDisplayName(singleTask) }}</span>
-        <span :class="['task-time-mini', { 'completed-time': singleTask.status === 'completed', 'armed-time': singleTask.status === 'armed' }]">
-          {{ singleTask.status === 'completed' ? `✓ ${getTimeStr(singleTask)}` : getTimeStr(singleTask) }}
+        <span :class="['task-time-mini', { 'completed-time': singleTask.status === 'completed', 'cancelled-time': singleTask.status === 'cancelled', 'armed-time': singleTask.status === 'armed' }]">
+          {{ singleTask.status === 'completed' ? `✓ ${getTimeStr(singleTask)}` : singleTask.status === 'cancelled' ? `✕ ${getTimeStr(singleTask)}` : getTimeStr(singleTask) }}
         </span>
         <span v-if="singleTask.ide || taskCustomTitles[singleTask.id]" :class="['ide-badge-mini', getIdeColorClass(singleTask.ide)]" :title="getTaskBadgeTitle(singleTask)">{{ getTaskBadgeTitle(singleTask) }}</span>
       </div>

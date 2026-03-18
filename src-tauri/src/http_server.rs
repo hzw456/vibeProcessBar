@@ -479,6 +479,58 @@ pub async fn reset_task_to_armed(task_id: &str) -> Result<(), String> {
     }
 }
 
+/// 取消任务并保留 cancelled 状态，避免立即回到 armed
+pub async fn cancel_task(task_id: &str) -> Result<(), String> {
+    let state = SHARED_STATE.clone();
+    let state_sync = {
+        let mut tasks = state.tasks.lock().unwrap();
+
+        if let Some(task) = tasks.iter_mut().find(|t| t.id == task_id) {
+            task.status = "cancelled".to_string();
+            task.end_time = Some(now_millis());
+            task.estimated_duration = None;
+            info!(task_id = %task_id, "Task marked as cancelled");
+
+            Some((
+                task.id.clone(),
+                task.status.clone(),
+                task.project_path.clone(),
+                task.active_file.clone(),
+                task.current_stage.clone(),
+                Some(task.window_title.clone()),
+                Some(task.is_focused),
+            ))
+        } else {
+            None
+        }
+    };
+
+    if let Some((
+        task_id,
+        status,
+        project_path,
+        active_file,
+        current_stage,
+        window_title,
+        is_focused,
+    )) = state_sync
+    {
+        sync_backend_state(
+            &task_id,
+            &status,
+            project_path.as_deref(),
+            active_file.as_deref(),
+            current_stage.as_deref(),
+            window_title.as_deref(),
+            is_focused,
+        )
+        .await;
+        Ok(())
+    } else {
+        Err(format!("Task not found: {}", task_id))
+    }
+}
+
 // ============================================================================
 // Task Merge Logic (Rust层合并)
 // ============================================================================

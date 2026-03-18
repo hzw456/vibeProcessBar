@@ -47,6 +47,11 @@ async fn reset_task_to_armed(task_id: String) -> Result<(), String> {
 }
 
 #[tauri::command]
+async fn cancel_task(task_id: String) -> Result<(), String> {
+    http_server::cancel_task(&task_id).await
+}
+
+#[tauri::command]
 async fn get_ide_windows() -> Result<Vec<IdeWindow>, String> {
     Ok(window_manager::scan_ide_windows())
 }
@@ -487,6 +492,7 @@ fn main() {
             activate_window,
             activate_ide_window,
             reset_task_to_armed,
+            cancel_task,
             get_ide_windows,
             open_settings_window,
             get_app_settings,

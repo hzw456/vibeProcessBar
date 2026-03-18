@@ -2,6 +2,7 @@ import type { ProgressTask } from '../stores/progressStore';
 
 const DISPLAYABLE_STATUSES = new Set<ProgressTask['status']>([
   'completed',
+  'cancelled',
   'running',
   'armed',
   'idle',
