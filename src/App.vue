@@ -42,14 +42,16 @@ async function getWindow() {
 
 // Check if this is the settings window
 const isSettingsWindow = ref(window.location.search.includes('type=settings'));
-if (isTauri && !isSettingsWindow.value) {
+const isHistoryWindow = ref(window.location.search.includes('type=history'));
+if (isTauri && !isSettingsWindow.value && !isHistoryWindow.value) {
     // Double check with label for main window, just in case, but rely on query param primarily
     getCurrentWindowLabel().then(label => {
         if (label === 'settings') isSettingsWindow.value = true;
-        debug('Window label check', { label, isSettings: isSettingsWindow.value });
+        if (label === 'history') isHistoryWindow.value = true;
+        debug('Window label check', { label, isSettings: isSettingsWindow.value, isHistory: isHistoryWindow.value });
     });
 } else {
-    debug('Window type detected from URL', { isSettings: isSettingsWindow.value });
+    debug('Window type detected from URL', { isSettings: isSettingsWindow.value, isHistory: isHistoryWindow.value });
 }
 
 interface IdeWindow {
@@ -72,7 +74,6 @@ const isCollapseTransition = ref(false);
 const ideWindows = ref<IdeWindow[]>([]);
 const prevTasks = ref<ProgressTask[]>([]);
 const isActivatingRef = ref(false);
-const activeMainView = ref<'tasks' | 'history'>('tasks');
 
 // Right-click context menu state
 const contextMenu = ref<{ show: boolean; x: number; y: number; task: ProgressTask | null }>({
@@ -299,8 +300,7 @@ function handleBgContextMenu(event: MouseEvent) {
   if (
     target.closest('.task-row') ||
     target.closest('.collapsed-single-task') ||
-    target.closest('.task-context-menu') ||
-    target.closest('.main-history-view')
+    target.closest('.task-context-menu')
   ) {
     return;
   }
@@ -309,16 +309,6 @@ function handleBgContextMenu(event: MouseEvent) {
 
 function closeBgMenu() {
   bgMenu.value.show = false;
-}
-
-function switchMainView(view: 'tasks' | 'history') {
-  activeMainView.value = view;
-  closeBgMenu();
-  closeContextMenu();
-
-  if (view === 'history' && isCollapsed.value) {
-    isCollapsed.value = false;
-  }
 }
 
 async function handleHideWindow() {
@@ -344,6 +334,15 @@ function handleShowAllTasks() {
   closeBgMenu();
   hiddenTaskIds.value = new Set();
   saveHiddenTaskIds();
+}
+
+async function openHistoryWindow() {
+  closeBgMenu();
+  try {
+    await safeInvoke('open_history_window');
+  } catch (err) {
+    error('Failed to open history window', { error: String(err) });
+  }
 }
 
 // Cancel a running/completed task -> keep cancelled state visible
@@ -404,8 +403,7 @@ async function handleMouseDown(event: MouseEvent) {
     target.closest('select') ||
     target.closest('.task-row') ||
     target.closest('.menu-item') ||
-    target.closest('.task-context-menu') ||
-    target.closest('.main-history-view')
+    target.closest('.task-context-menu')
   ) {
     return;
   }
@@ -620,19 +618,10 @@ watch(() => store.tasks, (newTasks) => {
 }, { deep: true });
 
 // Dynamic window resize
-watch([displayTasks, isCollapsed, isCollapseTransition, activeMainView], async () => {
-  // Skip resizing for settings window
+watch([displayTasks, isCollapsed, isCollapseTransition], async () => {
+  // Skip resizing for settings/history window
   if (isSettingsWindow.value) return;
   if (isCollapseTransition.value) return;
-
-  if (activeMainView.value === 'history') {
-    try {
-      await safeInvoke('resize_window', { width: 520, height: 560 });
-    } catch (e) {
-      error('Failed to resize history window', { error: String(e) });
-    }
-    return;
-  }
 
   const taskCount = displayTasks.value.length;
   const taskHeight = 36;  // Row height (8px padding * 2 + ~20px content)
@@ -717,6 +706,11 @@ onMounted(async () => {
     <SettingsPanel :is-standalone="true" />
   </div>
 
+  <!-- History Window -->
+  <div v-else-if="isHistoryWindow" class="settings-window-container">
+    <HistoryPanel :is-main-view="true" />
+  </div>
+
   <!-- Auth Container -->
   <div v-else-if="!authStore.isAuthenticated" class="auth-container">
     <Register v-if="showRegister" @switch-to-login="showRegister = false" />
@@ -744,15 +738,6 @@ onMounted(async () => {
     <div v-if="completedTask" class="completed-banner">
       ✓ {{ t('notification.taskCompleted', { taskName: store.tasks.find(t => t.id === completedTask)?.name || t('menu.title') }) }}
     </div>
-
-    <!-- History View -->
-    <template v-if="activeMainView === 'history'">
-      <div class="main-history-header">
-        <span class="main-history-title">{{ t('settings.tasks.history') }}</span>
-        <button class="main-history-back" @click="switchMainView('tasks')">← {{ t('settings.tasks.backToTasks') }}</button>
-      </div>
-      <HistoryPanel :is-main-view="true" class="main-history-view" />
-    </template>
 
     <!-- Multi-task view -->
     <div v-if="displayTasks.length > 1" class="multi-task-list">
@@ -904,7 +889,7 @@ onMounted(async () => {
           <div v-if="hiddenTaskIds.size > 0" class="menu-item" @click="handleShowAllTasks">
             ◉ {{ t('contextMenu.showAllTasks') }}
           </div>
-          <div class="menu-item" @click="switchMainView('history')">
+          <div class="menu-item" @click="openHistoryWindow">
             📋 {{ t('settings.tasks.history') }}
           </div>
         </div>

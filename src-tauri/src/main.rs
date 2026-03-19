@@ -88,6 +88,38 @@ fn open_settings_window<R: Runtime>(app: tauri::AppHandle<R>) -> Result<(), Stri
     Ok(())
 }
 
+#[tauri::command]
+fn open_history_window<R: Runtime>(app: tauri::AppHandle<R>) -> Result<(), String> {
+    if let Some(window) = app.get_webview_window("history") {
+        // 窗口已存在，确保显示并聚焦
+        let _ = window.show();
+        let _ = window.set_focus();
+    } else {
+        // 创建新窗口
+        let window = tauri::WebviewWindowBuilder::new(
+            &app,
+            "history",
+            tauri::WebviewUrl::App("index.html?type=history".into()),
+        )
+        .title("Task History")
+        .inner_size(520.0, 600.0)
+        .resizable(true)
+        .minimizable(true)
+        .maximizable(true)
+        .decorations(true)
+        .transparent(false)
+        .visible(true)
+        .focused(true)
+        .build()
+        .map_err(|e| e.to_string())?;
+
+        // 确保窗口显示并聚焦
+        let _ = window.show();
+        let _ = window.set_focus();
+    }
+    Ok(())
+}
+
 // ============================================================================
 // Task Commands (Rust层合并逻辑)
 // ============================================================================
