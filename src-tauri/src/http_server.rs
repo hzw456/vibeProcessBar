@@ -45,6 +45,29 @@ pub struct Task {
     pub current_stage: Option<String>,
 }
 
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct BackendStateSnapshot {
+    status: String,
+    project_path: Option<String>,
+    active_file: Option<String>,
+    current_stage: Option<String>,
+    window_title: String,
+    is_focused: bool,
+}
+
+impl From<&Task> for BackendStateSnapshot {
+    fn from(task: &Task) -> Self {
+        Self {
+            status: task.status.clone(),
+            project_path: task.project_path.clone(),
+            active_file: task.active_file.clone(),
+            current_stage: task.current_stage.clone(),
+            window_title: task.window_title.clone(),
+            is_focused: task.is_focused,
+        }
+    }
+}
+
 // ============================================================================
 // Request 数据结构
 // ============================================================================
@@ -254,6 +277,10 @@ fn should_sync_backend_state_for_update(req: &UpdateStateRequest) -> bool {
         || req.active_file.is_some()
         || req.window_title.is_some()
         || req.is_focused.is_some()
+}
+
+fn has_backend_state_changed(before: &BackendStateSnapshot, after: &Task) -> bool {
+    before != &BackendStateSnapshot::from(after)
 }
 
 fn apply_running_transition_defaults(
@@ -803,6 +830,8 @@ async fn update_state(
         let found = tasks.iter_mut().find(|t| t.id == req.task_id);
 
         if let Some(task) = found {
+            let backend_state_before = BackendStateSnapshot::from(&*task);
+
             if !can_update_source(&task.source, request_source) {
                 info!(task_id = %req.task_id, "Ignoring update_state - lower priority");
                 return (
@@ -851,11 +880,15 @@ async fn update_state(
                 );
 
                 if status == "completed" || status == "error" || status == "cancelled" {
-                    task.end_time = Some(now_millis());
-                    if status == "completed" {
+                    if old_status != *status {
+                        task.end_time = Some(now_millis());
+                    }
+                    if status == "completed" && task.current_stage.as_deref() != Some("__completed__") {
                         task.current_stage = Some("__completed__".to_string());
                     }
-                    info!(task_id = %req.task_id, new_status = %status, "Task ended");
+                    if old_status != *status {
+                        info!(task_id = %req.task_id, new_status = %status, "Task ended");
+                    }
                 }
 
                 if status == "armed" {
@@ -874,7 +907,9 @@ async fn update_state(
                 task.current_stage = Some(current_stage.clone());
             }
 
-            if should_sync_backend_state_for_update(&req) {
+            if should_sync_backend_state_for_update(&req)
+                && has_backend_state_changed(&backend_state_before, task)
+            {
                 state_sync = Some((
                     task.id.clone(),
                     task.status.clone(),
@@ -884,6 +919,8 @@ async fn update_state(
                     Some(task.window_title.clone()),
                     Some(task.is_focused),
                 ));
+            } else if should_sync_backend_state_for_update(&req) {
+                debug!(task_id = %req.task_id, "Skipping backend state sync for no-op update");
             }
 
             if req.estimated_duration.is_some() || req.current_stage.is_some() {
@@ -1099,6 +1136,8 @@ async fn update_state_by_path(
         });
 
         if let Some(task) = found {
+            let backend_state_before = BackendStateSnapshot::from(&*task);
+
             if !can_update_source(&task.source, request_source) {
                 info!(project_path = %req.project_path, "Ignoring update_state_by_path - lower priority");
                 return (
@@ -1139,22 +1178,29 @@ async fn update_state_by_path(
                 }
 
                 if status == "completed" || status == "error" || status == "cancelled" {
-                    task.end_time = Some(now_millis());
-                    if status == "completed" {
+                    if old_status != *status {
+                        task.end_time = Some(now_millis());
+                    }
+                    if status == "completed" && task.current_stage.as_deref() != Some("__completed__") {
                         task.current_stage = Some("__completed__".to_string());
                     }
                 }
             }
 
-            Some((
-                task.id.clone(),
-                task.status.clone(),
-                task.project_path.clone(),
-                task.active_file.clone(),
-                task.current_stage.clone(),
-                Some(task.window_title.clone()),
-                Some(task.is_focused),
-            ))
+            if has_backend_state_changed(&backend_state_before, task) {
+                Some((
+                    task.id.clone(),
+                    task.status.clone(),
+                    task.project_path.clone(),
+                    task.active_file.clone(),
+                    task.current_stage.clone(),
+                    Some(task.window_title.clone()),
+                    Some(task.is_focused),
+                ))
+            } else {
+                debug!(project_path = %req.project_path, "Skipping backend state sync for no-op path update");
+                None
+            }
         } else {
             return (
                 StatusCode::NOT_FOUND,
