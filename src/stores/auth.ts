@@ -1,8 +1,9 @@
 import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
+import { DEFAULT_BACKEND_SERVER_URL } from './defaultSettings'
 
 // API URL - can be updated from settings
-let apiBaseUrl = 'https://home.haozw.top:3010';
+let apiBaseUrl = DEFAULT_BACKEND_SERVER_URL;
 
 export const setApiBaseUrl = (url: string) => {
   apiBaseUrl = url;

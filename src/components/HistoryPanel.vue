@@ -2,6 +2,7 @@
 import { computed, onMounted, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useProgressStore, type ProgressTask } from '../stores/progressStore';
+import { DEFAULT_BACKEND_SERVER_URL } from '../stores/defaultSettings';
 import './SettingsPanel.css';
 
 interface Props {
@@ -118,7 +119,7 @@ function formatDuration(task: ProgressTask) {
 }
 
 function getHistoryApiBaseUrl() {
-  return (store.settings.backendServerUrl?.trim() || 'http://localhost:3010').replace(/\/+$/, '');
+  return (store.settings.backendServerUrl?.trim() || DEFAULT_BACKEND_SERVER_URL).replace(/\/+$/, '');
 }
 
 function getHistoryRequestHeaders() {

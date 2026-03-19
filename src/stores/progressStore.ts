@@ -4,6 +4,7 @@ import { debug, error } from '../utils/logger';
 import type { SupportedLanguage } from '../utils/i18n';
 import { setLanguage as setI18nLanguage } from '../utils/i18n';
 import { useAuthStore, setApiBaseUrl } from './auth';
+import { DEFAULT_BACKEND_SERVER_URL } from './defaultSettings';
 
 const isTauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
 
@@ -70,7 +71,7 @@ const defaultSettings: AppSettings = {
   httpHost: '127.0.0.1',
   httpPort: 31415,
   apiKey: '',
-  backendServerUrl: 'https://home.haozw.top:3010',
+  backendServerUrl: DEFAULT_BACKEND_SERVER_URL,
   windowVisible: true,
   blockPluginStatus: true,
   windowX: null,

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { useProgressStore } from '../stores/progressStore';
+import { DEFAULT_BACKEND_SERVER_URL } from '../stores/defaultSettings';
 import LanguageSelector from './LanguageSelector.vue';
 import './SettingsPanel.css';
 import { ref, computed } from 'vue';
@@ -25,7 +26,6 @@ type TabType = 'general' | 'appearance' | 'account';
 const activeTab = ref<TabType>('general');
 
 const themes = ['dark', 'purple', 'ocean', 'forest', 'midnight'] as const;
-const defaultBackendServerUrl = 'https://home.haozw.top:3010';
 
 // App version
 const appVersion = '1.0.1';
@@ -46,7 +46,7 @@ function handleResetDefaults() {
   store.setSoundVolume(0.7);
   store.setHttpHost('127.0.0.1');
   store.setHttpPort(31415);
-  store.setBackendServerUrl(defaultBackendServerUrl);
+  store.setBackendServerUrl(DEFAULT_BACKEND_SERVER_URL);
   store.setApiKey('');
   store.setBlockPluginStatus(true);
   store.setShowOnlyWhenRunning(false);
