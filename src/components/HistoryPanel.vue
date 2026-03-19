@@ -3,6 +3,13 @@ import { computed, onMounted, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useProgressStore, type ProgressTask } from '../stores/progressStore';
 import { DEFAULT_BACKEND_SERVER_URL } from '../stores/defaultSettings';
+import {
+  getHistoryMeta,
+  getHistoryTitle,
+  normalizeTaskHistory,
+  type HistoryTimelineEvent,
+  type TaskStageRecord,
+} from '../utils/history';
 import './SettingsPanel.css';
 
 interface Props {
@@ -28,14 +35,6 @@ const stageLoading = ref<Record<string, boolean>>({});
 const stageErrors = ref<Record<string, string>>({});
 
 const statusOptions: FilterStatus[] = ['all', 'running', 'armed', 'completed', 'cancelled', 'idle', 'error'];
-
-interface TaskStageRecord {
-  stage: string;
-  description?: string;
-  started_at?: number;
-  ended_at?: number;
-  duration?: number;
-}
 
 interface TaskStagesApiResponse {
   stages?: TaskStageRecord[];
@@ -79,11 +78,11 @@ function getStatusLabel(status: ProgressTask['status'] | 'all') {
 }
 
 function getTaskTitle(task: ProgressTask) {
-  return task.current_stage || task.name || task.window_title || task.id;
+  return getHistoryTitle(task);
 }
 
 function getTaskMeta(task: ProgressTask) {
-  return task.window_title || task.project_path || task.active_file || task.id;
+  return getHistoryMeta(task);
 }
 
 function formatDate(value?: number) {
@@ -175,15 +174,10 @@ async function fetchTaskStages(taskId: string) {
     }
 
     const payload = (await response.json()) as TaskStagesApiResponse;
-    const stages = [...(payload.stages || [])].sort((a, b) => {
-      const timeA = a.started_at || a.ended_at || 0;
-      const timeB = b.started_at || b.ended_at || 0;
-      return timeB - timeA;
-    });
 
     stageRecords.value = {
       ...stageRecords.value,
-      [taskId]: stages,
+      [taskId]: payload.stages || [],
     };
   } catch (err) {
     stageErrors.value = {
@@ -213,6 +207,26 @@ function formatStageDuration(duration?: number, startedAt?: number, endedAt?: nu
   }
 
   return t('time.seconds', { seconds });
+}
+
+function getTimeline(task: ProgressTask): HistoryTimelineEvent[] {
+  return normalizeTaskHistory(task, stageRecords.value[task.id] || []);
+}
+
+function formatEventTitle(task: ProgressTask, event: HistoryTimelineEvent) {
+  return event.kind === 'stage' ? event.title : getStatusLabel(task.status);
+}
+
+function formatEventSubtitle(event: HistoryTimelineEvent) {
+  return event.subtitle || t('settings.tasks.notAvailable');
+}
+
+function formatEventTime(event: HistoryTimelineEvent) {
+  if (event.startedAt && event.endedAt && event.startedAt !== event.endedAt) {
+    return `${formatDate(event.startedAt)} - ${formatDate(event.endedAt)}`;
+  }
+
+  return formatDate(event.startedAt || event.endedAt);
 }
 
 async function refreshHistory() {
@@ -327,23 +341,26 @@ onMounted(async () => {
               <div v-else-if="stageErrors[task.id]" class="history-state history-error">
                 {{ t('settings.tasks.stages.loadError', { message: stageErrors[task.id] }) }}
               </div>
-              <div v-else-if="!(stageRecords[task.id]?.length)" class="history-state">
+              <div v-else-if="!(getTimeline(task).length)" class="history-state">
                 {{ t('settings.tasks.stages.empty') }}
               </div>
-              <div v-else class="history-stage-list">
+              <div v-else class="history-stage-list history-timeline">
                 <div
-                  v-for="(record, index) in stageRecords[task.id]"
-                  :key="`${task.id}-${index}`"
-                  class="history-stage-card"
+                  v-for="event in getTimeline(task)"
+                  :key="event.key"
+                  :class="['history-stage-card', 'history-timeline-item', `kind-${event.kind}`]"
                 >
                   <div class="history-stage-header">
-                    <span class="history-stage-name">{{ record.stage || t('settings.tasks.notAvailable') }}</span>
+                    <div class="history-timeline-copy">
+                      <span class="history-stage-name">{{ formatEventTitle(task, event) }}</span>
+                      <span class="history-stage-description">{{ formatEventSubtitle(event) }}</span>
+                    </div>
                     <span class="history-stage-duration">
-                      {{ formatStageDuration(record.duration, record.started_at, record.ended_at) }}
+                      {{ formatStageDuration(event.duration, event.startedAt, event.endedAt) }}
                     </span>
                   </div>
-                  <div class="history-stage-description">
-                    {{ record.description || t('settings.tasks.notAvailable') }}
+                  <div class="history-timeline-time">
+                    {{ formatEventTime(event) }}
                   </div>
                 </div>
               </div>

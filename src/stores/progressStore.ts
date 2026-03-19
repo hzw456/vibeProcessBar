@@ -198,7 +198,7 @@ export const useProgressStore = defineStore('progress', () => {
   function getStatusApiUrl(): string {
     const baseUrl = (settings.value.backendServerUrl?.trim() || defaultSettings.backendServerUrl)
       .replace(/\/+$/, '');
-    return `${baseUrl}/api/status`;
+    return `${baseUrl}/api/history`;
   }
 
   async function fetchHistory() {
