@@ -128,6 +128,7 @@
         "startedAt": "Started",
         "duration": "Duration"
       },
+      "backToTasks": "Back to Tasks",
       "clearHistory": "Clear History",
       "clear": "Clear"
     },

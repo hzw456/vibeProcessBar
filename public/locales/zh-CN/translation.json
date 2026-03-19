@@ -128,6 +128,7 @@
         "startedAt": "开始时间",
         "duration": "持续时间"
       },
+      "backToTasks": "返回任务",
       "clearHistory": "清除历史",
       "clear": "清除"
     },

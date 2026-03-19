@@ -6,6 +6,7 @@ import { useAuthStore } from './stores/auth';
 import Login from './components/Login.vue';
 import Register from './components/Register.vue';
 import SettingsPanel from './components/SettingsPanel.vue';
+import HistoryPanel from './components/HistoryPanel.vue';
 import { debug, error } from './utils/logger';
 import { playCompletionSound } from './utils/notifications';
 import { shouldDisplayTask } from './utils/taskFilters';
@@ -71,6 +72,7 @@ const isCollapseTransition = ref(false);
 const ideWindows = ref<IdeWindow[]>([]);
 const prevTasks = ref<ProgressTask[]>([]);
 const isActivatingRef = ref(false);
+const activeMainView = ref<'tasks' | 'history'>('tasks');
 
 // Right-click context menu state
 const contextMenu = ref<{ show: boolean; x: number; y: number; task: ProgressTask | null }>({
@@ -294,7 +296,12 @@ function handleBgContextMenu(event: MouseEvent) {
   event.preventDefault();
   // Only show on background, not on task rows
   const target = event.target as HTMLElement;
-  if (target.closest('.task-row') || target.closest('.collapsed-single-task') || target.closest('.task-context-menu')) {
+  if (
+    target.closest('.task-row') ||
+    target.closest('.collapsed-single-task') ||
+    target.closest('.task-context-menu') ||
+    target.closest('.main-history-view')
+  ) {
     return;
   }
   bgMenu.value = { show: true, x: event.clientX, y: event.clientY };
@@ -302,6 +309,16 @@ function handleBgContextMenu(event: MouseEvent) {
 
 function closeBgMenu() {
   bgMenu.value.show = false;
+}
+
+function switchMainView(view: 'tasks' | 'history') {
+  activeMainView.value = view;
+  closeBgMenu();
+  closeContextMenu();
+
+  if (view === 'history' && isCollapsed.value) {
+    isCollapsed.value = false;
+  }
 }
 
 async function handleHideWindow() {
@@ -381,7 +398,15 @@ function confirmRenameIde() {
 async function handleMouseDown(event: MouseEvent) {
   // Only start drag if clicking on the container itself (not buttons or interactive elements)
   const target = event.target as HTMLElement;
-  if (target.closest('button') || target.closest('.task-row') || target.closest('.menu-item') || target.closest('.task-context-menu')) {
+  if (
+    target.closest('button') ||
+    target.closest('input') ||
+    target.closest('select') ||
+    target.closest('.task-row') ||
+    target.closest('.menu-item') ||
+    target.closest('.task-context-menu') ||
+    target.closest('.main-history-view')
+  ) {
     return;
   }
   try {
@@ -595,10 +620,19 @@ watch(() => store.tasks, (newTasks) => {
 }, { deep: true });
 
 // Dynamic window resize
-watch([displayTasks, isCollapsed, isCollapseTransition], async () => {
+watch([displayTasks, isCollapsed, isCollapseTransition, activeMainView], async () => {
   // Skip resizing for settings window
   if (isSettingsWindow.value) return;
   if (isCollapseTransition.value) return;
+
+  if (activeMainView.value === 'history') {
+    try {
+      await safeInvoke('resize_window', { width: 520, height: 560 });
+    } catch (e) {
+      error('Failed to resize history window', { error: String(e) });
+    }
+    return;
+  }
 
   const taskCount = displayTasks.value.length;
   const taskHeight = 36;  // Row height (8px padding * 2 + ~20px content)
@@ -710,6 +744,15 @@ onMounted(async () => {
     <div v-if="completedTask" class="completed-banner">
       ✓ {{ t('notification.taskCompleted', { taskName: store.tasks.find(t => t.id === completedTask)?.name || t('menu.title') }) }}
     </div>
+
+    <!-- History View -->
+    <template v-if="activeMainView === 'history'">
+      <div class="main-history-header">
+        <span class="main-history-title">{{ t('settings.tasks.history') }}</span>
+        <button class="main-history-back" @click="switchMainView('tasks')">← {{ t('settings.tasks.backToTasks') }}</button>
+      </div>
+      <HistoryPanel :is-main-view="true" class="main-history-view" />
+    </template>
 
     <!-- Multi-task view -->
     <div v-if="displayTasks.length > 1" class="multi-task-list">
@@ -860,6 +903,9 @@ onMounted(async () => {
           </div>
           <div v-if="hiddenTaskIds.size > 0" class="menu-item" @click="handleShowAllTasks">
             ◉ {{ t('contextMenu.showAllTasks') }}
+          </div>
+          <div class="menu-item" @click="switchMainView('history')">
+            📋 {{ t('settings.tasks.history') }}
           </div>
         </div>
       </div>

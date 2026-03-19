@@ -2,6 +2,15 @@
 import { computed, onMounted, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useProgressStore, type ProgressTask } from '../stores/progressStore';
+import './SettingsPanel.css';
+
+interface Props {
+  isMainView?: boolean;
+}
+
+withDefaults(defineProps<Props>(), {
+  isMainView: false,
+});
 
 const store = useProgressStore();
 const { t } = useI18n();
@@ -115,7 +124,7 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="settings-section history-section">
+  <div :class="['settings-section', 'history-section', { 'history-panel-main': isMainView }]" @contextmenu.stop>
     <div class="history-toolbar">
       <input
         v-model="searchQuery"
