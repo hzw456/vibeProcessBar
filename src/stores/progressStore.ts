@@ -203,11 +203,18 @@ export const useProgressStore = defineStore('progress', () => {
 
   async function fetchHistory() {
     try {
-      const response = await fetch(getStatusApiUrl(), {
+      const apiUrl = getStatusApiUrl();
+      const headers: Record<string, string> = {
+        Accept: 'application/json',
+      };
+      const apiKey = settings.value.apiKey?.trim();
+      if (apiKey) {
+        headers['x-api-key'] = apiKey;
+      }
+
+      const response = await fetch(apiUrl, {
         method: 'GET',
-        headers: {
-          Accept: 'application/json',
-        },
+        headers,
       });
 
       if (!response.ok) {
