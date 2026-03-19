@@ -104,6 +104,30 @@
     "tasks": {
       "history": "Task History",
       "historyCount": "{count} tasks",
+      "filteredFrom": "Filtered from {total}",
+      "searchPlaceholder": "Search by task, IDE, file, or path",
+      "refresh": "Refresh",
+      "loading": "Loading...",
+      "empty": "No matching tasks",
+      "loadError": "Failed to load history: {message}",
+      "notAvailable": "N/A",
+      "filters": {
+        "allStatuses": "All statuses"
+      },
+      "statuses": {
+        "running": "Running",
+        "armed": "Armed",
+        "completed": "Completed",
+        "cancelled": "Cancelled",
+        "idle": "Idle",
+        "error": "Error"
+      },
+      "fields": {
+        "ide": "IDE",
+        "tokens": "Tokens",
+        "startedAt": "Started",
+        "duration": "Duration"
+      },
       "clearHistory": "Clear History",
       "clear": "Clear"
     },

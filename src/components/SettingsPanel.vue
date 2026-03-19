@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { useProgressStore } from '../stores/progressStore';
 import LanguageSelector from './LanguageSelector.vue';
+import HistoryPanel from './HistoryPanel.vue';
 import './SettingsPanel.css';
 import { ref, computed } from 'vue';
 import { useI18n } from 'vue-i18n';
@@ -21,7 +22,7 @@ const emit = defineEmits<{
 const store = useProgressStore();
 const { t } = useI18n();
 
-type TabType = 'general' | 'appearance' | 'account';
+type TabType = 'general' | 'appearance' | 'history' | 'account';
 const activeTab = ref<TabType>('general');
 
 const themes = ['dark', 'purple', 'ocean', 'forest', 'midnight'] as const;
@@ -87,6 +88,9 @@ function handlePositionChange(event: Event) {
       </button>
       <button :class="['tab', { active: activeTab === 'appearance' }]" @click="activeTab = 'appearance'">
         {{ t('settings.tabs.appearance') }}
+      </button>
+      <button :class="['tab', { active: activeTab === 'history' }]" @click="activeTab = 'history'">
+        {{ t('settings.tasks.history') }}
       </button>
       <button :class="['tab', { active: activeTab === 'account' }]" @click="activeTab = 'account'">
         {{ t('settings.tabs.account') }}
@@ -181,6 +185,9 @@ function handlePositionChange(event: Event) {
         </div>
         <div class="setting-hint">{{ t('settings.appearance.windowPositionHint') }}</div>
       </div>
+
+      <!-- History Tab -->
+      <HistoryPanel v-if="activeTab === 'history'" />
 
       <!-- Account Tab -->
       <div v-if="activeTab === 'account'" class="settings-section">

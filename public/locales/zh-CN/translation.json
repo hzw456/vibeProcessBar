@@ -104,6 +104,30 @@
     "tasks": {
       "history": "任务历史",
       "historyCount": "{count} 个任务",
+      "filteredFrom": "筛选自 {total} 个任务",
+      "searchPlaceholder": "搜索任务、IDE、文件或路径",
+      "refresh": "刷新",
+      "loading": "加载中...",
+      "empty": "无匹配任务",
+      "loadError": "加载历史失败：{message}",
+      "notAvailable": "暂无",
+      "filters": {
+        "allStatuses": "全部状态"
+      },
+      "statuses": {
+        "running": "运行中",
+        "armed": "等待中",
+        "completed": "已完成",
+        "cancelled": "已取消",
+        "idle": "空闲",
+        "error": "错误"
+      },
+      "fields": {
+        "ide": "IDE",
+        "tokens": "Token数",
+        "startedAt": "开始时间",
+        "duration": "持续时间"
+      },
       "clearHistory": "清除历史",
       "clear": "清除"
     },

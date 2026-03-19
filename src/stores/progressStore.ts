@@ -33,6 +33,11 @@ export interface ProgressTask {
   current_stage?: string; // 当前阶段描述
 }
 
+interface StatusApiResponse {
+  tasks?: ProgressTask[];
+  taskCount?: number;
+}
+
 export interface AppSettings {
   language: SupportedLanguage;
   theme: 'dark' | 'purple' | 'ocean' | 'forest' | 'midnight';
@@ -185,6 +190,39 @@ export const useProgressStore = defineStore('progress', () => {
       }
     } catch (err) {
       error('Failed to fetch tasks', { error: String(err) });
+    }
+  }
+
+  function getStatusApiUrl(): string {
+    const rawHost = settings.value.httpHost?.trim() || defaultSettings.httpHost;
+    const host = rawHost === '0.0.0.0' ? '127.0.0.1' : rawHost;
+    const port = settings.value.httpPort || defaultSettings.httpPort;
+    return `http://${host}:${port}/api/status`;
+  }
+
+  async function fetchHistory() {
+    try {
+      const response = await fetch(getStatusApiUrl(), {
+        method: 'GET',
+        headers: {
+          Accept: 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+
+      const payload = (await response.json()) as StatusApiResponse;
+      history.value = [...(payload.tasks || [])].sort((a, b) => {
+        const timeA = a.end_time || a.start_time || 0;
+        const timeB = b.end_time || b.start_time || 0;
+        return timeB - timeA;
+      });
+      debug('Fetched task history from HTTP API', { count: history.value.length });
+    } catch (err) {
+      error('Failed to fetch task history', { error: String(err) });
+      throw err;
     }
   }
 
@@ -429,6 +467,7 @@ export const useProgressStore = defineStore('progress', () => {
     setWindowVisible,
     addToHistory,
     clearHistory,
+    fetchHistory,
     syncFromHttpApi,
     fetchTasks,
     initEventListeners,
