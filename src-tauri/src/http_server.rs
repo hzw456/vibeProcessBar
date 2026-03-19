@@ -1353,6 +1353,19 @@ struct McpRequest {
     params: Option<serde_json::Value>,
 }
 
+async fn mcp_get_handler() -> (StatusCode, Json<serde_json::Value>) {
+    (
+        StatusCode::METHOD_NOT_ALLOWED,
+        Json(serde_json::json!({
+            "jsonrpc": "2.0",
+            "error": {
+                "code": -32000,
+                "message": "This MCP endpoint only supports HTTP POST JSON-RPC requests. SSE transport is not implemented."
+            }
+        })),
+    )
+}
+
 async fn mcp_handler(
     State(state): State<Arc<SharedState>>,
     Json(req): Json<McpRequest>,
@@ -1723,7 +1736,7 @@ fn create_app(state: Arc<SharedState>) -> Router {
         .route("/api/task/update_state_by_path", post(update_state_by_path))
         .route("/api/task/delete", post(delete_task))
         .route("/api/reset", post(reset_tasks))
-        .route("/mcp", post(mcp_handler))
+        .route("/mcp", get(mcp_get_handler).post(mcp_handler))
         .layer(create_cors_layer())
         .with_state(state)
 }

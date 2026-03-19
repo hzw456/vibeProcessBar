@@ -176,6 +176,8 @@ Connects directly via the Model Context Protocol standard.
 }
 ```
 
+This endpoint currently implements MCP over HTTP JSON-RPC on `POST /mcp`. Clients that require SSE transport are not compatible with the current server implementation.
+
 ### 3️⃣ Plugin Reporting (Code Detection)
 Analyzes code change frequency via VS Code extension.
 - **Principle**: Monitors file modification speed and character changes to infer if AI is generating code.

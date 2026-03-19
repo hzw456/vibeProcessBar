@@ -42,6 +42,16 @@ fn default_backend_email() -> String {
     "fulltest@vibe.app".to_string()
 }
 
+fn normalize_http_host(host: &str) -> String {
+    let trimmed = host.trim();
+
+    if trimmed.is_empty() || matches!(trimmed, "localhost" | "::1" | "[::1]") {
+        "127.0.0.1".to_string()
+    } else {
+        trimmed.to_string()
+    }
+}
+
 impl Default for AppSettings {
     fn default() -> Self {
         Self {
@@ -74,8 +84,11 @@ impl AppSettings {
         }
 
         match fs::read_to_string(path) {
-            Ok(content) => match serde_json::from_str(&content) {
-                Ok(settings) => settings,
+            Ok(content) => match serde_json::from_str::<Self>(&content) {
+                Ok(mut settings) => {
+                    settings.http_host = normalize_http_host(&settings.http_host);
+                    settings
+                }
                 Err(e) => {
                     error!("Failed to parse settings JSON: {}", e);
                     Self::default()
@@ -93,7 +106,10 @@ impl AppSettings {
             fs::create_dir_all(parent).map_err(|e| e.to_string())?;
         }
 
-        let content = serde_json::to_string_pretty(self).map_err(|e| e.to_string())?;
+        let mut normalized = self.clone();
+        normalized.http_host = normalize_http_host(&normalized.http_host);
+
+        let content = serde_json::to_string_pretty(&normalized).map_err(|e| e.to_string())?;
         fs::write(path, content).map_err(|e| e.to_string())?;
         info!("Settings saved to {:?}", path);
         Ok(())
@@ -140,8 +156,29 @@ impl SettingsState {
                 .settings
                 .lock()
                 .map_err(|_| "Failed to lock settings mutex")?;
-            *settings = new_settings;
+            let mut normalized = new_settings;
+            normalized.http_host = normalize_http_host(&normalized.http_host);
+            *settings = normalized;
         }
         self.save()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::normalize_http_host;
+
+    #[test]
+    fn normalize_http_host_maps_localhost_variants_to_ipv4_loopback() {
+        assert_eq!(normalize_http_host("localhost"), "127.0.0.1");
+        assert_eq!(normalize_http_host(" ::1 "), "127.0.0.1");
+        assert_eq!(normalize_http_host("[::1]"), "127.0.0.1");
+        assert_eq!(normalize_http_host(""), "127.0.0.1");
+    }
+
+    #[test]
+    fn normalize_http_host_preserves_explicit_addresses() {
+        assert_eq!(normalize_http_host("127.0.0.1"), "127.0.0.1");
+        assert_eq!(normalize_http_host("0.0.0.0"), "0.0.0.0");
     }
 }

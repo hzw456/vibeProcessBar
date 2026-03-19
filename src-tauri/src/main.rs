@@ -152,9 +152,10 @@ async fn update_app_settings<R: Runtime>(
 
     // 保存设置
     state.update_settings(new_settings.clone())?;
+    let saved_settings = state.get_settings();
 
     // 通过 emit 发送到所有窗口
-    app.emit("settings-changed", &new_settings)
+    app.emit("settings-changed", &saved_settings)
         .map_err(|e| e.to_string())?;
 
     Ok(())
