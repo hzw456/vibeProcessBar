@@ -195,10 +195,9 @@ export const useProgressStore = defineStore('progress', () => {
   }
 
   function getStatusApiUrl(): string {
-    const rawHost = settings.value.httpHost?.trim() || defaultSettings.httpHost;
-    const host = rawHost === '0.0.0.0' ? '127.0.0.1' : rawHost;
-    const port = settings.value.httpPort || defaultSettings.httpPort;
-    return `http://${host}:${port}/api/status`;
+    const baseUrl = (settings.value.backendServerUrl?.trim() || defaultSettings.backendServerUrl)
+      .replace(/\/+$/, '');
+    return `${baseUrl}/api/status`;
   }
 
   async function fetchHistory() {

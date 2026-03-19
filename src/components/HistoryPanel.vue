@@ -117,11 +117,23 @@ function formatDuration(task: ProgressTask) {
   return t('time.seconds', { seconds });
 }
 
+function getHistoryApiBaseUrl() {
+  return (store.settings.backendServerUrl?.trim() || 'http://localhost:3010').replace(/\/+$/, '');
+}
+
+function getHistoryRequestHeaders() {
+  const headers: Record<string, string> = {
+    Accept: 'application/json',
+  };
+  const apiKey = store.settings.apiKey?.trim();
+  if (apiKey) {
+    headers['x-api-key'] = apiKey;
+  }
+  return headers;
+}
+
 function getStagesApiUrl(taskId: string) {
-  const rawHost = store.settings.httpHost?.trim() || '127.0.0.1';
-  const host = rawHost === '0.0.0.0' ? '127.0.0.1' : rawHost;
-  const port = store.settings.httpPort || 31415;
-  return `http://${host}:${port}/api/task/${encodeURIComponent(taskId)}/stages`;
+  return `${getHistoryApiBaseUrl()}/api/task/${encodeURIComponent(taskId)}/stages`;
 }
 
 function isExpanded(taskId: string) {
@@ -154,9 +166,7 @@ async function fetchTaskStages(taskId: string) {
   try {
     const response = await fetch(getStagesApiUrl(taskId), {
       method: 'GET',
-      headers: {
-        Accept: 'application/json',
-      },
+      headers: getHistoryRequestHeaders(),
     });
 
     if (!response.ok) {
@@ -221,7 +231,7 @@ async function refreshHistory() {
   }
 }
 
-watch(() => [store.settings.httpHost, store.settings.httpPort], refreshHistory);
+watch(() => [store.settings.backendServerUrl, store.settings.apiKey], refreshHistory);
 
 onMounted(async () => {
   if (store.history.length === 0) {
