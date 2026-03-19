@@ -198,6 +198,7 @@
   "tray": {
     "showWindow": "Show/Hide",
     "hideWindow": "Show/Hide",
+    "history": "Task History",
     "settings": "Settings",
     "quit": "Quit",
     "noTasks": "No tasks",

@@ -97,6 +97,7 @@ export const useProgressStore = defineStore('progress', () => {
           translations: {
             showWindow: tray.showWindow || '☀ Show Window',
             hideWindow: tray.hideWindow || '☾ Hide Window',
+            history: tray.history || 'Task History',
             settings: tray.settings || 'Settings',
             quit: tray.quit || 'Quit',
             noTasks: tray.noTasks || 'No tasks',

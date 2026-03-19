@@ -198,6 +198,7 @@
   "tray": {
     "showWindow": "显示/隐藏",
     "hideWindow": "显示/隐藏",
+    "history": "任务历史",
     "settings": "设置",
     "quit": "退出",
     "noTasks": "无任务",

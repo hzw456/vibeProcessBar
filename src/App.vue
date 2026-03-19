@@ -336,15 +336,6 @@ function handleShowAllTasks() {
   saveHiddenTaskIds();
 }
 
-async function openHistoryWindow() {
-  closeBgMenu();
-  try {
-    await safeInvoke('open_history_window');
-  } catch (err) {
-    error('Failed to open history window', { error: String(err) });
-  }
-}
-
 // Cancel a running/completed task -> keep cancelled state visible
 async function handleCancelTask() {
   const task = contextMenu.value.task;
@@ -888,9 +879,6 @@ onMounted(async () => {
           </div>
           <div v-if="hiddenTaskIds.size > 0" class="menu-item" @click="handleShowAllTasks">
             ◉ {{ t('contextMenu.showAllTasks') }}
-          </div>
-          <div class="menu-item" @click="openHistoryWindow">
-            📋 {{ t('settings.tasks.history') }}
           </div>
         </div>
       </div>

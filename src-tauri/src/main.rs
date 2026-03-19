@@ -400,6 +400,7 @@ async fn trigger_notification<R: Runtime>(
 pub struct TrayTranslations {
     pub show_window: String,
     pub hide_window: String,
+    pub history: String,
     pub settings: String,
     pub quit: String,
     pub no_tasks: String,
@@ -410,6 +411,7 @@ lazy_static::lazy_static! {
     static ref TRAY_TRANSLATIONS: std::sync::Mutex<TrayTranslations> = std::sync::Mutex::new(TrayTranslations {
         show_window: "Show/Hide".to_string(),
         hide_window: "Show/Hide".to_string(),
+        history: "History".to_string(),
         settings: "Settings".to_string(),
         quit: "Quit".to_string(),
         no_tasks: "No tasks".to_string(),
@@ -424,6 +426,7 @@ fn get_tray_translations_internal() -> TrayTranslations {
         .unwrap_or_else(|_| TrayTranslations {
             show_window: "Show/Hide".to_string(),
             hide_window: "Show/Hide".to_string(),
+            history: "History".to_string(),
             settings: "Settings".to_string(),
             quit: "Quit".to_string(),
             no_tasks: "No tasks".to_string(),
@@ -456,12 +459,14 @@ fn update_tray_menu<R: Runtime>(app: &tauri::AppHandle<R>) {
 
     let window_toggle =
         MenuItem::with_id(app, "toggle-window", &trans.show_window, true, None::<&str>).ok();
+    let history_item =
+        MenuItem::with_id(app, "history", &trans.history, true, None::<&str>).ok();
     let settings_item =
         MenuItem::with_id(app, "settings", &trans.settings, true, None::<&str>).ok();
     let quit_item = MenuItem::with_id(app, "quit", &trans.quit, true, None::<&str>).ok();
 
-    if let (Some(w), Some(s), Some(q)) = (window_toggle, settings_item, quit_item) {
-        let items: Vec<&dyn tauri::menu::IsMenuItem<R>> = vec![&w, &s, &q];
+    if let (Some(w), Some(h), Some(s), Some(q)) = (window_toggle, history_item, settings_item, quit_item) {
+        let items: Vec<&dyn tauri::menu::IsMenuItem<R>> = vec![&w, &h, &s, &q];
 
         if let Ok(menu) = tauri::menu::Menu::with_items(app, &items) {
             if let Some(tray) = app.tray_by_id("main-tray") {
@@ -527,6 +532,7 @@ fn main() {
             cancel_task,
             get_ide_windows,
             open_settings_window,
+            open_history_window,
             get_app_settings,
             update_app_settings,
             get_window_visibility,
@@ -591,6 +597,8 @@ fn main() {
                 true,
                 None::<&str>,
             )?;
+            let history_item =
+                MenuItem::with_id(&app_handle, "history", &trans.history, true, None::<&str>)?;
             let settings_item = MenuItem::with_id(&app_handle, "settings", &trans.settings, true, None::<&str>)?;
             let quit_item = MenuItem::with_id(&app_handle, "quit", &trans.quit, true, None::<&str>)?;
 
@@ -609,7 +617,7 @@ fn main() {
                 .tooltip("Vibe Process Bar")
                 .menu(&tauri::menu::Menu::with_items(
                     &app_handle,
-                    &[&window_toggle_item, &settings_item, &quit_item],
+                    &[&window_toggle_item, &history_item, &settings_item, &quit_item],
                 )?)
                 .show_menu_on_left_click(true)
                 .on_menu_event(move |app, event| {
@@ -634,6 +642,9 @@ fn main() {
                                 let _ = app.tray_by_id("main-tray").unwrap()
                                     .set_tooltip(Some("Vibe Process Bar"));
                             }
+                        }
+                        "history" => {
+                            let _ = open_history_window(app.app_handle().clone());
                         }
                         "settings" => {
                             let _ = open_settings_window(app.app_handle().clone());
