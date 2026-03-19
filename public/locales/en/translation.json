@@ -128,6 +128,11 @@
         "startedAt": "Started",
         "duration": "Duration"
       },
+      "stages": {
+        "title": "Task Stages",
+        "empty": "No stage records",
+        "loadError": "Failed to load stages: {message}"
+      },
       "backToTasks": "Back to Tasks",
       "clearHistory": "Clear History",
       "clear": "Clear"

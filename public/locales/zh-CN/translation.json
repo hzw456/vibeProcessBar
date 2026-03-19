@@ -128,6 +128,11 @@
         "startedAt": "开始时间",
         "duration": "持续时间"
       },
+      "stages": {
+        "title": "任务阶段",
+        "empty": "暂无阶段记录",
+        "loadError": "加载阶段记录失败：{message}"
+      },
       "backToTasks": "返回任务",
       "clearHistory": "清除历史",
       "clear": "清除"

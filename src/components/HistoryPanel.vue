@@ -21,8 +21,24 @@ const searchQuery = ref('');
 const statusFilter = ref<FilterStatus>('all');
 const isLoading = ref(false);
 const loadError = ref('');
+const expandedTaskIds = ref<string[]>([]);
+const stageRecords = ref<Record<string, TaskStageRecord[]>>({});
+const stageLoading = ref<Record<string, boolean>>({});
+const stageErrors = ref<Record<string, string>>({});
 
 const statusOptions: FilterStatus[] = ['all', 'running', 'armed', 'completed', 'cancelled', 'idle', 'error'];
+
+interface TaskStageRecord {
+  stage: string;
+  description?: string;
+  started_at?: number;
+  ended_at?: number;
+  duration?: number;
+}
+
+interface TaskStagesApiResponse {
+  stages?: TaskStageRecord[];
+}
 
 const filteredHistory = computed(() => {
   const keyword = searchQuery.value.trim().toLowerCase();
@@ -101,9 +117,100 @@ function formatDuration(task: ProgressTask) {
   return t('time.seconds', { seconds });
 }
 
+function getStagesApiUrl(taskId: string) {
+  const rawHost = store.settings.httpHost?.trim() || '127.0.0.1';
+  const host = rawHost === '0.0.0.0' ? '127.0.0.1' : rawHost;
+  const port = store.settings.httpPort || 31415;
+  return `http://${host}:${port}/api/task/${encodeURIComponent(taskId)}/stages`;
+}
+
+function isExpanded(taskId: string) {
+  return expandedTaskIds.value.includes(taskId);
+}
+
+function toggleExpanded(taskId: string) {
+  if (isExpanded(taskId)) {
+    expandedTaskIds.value = expandedTaskIds.value.filter((id) => id !== taskId);
+    return;
+  }
+
+  expandedTaskIds.value = [...expandedTaskIds.value, taskId];
+
+  if (!stageRecords.value[taskId] && !stageLoading.value[taskId]) {
+    void fetchTaskStages(taskId);
+  }
+}
+
+async function fetchTaskStages(taskId: string) {
+  stageLoading.value = {
+    ...stageLoading.value,
+    [taskId]: true,
+  };
+  stageErrors.value = {
+    ...stageErrors.value,
+    [taskId]: '',
+  };
+
+  try {
+    const response = await fetch(getStagesApiUrl(taskId), {
+      method: 'GET',
+      headers: {
+        Accept: 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+
+    const payload = (await response.json()) as TaskStagesApiResponse;
+    const stages = [...(payload.stages || [])].sort((a, b) => {
+      const timeA = a.started_at || a.ended_at || 0;
+      const timeB = b.started_at || b.ended_at || 0;
+      return timeB - timeA;
+    });
+
+    stageRecords.value = {
+      ...stageRecords.value,
+      [taskId]: stages,
+    };
+  } catch (err) {
+    stageErrors.value = {
+      ...stageErrors.value,
+      [taskId]: err instanceof Error ? err.message : String(err),
+    };
+  } finally {
+    stageLoading.value = {
+      ...stageLoading.value,
+      [taskId]: false,
+    };
+  }
+}
+
+function formatStageDuration(duration?: number, startedAt?: number, endedAt?: number) {
+  const durationMs = duration ?? (startedAt && endedAt ? Math.max(0, endedAt - startedAt) : undefined);
+  if (durationMs === undefined) {
+    return t('settings.tasks.notAvailable');
+  }
+
+  const totalSeconds = Math.floor(durationMs / 1000);
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+
+  if (minutes > 0) {
+    return t('time.minutesSeconds', { minutes, seconds });
+  }
+
+  return t('time.seconds', { seconds });
+}
+
 async function refreshHistory() {
   isLoading.value = true;
   loadError.value = '';
+  expandedTaskIds.value = [];
+  stageRecords.value = {};
+  stageLoading.value = {};
+  stageErrors.value = {};
 
   try {
     await store.fetchHistory();
@@ -160,16 +267,25 @@ onMounted(async () => {
     </div>
 
     <div v-else class="history-list">
-      <article v-for="task in filteredHistory" :key="task.id" class="history-card">
-        <div class="history-card-header">
-          <div class="history-card-main">
-            <div class="history-task-title" :title="getTaskTitle(task)">{{ getTaskTitle(task) }}</div>
-            <div class="history-task-meta" :title="getTaskMeta(task)">{{ getTaskMeta(task) }}</div>
+      <article
+        v-for="task in filteredHistory"
+        :key="task.id"
+        :class="['history-card', { 'history-card-expanded': isExpanded(task.id) }]"
+      >
+        <button class="history-card-toggle" type="button" @click="toggleExpanded(task.id)">
+          <div class="history-card-header">
+            <div class="history-card-main">
+              <div class="history-task-title" :title="getTaskTitle(task)">{{ getTaskTitle(task) }}</div>
+              <div class="history-task-meta" :title="getTaskMeta(task)">{{ getTaskMeta(task) }}</div>
+            </div>
+            <div class="history-card-side">
+              <span :class="['history-status-pill', `status-${task.status}`]">
+                {{ getStatusLabel(task.status) }}
+              </span>
+              <span class="history-expand-indicator">{{ isExpanded(task.id) ? '−' : '+' }}</span>
+            </div>
           </div>
-          <span :class="['history-status-pill', `status-${task.status}`]">
-            {{ getStatusLabel(task.status) }}
-          </span>
-        </div>
+        </button>
 
         <div class="history-grid">
           <div class="history-grid-item">
@@ -187,6 +303,32 @@ onMounted(async () => {
           <div class="history-grid-item">
             <span class="history-grid-label">{{ t('settings.tasks.fields.duration') }}</span>
             <span>{{ formatDuration(task) }}</span>
+          </div>
+        </div>
+
+        <div v-if="isExpanded(task.id)" class="history-stages">
+          <div class="history-stages-title">{{ t('settings.tasks.stages.title') }}</div>
+          <div v-if="stageLoading[task.id]" class="history-state">
+            {{ t('settings.tasks.loading') }}
+          </div>
+          <div v-else-if="stageErrors[task.id]" class="history-state history-error">
+            {{ t('settings.tasks.stages.loadError', { message: stageErrors[task.id] }) }}
+          </div>
+          <div v-else-if="!(stageRecords[task.id]?.length)" class="history-state">
+            {{ t('settings.tasks.stages.empty') }}
+          </div>
+          <div v-else class="history-stage-list">
+            <div v-for="(record, index) in stageRecords[task.id]" :key="`${task.id}-${index}`" class="history-stage-card">
+              <div class="history-stage-header">
+                <span class="history-stage-name">{{ record.stage || t('settings.tasks.notAvailable') }}</span>
+                <span class="history-stage-duration">
+                  {{ formatStageDuration(record.duration, record.started_at, record.ended_at) }}
+                </span>
+              </div>
+              <div class="history-stage-description">
+                {{ record.description || t('settings.tasks.notAvailable') }}
+              </div>
+            </div>
           </div>
         </div>
       </article>

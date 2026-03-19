@@ -252,6 +252,36 @@
   background: rgba(255, 255, 255, 0.04);
 }
 
+.history-card-expanded {
+  border-color: rgba(var(--primary-color-rgb, 99, 102, 241), 0.35);
+}
+
+.history-card-toggle {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.history-card-side {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.history-expand-indicator {
+  width: 20px;
+  text-align: center;
+  font-size: 16px;
+  line-height: 1;
+  color: var(--text-secondary);
+}
+
 .history-card-header {
   display: flex;
   justify-content: space-between;
@@ -342,6 +372,59 @@
 .history-grid-label {
   font-size: 11px;
   color: var(--text-secondary);
+}
+
+.history-stages {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border-color);
+}
+
+.history-stages-title {
+  margin-bottom: 10px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.history-stage-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.history-stage-card {
+  padding: 10px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.history-stage-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: baseline;
+}
+
+.history-stage-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-color);
+}
+
+.history-stage-duration {
+  font-size: 11px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.history-stage-description {
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 
 .history-state {

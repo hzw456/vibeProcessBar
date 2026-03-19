@@ -1,5 +1,5 @@
 use axum::{
-    extract::State,
+    extract::{Path, State},
     http::StatusCode,
     response::Json,
     routing::{get, post},
@@ -152,6 +152,24 @@ struct StatusResponse {
     tasks: Vec<Task>,
     #[serde(rename = "taskCount")]
     task_count: usize,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+struct TaskStage {
+    stage: String,
+    #[serde(default)]
+    description: Option<String>,
+    #[serde(default)]
+    started_at: Option<u64>,
+    #[serde(default)]
+    ended_at: Option<u64>,
+    #[serde(default)]
+    duration: Option<u64>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+struct TaskStagesResponse {
+    stages: Vec<TaskStage>,
 }
 
 // ============================================================================
@@ -424,6 +442,50 @@ async fn sync_backend_progress(
     }
 }
 
+async fn fetch_backend_task_stages(task_id: &str) -> Result<Vec<TaskStage>, String> {
+    let base_url = BACKEND_SERVER_URL.lock().unwrap().clone();
+    let api_key = BACKEND_API_KEY.lock().unwrap().clone();
+    let url = format!("{}/api/task/{}/stages", base_url, task_id);
+
+    let request = HTTP_CLIENT.get(&url);
+    let request = if api_key.is_empty() {
+        request
+    } else {
+        request.header("x-api-key", api_key)
+    };
+
+    let response = request
+        .send()
+        .await
+        .map_err(|err| format!("Failed to fetch task stages: {}", err))?;
+
+    if !response.status().is_success() {
+        let http_status = response.status();
+        let response_body = response
+            .text()
+            .await
+            .unwrap_or_else(|err| format!("<failed to read response body: {}>", err));
+        return Err(format!(
+            "Failed to fetch task stages: HTTP {} {}",
+            http_status, response_body
+        ));
+    }
+
+    let mut payload = response
+        .json::<TaskStagesResponse>()
+        .await
+        .map_err(|err| format!("Invalid task stages response: {}", err))?;
+
+    payload.stages.sort_by(|a, b| {
+        b.started_at
+            .unwrap_or(0)
+            .cmp(&a.started_at.unwrap_or(0))
+            .then_with(|| b.ended_at.unwrap_or(0).cmp(&a.ended_at.unwrap_or(0)))
+    });
+
+    Ok(payload.stages)
+}
+
 /// 重置任务为 armed 状态，并同步到后端
 pub async fn reset_task_to_armed(task_id: &str) -> Result<(), String> {
     let state = SHARED_STATE.clone();
@@ -577,6 +639,18 @@ async fn get_status(State(_state): State<Arc<SharedState>>) -> Json<StatusRespon
         task_count: tasks_vec.len(),
         tasks: tasks_vec,
     })
+}
+
+async fn get_task_stages(
+    Path(task_id): Path<String>,
+) -> (StatusCode, Json<TaskStagesResponse>) {
+    match fetch_backend_task_stages(&task_id).await {
+        Ok(stages) => (StatusCode::OK, Json(TaskStagesResponse { stages })),
+        Err(err) => {
+            error!(task_id = %task_id, error = %err, "Failed to get task stages");
+            (StatusCode::BAD_GATEWAY, Json(TaskStagesResponse { stages: vec![] }))
+        }
+    }
 }
 
 async fn report_task(
@@ -1491,6 +1565,7 @@ fn create_cors_layer() -> CorsLayer {
 fn create_app(state: Arc<SharedState>) -> Router {
     Router::new()
         .route("/api/status", get(get_status))
+        .route("/api/task/:task_id/stages", get(get_task_stages))
         .route("/api/task/report", post(report_task))
         .route("/api/task/update_state", post(update_state))
         .route("/api/task/update_state_by_path", post(update_state_by_path))
