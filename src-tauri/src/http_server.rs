@@ -68,6 +68,21 @@ impl From<&Task> for BackendStateSnapshot {
     }
 }
 
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct BackendProgressSnapshot {
+    estimated_duration: Option<u64>,
+    current_stage: Option<String>,
+}
+
+impl From<&Task> for BackendProgressSnapshot {
+    fn from(task: &Task) -> Self {
+        Self {
+            estimated_duration: task.estimated_duration,
+            current_stage: task.current_stage.clone(),
+        }
+    }
+}
+
 // ============================================================================
 // Request 数据结构
 // ============================================================================
@@ -281,6 +296,146 @@ fn should_sync_backend_state_for_update(req: &UpdateStateRequest) -> bool {
 
 fn has_backend_state_changed(before: &BackendStateSnapshot, after: &Task) -> bool {
     before != &BackendStateSnapshot::from(after)
+}
+
+fn has_backend_progress_changed(before: &BackendProgressSnapshot, after: &Task) -> bool {
+    before != &BackendProgressSnapshot::from(after)
+}
+
+fn is_terminal_status(status: &str) -> bool {
+    matches!(status, "completed" | "error" | "cancelled")
+}
+
+fn normalize_requested_stage(status: &str, stage: Option<&str>) -> Option<String> {
+    let trimmed = stage.map(str::trim).filter(|value| !value.is_empty())?;
+
+    match status {
+        "completed" if trimmed == "__completed__" => Some(trimmed.to_string()),
+        "running" | "armed" => Some(trimmed.to_string()),
+        _ => None,
+    }
+}
+
+fn apply_task_status_transition(
+    task: &mut Task,
+    new_status: &str,
+    has_explicit_estimated_duration: bool,
+    has_explicit_current_stage: bool,
+) {
+    let old_status = task.status.clone();
+    task.status = new_status.to_string();
+
+    apply_running_transition_defaults(
+        task,
+        &old_status,
+        new_status,
+        has_explicit_estimated_duration,
+        has_explicit_current_stage,
+    );
+
+    if is_terminal_status(new_status) {
+        if old_status != new_status {
+            task.end_time = Some(now_millis());
+        }
+
+        if new_status == "completed" {
+            task.current_stage = Some("__completed__".to_string());
+        }
+
+        if old_status != new_status {
+            info!(task_id = %task.id, new_status = %new_status, "Task ended");
+        }
+    }
+
+    if new_status == "armed" {
+        task.estimated_duration = None;
+        task.current_stage = None;
+        task.start_time = 0;
+        task.end_time = None;
+    }
+}
+
+fn apply_task_progress_update(
+    task: &mut Task,
+    estimated_duration: Option<u64>,
+    requested_stage: Option<&str>,
+) {
+    if let Some(estimated_duration) = estimated_duration {
+        task.estimated_duration = Some(estimated_duration);
+    }
+
+    if let Some(stage) = normalize_requested_stage(&task.status, requested_stage) {
+        task.current_stage = Some(stage);
+    }
+}
+
+fn sort_stage_records_desc(stages: &mut [TaskStage]) {
+    stages.sort_by(|a, b| {
+        b.started_at
+            .unwrap_or(0)
+            .cmp(&a.started_at.unwrap_or(0))
+            .then_with(|| b.ended_at.unwrap_or(0).cmp(&a.ended_at.unwrap_or(0)))
+    });
+}
+
+fn normalize_task_stages(stages: Vec<TaskStage>) -> Vec<TaskStage> {
+    let mut merged: Vec<TaskStage> = Vec::new();
+
+    for mut stage in stages {
+        stage.stage = stage.stage.trim().to_string();
+        if stage.stage.is_empty() {
+            continue;
+        }
+
+        if let (Some(started_at), Some(ended_at)) = (stage.started_at, stage.ended_at) {
+            if ended_at < started_at {
+                stage.ended_at = Some(started_at);
+            }
+        }
+
+        if stage.duration.is_none() {
+            stage.duration = match (stage.started_at, stage.ended_at) {
+                (Some(started_at), Some(ended_at)) => Some(ended_at.saturating_sub(started_at)),
+                _ => None,
+            };
+        }
+
+        if let Some(existing) = merged.iter_mut().find(|item| item.stage == stage.stage) {
+            existing.started_at = match (existing.started_at, stage.started_at) {
+                (Some(left), Some(right)) => Some(left.min(right)),
+                (Some(left), None) => Some(left),
+                (None, Some(right)) => Some(right),
+                (None, None) => None,
+            };
+
+            existing.ended_at = match (existing.ended_at, stage.ended_at) {
+                (Some(left), Some(right)) => Some(left.max(right)),
+                (Some(left), None) => Some(left),
+                (None, Some(right)) => Some(right),
+                (None, None) => None,
+            };
+
+            if let (Some(started_at), Some(ended_at)) = (existing.started_at, existing.ended_at) {
+                if ended_at < started_at {
+                    existing.ended_at = Some(started_at);
+                }
+            }
+
+            existing.duration = match (existing.started_at, existing.ended_at) {
+                (Some(started_at), Some(ended_at)) => Some(ended_at.saturating_sub(started_at)),
+                _ => existing.duration.or(stage.duration),
+            };
+
+            if existing.description.is_none() {
+                existing.description = stage.description.clone();
+            }
+        } else {
+            merged.push(stage);
+        }
+    }
+
+    sort_stage_records_desc(&mut merged);
+    merged
 }
 
 fn apply_running_transition_defaults(
@@ -520,11 +675,7 @@ pub async fn reset_task_to_armed(task_id: &str) -> Result<(), String> {
         let mut tasks = state.tasks.lock().unwrap();
 
         if let Some(task) = tasks.iter_mut().find(|t| t.id == task_id) {
-            task.status = "armed".to_string();
-            task.start_time = 0;
-            task.end_time = None;
-            task.estimated_duration = None;
-            task.current_stage = None;
+            apply_task_status_transition(task, "armed", false, false);
             info!(task_id = %task_id, "Task reset to armed");
 
             Some((
@@ -575,9 +726,7 @@ pub async fn cancel_task(task_id: &str) -> Result<(), String> {
         let mut tasks = state.tasks.lock().unwrap();
 
         if let Some(task) = tasks.iter_mut().find(|t| t.id == task_id) {
-            task.status = "cancelled".to_string();
-            task.end_time = Some(now_millis());
-            task.estimated_duration = None;
+            apply_task_status_transition(task, "cancelled", false, false);
             info!(task_id = %task_id, "Task marked as cancelled");
 
             Some((
@@ -672,7 +821,12 @@ async fn get_task_stages(
     Path(task_id): Path<String>,
 ) -> (StatusCode, Json<TaskStagesResponse>) {
     match fetch_backend_task_stages(&task_id).await {
-        Ok(stages) => (StatusCode::OK, Json(TaskStagesResponse { stages })),
+        Ok(stages) => (
+            StatusCode::OK,
+            Json(TaskStagesResponse {
+                stages: normalize_task_stages(stages),
+            }),
+        ),
         Err(err) => {
             error!(task_id = %task_id, error = %err, "Failed to get task stages");
             (StatusCode::BAD_GATEWAY, Json(TaskStagesResponse { stages: vec![] }))
@@ -831,6 +985,7 @@ async fn update_state(
 
         if let Some(task) = found {
             let backend_state_before = BackendStateSnapshot::from(&*task);
+            let backend_progress_before = BackendProgressSnapshot::from(&*task);
 
             if !can_update_source(&task.source, request_source) {
                 info!(task_id = %req.task_id, "Ignoring update_state - lower priority");
@@ -868,44 +1023,15 @@ async fn update_state(
                     );
                 }
 
-                let old_status = task.status.clone();
-                task.status = status.clone();
-
-                apply_running_transition_defaults(
+                apply_task_status_transition(
                     task,
-                    &old_status,
                     status,
                     has_explicit_estimated_duration,
                     has_explicit_current_stage,
                 );
-
-                if status == "completed" || status == "error" || status == "cancelled" {
-                    if old_status != *status {
-                        task.end_time = Some(now_millis());
-                    }
-                    if status == "completed" && task.current_stage.as_deref() != Some("__completed__") {
-                        task.current_stage = Some("__completed__".to_string());
-                    }
-                    if old_status != *status {
-                        info!(task_id = %req.task_id, new_status = %status, "Task ended");
-                    }
-                }
-
-                if status == "armed" {
-                    task.estimated_duration = None;
-                    task.current_stage = None;
-                    task.start_time = 0;
-                    task.end_time = None;
-                }
             }
 
-            if let Some(estimated_duration) = req.estimated_duration {
-                task.estimated_duration = Some(estimated_duration);
-            }
-
-            if let Some(ref current_stage) = req.current_stage {
-                task.current_stage = Some(current_stage.clone());
-            }
+            apply_task_progress_update(task, req.estimated_duration, req.current_stage.as_deref());
 
             if should_sync_backend_state_for_update(&req)
                 && has_backend_state_changed(&backend_state_before, task)
@@ -923,7 +1049,9 @@ async fn update_state(
                 debug!(task_id = %req.task_id, "Skipping backend state sync for no-op update");
             }
 
-            if req.estimated_duration.is_some() || req.current_stage.is_some() {
+            if (req.estimated_duration.is_some() || req.current_stage.is_some())
+                && has_backend_progress_changed(&backend_progress_before, task)
+            {
                 progress_sync = Some((
                     task.id.clone(),
                     task.estimated_duration,
@@ -932,6 +1060,8 @@ async fn update_state(
                     Some(task.window_title.clone()),
                     Some(task.is_focused),
                 ));
+            } else if req.estimated_duration.is_some() || req.current_stage.is_some() {
+                debug!(task_id = %req.task_id, "Skipping backend progress sync for no-op update");
             }
         } else {
             return (
@@ -1160,31 +1290,7 @@ async fn update_state_by_path(
                     );
                 }
 
-                let old_status = task.status.clone();
-                task.status = status.clone();
-
-                if status == "running" {
-                    if old_status == "completed"
-                        || old_status == "error"
-                        || old_status == "cancelled"
-                    {
-                        task.start_time = now_millis();
-                        task.end_time = None;
-                        task.estimated_duration = None;
-                        task.current_stage = task.active_file.clone();
-                    } else if task.start_time == 0 {
-                        task.start_time = now_millis();
-                    }
-                }
-
-                if status == "completed" || status == "error" || status == "cancelled" {
-                    if old_status != *status {
-                        task.end_time = Some(now_millis());
-                    }
-                    if status == "completed" && task.current_stage.as_deref() != Some("__completed__") {
-                        task.current_stage = Some("__completed__".to_string());
-                    }
-                }
+                apply_task_status_transition(task, status, false, false);
             }
 
             if has_backend_state_changed(&backend_state_before, task) {
