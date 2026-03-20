@@ -202,12 +202,34 @@ export const useProgressStore = defineStore('progress', () => {
 
   async function fetchHistory() {
     try {
+      // Fetch from backend server if configured
+      const url = settings.value.backendServerUrl;
+      const key = settings.value.apiKey;
+      
+      if (url) {
+        const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+        if (key) {
+          headers['X-API-Key'] = key;
+        }
+        
+        const response = await fetch(`${url}/api/status`, { headers });
+        if (response.ok) {
+          const data = await response.json();
+          const completedTasks = (data.tasks || []).filter(
+            (t: ProgressTask) => t.status === 'completed' || t.status === 'cancelled'
+          );
+          history.value = completedTasks;
+          debug('Fetched history from backend', { count: completedTasks.length });
+          return;
+        }
+      }
+      
+      // Fallback to local tasks
       const taskList = await safeInvoke<ProgressTask[]>('get_tasks');
       if (taskList) {
-        // Filter completed/cancelled tasks as history
         const completedTasks = taskList.filter(t => t.status === 'completed' || t.status === 'cancelled');
         history.value = completedTasks;
-        debug('Fetched history from Rust', { count: completedTasks.length });
+        debug('Fetched history from local', { count: completedTasks.length });
       }
     } catch (err) {
       error('Failed to fetch history', { error: String(err) });
