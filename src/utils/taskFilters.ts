@@ -22,7 +22,7 @@ export function shouldDisplayTask(
   }
 
   if (showOnlyWhenRunning) {
-    return task.status === 'running';
+    return task.status === 'running' || task.is_focused === true;
   }
 
   return true;
