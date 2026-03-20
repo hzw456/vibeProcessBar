@@ -55,6 +55,8 @@ Vibe Process Bar 提供三种灵活的状态检测机制：
 - `update_task_status`：报告任务状态（running, completed, error）
 - `update_task_progress`：更新任务进度和当前阶段
 
+**注意：** 当前服务端实现的是 HTTP JSON-RPC `POST /mcp`，不支持 SSE transport。请确认你的 MCP 客户端支持通过 HTTP `POST` 连接该 URL。
+
 ### 3. 插件检测模式（代码检测）
 
 通过 VS Code 扩展分析代码变化频率。
@@ -202,7 +204,7 @@ A:
 **HTTP API（端口 31415）：**
 ```
 POST /api/task/update_state_by_path  # Hook 模式使用
-POST /mcp                             # MCP 模式使用
+POST /mcp                             # MCP 模式使用（HTTP JSON-RPC）
 ```
 
 **WebSocket（端口 31415）：**

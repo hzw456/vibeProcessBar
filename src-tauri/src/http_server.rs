@@ -1,5 +1,5 @@
 use axum::{
-    extract::State,
+    extract::{Path, State},
     http::StatusCode,
     response::Json,
     routing::{get, post},
@@ -43,6 +43,44 @@ pub struct Task {
     /// 当前阶段描述
     #[serde(default)]
     pub current_stage: Option<String>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct BackendStateSnapshot {
+    status: String,
+    project_path: Option<String>,
+    active_file: Option<String>,
+    current_stage: Option<String>,
+    window_title: String,
+    is_focused: bool,
+}
+
+impl From<&Task> for BackendStateSnapshot {
+    fn from(task: &Task) -> Self {
+        Self {
+            status: task.status.clone(),
+            project_path: task.project_path.clone(),
+            active_file: task.active_file.clone(),
+            current_stage: task.current_stage.clone(),
+            window_title: task.window_title.clone(),
+            is_focused: task.is_focused,
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct BackendProgressSnapshot {
+    estimated_duration: Option<u64>,
+    current_stage: Option<String>,
+}
+
+impl From<&Task> for BackendProgressSnapshot {
+    fn from(task: &Task) -> Self {
+        Self {
+            estimated_duration: task.estimated_duration,
+            current_stage: task.current_stage.clone(),
+        }
+    }
 }
 
 // ============================================================================
@@ -154,6 +192,24 @@ struct StatusResponse {
     task_count: usize,
 }
 
+#[derive(Serialize, Deserialize, Clone, Debug)]
+struct TaskStage {
+    stage: String,
+    #[serde(default)]
+    description: Option<String>,
+    #[serde(default)]
+    started_at: Option<u64>,
+    #[serde(default)]
+    ended_at: Option<u64>,
+    #[serde(default)]
+    duration: Option<u64>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+struct TaskStagesResponse {
+    stages: Vec<TaskStage>,
+}
+
 // ============================================================================
 // Shared State
 // ============================================================================
@@ -236,6 +292,150 @@ fn should_sync_backend_state_for_update(req: &UpdateStateRequest) -> bool {
         || req.active_file.is_some()
         || req.window_title.is_some()
         || req.is_focused.is_some()
+}
+
+fn has_backend_state_changed(before: &BackendStateSnapshot, after: &Task) -> bool {
+    before != &BackendStateSnapshot::from(after)
+}
+
+fn has_backend_progress_changed(before: &BackendProgressSnapshot, after: &Task) -> bool {
+    before != &BackendProgressSnapshot::from(after)
+}
+
+fn is_terminal_status(status: &str) -> bool {
+    matches!(status, "completed" | "error" | "cancelled")
+}
+
+fn normalize_requested_stage(status: &str, stage: Option<&str>) -> Option<String> {
+    let trimmed = stage.map(str::trim).filter(|value| !value.is_empty())?;
+
+    match status {
+        "completed" if trimmed == "__completed__" => Some(trimmed.to_string()),
+        "running" | "armed" => Some(trimmed.to_string()),
+        _ => None,
+    }
+}
+
+fn apply_task_status_transition(
+    task: &mut Task,
+    new_status: &str,
+    has_explicit_estimated_duration: bool,
+    has_explicit_current_stage: bool,
+) {
+    let old_status = task.status.clone();
+    task.status = new_status.to_string();
+
+    apply_running_transition_defaults(
+        task,
+        &old_status,
+        new_status,
+        has_explicit_estimated_duration,
+        has_explicit_current_stage,
+    );
+
+    if is_terminal_status(new_status) {
+        if old_status != new_status {
+            task.end_time = Some(now_millis());
+        }
+
+        if new_status == "completed" {
+            task.current_stage = Some("__completed__".to_string());
+        }
+
+        if old_status != new_status {
+            info!(task_id = %task.id, new_status = %new_status, "Task ended");
+        }
+    }
+
+    if new_status == "armed" {
+        task.estimated_duration = None;
+        task.current_stage = None;
+        task.start_time = 0;
+        task.end_time = None;
+    }
+}
+
+fn apply_task_progress_update(
+    task: &mut Task,
+    estimated_duration: Option<u64>,
+    requested_stage: Option<&str>,
+) {
+    if let Some(estimated_duration) = estimated_duration {
+        task.estimated_duration = Some(estimated_duration);
+    }
+
+    if let Some(stage) = normalize_requested_stage(&task.status, requested_stage) {
+        task.current_stage = Some(stage);
+    }
+}
+
+fn sort_stage_records_desc(stages: &mut [TaskStage]) {
+    stages.sort_by(|a, b| {
+        b.started_at
+            .unwrap_or(0)
+            .cmp(&a.started_at.unwrap_or(0))
+            .then_with(|| b.ended_at.unwrap_or(0).cmp(&a.ended_at.unwrap_or(0)))
+    });
+}
+
+fn normalize_task_stages(stages: Vec<TaskStage>) -> Vec<TaskStage> {
+    let mut merged: Vec<TaskStage> = Vec::new();
+
+    for mut stage in stages {
+        stage.stage = stage.stage.trim().to_string();
+        if stage.stage.is_empty() {
+            continue;
+        }
+
+        if let (Some(started_at), Some(ended_at)) = (stage.started_at, stage.ended_at) {
+            if ended_at < started_at {
+                stage.ended_at = Some(started_at);
+            }
+        }
+
+        if stage.duration.is_none() {
+            stage.duration = match (stage.started_at, stage.ended_at) {
+                (Some(started_at), Some(ended_at)) => Some(ended_at.saturating_sub(started_at)),
+                _ => None,
+            };
+        }
+
+        if let Some(existing) = merged.iter_mut().find(|item| item.stage == stage.stage) {
+            existing.started_at = match (existing.started_at, stage.started_at) {
+                (Some(left), Some(right)) => Some(left.min(right)),
+                (Some(left), None) => Some(left),
+                (None, Some(right)) => Some(right),
+                (None, None) => None,
+            };
+
+            existing.ended_at = match (existing.ended_at, stage.ended_at) {
+                (Some(left), Some(right)) => Some(left.max(right)),
+                (Some(left), None) => Some(left),
+                (None, Some(right)) => Some(right),
+                (None, None) => None,
+            };
+
+            if let (Some(started_at), Some(ended_at)) = (existing.started_at, existing.ended_at) {
+                if ended_at < started_at {
+                    existing.ended_at = Some(started_at);
+                }
+            }
+
+            existing.duration = match (existing.started_at, existing.ended_at) {
+                (Some(started_at), Some(ended_at)) => Some(ended_at.saturating_sub(started_at)),
+                _ => existing.duration.or(stage.duration),
+            };
+
+            if existing.description.is_none() {
+                existing.description = stage.description.clone();
+            }
+        } else {
+            merged.push(stage);
+        }
+    }
+
+    sort_stage_records_desc(&mut merged);
+    merged
 }
 
 fn apply_running_transition_defaults(
@@ -424,18 +624,145 @@ async fn sync_backend_progress(
     }
 }
 
-/// 重置任务为 armed 状态
-pub fn reset_task_to_armed(task_id: &str) -> Result<(), String> {
-    let state = SHARED_STATE.clone();
-    let mut tasks = state.tasks.lock().unwrap();
+async fn fetch_backend_task_stages(task_id: &str) -> Result<Vec<TaskStage>, String> {
+    let base_url = BACKEND_SERVER_URL.lock().unwrap().clone();
+    let api_key = BACKEND_API_KEY.lock().unwrap().clone();
+    let url = format!("{}/api/task/{}/stages", base_url, task_id);
 
-    if let Some(task) = tasks.iter_mut().find(|t| t.id == task_id) {
-        task.status = "armed".to_string();
-        task.start_time = 0;
-        task.end_time = None;
-        task.estimated_duration = None;
-        task.current_stage = None;
-        info!(task_id = %task_id, "Task reset to armed");
+    let request = HTTP_CLIENT.get(&url);
+    let request = if api_key.is_empty() {
+        request
+    } else {
+        request.header("x-api-key", api_key)
+    };
+
+    let response = request
+        .send()
+        .await
+        .map_err(|err| format!("Failed to fetch task stages: {}", err))?;
+
+    if !response.status().is_success() {
+        let http_status = response.status();
+        let response_body = response
+            .text()
+            .await
+            .unwrap_or_else(|err| format!("<failed to read response body: {}>", err));
+        return Err(format!(
+            "Failed to fetch task stages: HTTP {} {}",
+            http_status, response_body
+        ));
+    }
+
+    let mut payload = response
+        .json::<TaskStagesResponse>()
+        .await
+        .map_err(|err| format!("Invalid task stages response: {}", err))?;
+
+    payload.stages.sort_by(|a, b| {
+        b.started_at
+            .unwrap_or(0)
+            .cmp(&a.started_at.unwrap_or(0))
+            .then_with(|| b.ended_at.unwrap_or(0).cmp(&a.ended_at.unwrap_or(0)))
+    });
+
+    Ok(payload.stages)
+}
+
+/// 重置任务为 armed 状态，并同步到后端
+pub async fn reset_task_to_armed(task_id: &str) -> Result<(), String> {
+    let state = SHARED_STATE.clone();
+    let state_sync = {
+        let mut tasks = state.tasks.lock().unwrap();
+
+        if let Some(task) = tasks.iter_mut().find(|t| t.id == task_id) {
+            apply_task_status_transition(task, "armed", false, false);
+            info!(task_id = %task_id, "Task reset to armed");
+
+            Some((
+                task.id.clone(),
+                task.status.clone(),
+                task.project_path.clone(),
+                task.active_file.clone(),
+                task.current_stage.clone(),
+                Some(task.window_title.clone()),
+                Some(task.is_focused),
+            ))
+        } else {
+            None
+        }
+    };
+
+    if let Some((
+        task_id,
+        status,
+        project_path,
+        active_file,
+        current_stage,
+        window_title,
+        is_focused,
+    )) = state_sync
+    {
+        sync_backend_state(
+            &task_id,
+            &status,
+            project_path.as_deref(),
+            active_file.as_deref(),
+            current_stage.as_deref(),
+            window_title.as_deref(),
+            is_focused,
+        )
+        .await;
+
+        Ok(())
+    } else {
+        Err(format!("Task not found: {}", task_id))
+    }
+}
+
+/// 取消任务并保留 cancelled 状态，避免立即回到 armed
+pub async fn cancel_task(task_id: &str) -> Result<(), String> {
+    let state = SHARED_STATE.clone();
+    let state_sync = {
+        let mut tasks = state.tasks.lock().unwrap();
+
+        if let Some(task) = tasks.iter_mut().find(|t| t.id == task_id) {
+            apply_task_status_transition(task, "cancelled", false, false);
+            info!(task_id = %task_id, "Task marked as cancelled");
+
+            Some((
+                task.id.clone(),
+                task.status.clone(),
+                task.project_path.clone(),
+                task.active_file.clone(),
+                task.current_stage.clone(),
+                Some(task.window_title.clone()),
+                Some(task.is_focused),
+            ))
+        } else {
+            None
+        }
+    };
+
+    if let Some((
+        task_id,
+        status,
+        project_path,
+        active_file,
+        current_stage,
+        window_title,
+        is_focused,
+    )) = state_sync
+    {
+        sync_backend_state(
+            &task_id,
+            &status,
+            project_path.as_deref(),
+            active_file.as_deref(),
+            current_stage.as_deref(),
+            window_title.as_deref(),
+            is_focused,
+        )
+        .await;
         Ok(())
     } else {
         Err(format!("Task not found: {}", task_id))
@@ -488,6 +815,23 @@ async fn get_status(State(_state): State<Arc<SharedState>>) -> Json<StatusRespon
         task_count: tasks_vec.len(),
         tasks: tasks_vec,
     })
+}
+
+async fn get_task_stages(
+    Path(task_id): Path<String>,
+) -> (StatusCode, Json<TaskStagesResponse>) {
+    match fetch_backend_task_stages(&task_id).await {
+        Ok(stages) => (
+            StatusCode::OK,
+            Json(TaskStagesResponse {
+                stages: normalize_task_stages(stages),
+            }),
+        ),
+        Err(err) => {
+            error!(task_id = %task_id, error = %err, "Failed to get task stages");
+            (StatusCode::BAD_GATEWAY, Json(TaskStagesResponse { stages: vec![] }))
+        }
+    }
 }
 
 async fn report_task(
@@ -640,6 +984,9 @@ async fn update_state(
         let found = tasks.iter_mut().find(|t| t.id == req.task_id);
 
         if let Some(task) = found {
+            let backend_state_before = BackendStateSnapshot::from(&*task);
+            let backend_progress_before = BackendProgressSnapshot::from(&*task);
+
             if !can_update_source(&task.source, request_source) {
                 info!(task_id = %req.task_id, "Ignoring update_state - lower priority");
                 return (
@@ -676,42 +1023,19 @@ async fn update_state(
                     );
                 }
 
-                let old_status = task.status.clone();
-                task.status = status.clone();
-
-                apply_running_transition_defaults(
+                apply_task_status_transition(
                     task,
-                    &old_status,
                     status,
                     has_explicit_estimated_duration,
                     has_explicit_current_stage,
                 );
-
-                if status == "completed" || status == "error" || status == "cancelled" {
-                    task.end_time = Some(now_millis());
-                    if status == "completed" {
-                        task.current_stage = Some("__completed__".to_string());
-                    }
-                    info!(task_id = %req.task_id, new_status = %status, "Task ended");
-                }
-
-                if status == "armed" {
-                    task.estimated_duration = None;
-                    task.current_stage = None;
-                    task.start_time = 0;
-                    task.end_time = None;
-                }
             }
 
-            if let Some(estimated_duration) = req.estimated_duration {
-                task.estimated_duration = Some(estimated_duration);
-            }
+            apply_task_progress_update(task, req.estimated_duration, req.current_stage.as_deref());
 
-            if let Some(ref current_stage) = req.current_stage {
-                task.current_stage = Some(current_stage.clone());
-            }
-
-            if should_sync_backend_state_for_update(&req) {
+            if should_sync_backend_state_for_update(&req)
+                && has_backend_state_changed(&backend_state_before, task)
+            {
                 state_sync = Some((
                     task.id.clone(),
                     task.status.clone(),
@@ -721,9 +1045,13 @@ async fn update_state(
                     Some(task.window_title.clone()),
                     Some(task.is_focused),
                 ));
+            } else if should_sync_backend_state_for_update(&req) {
+                debug!(task_id = %req.task_id, "Skipping backend state sync for no-op update");
             }
 
-            if req.estimated_duration.is_some() || req.current_stage.is_some() {
+            if (req.estimated_duration.is_some() || req.current_stage.is_some())
+                && has_backend_progress_changed(&backend_progress_before, task)
+            {
                 progress_sync = Some((
                     task.id.clone(),
                     task.estimated_duration,
@@ -732,6 +1060,8 @@ async fn update_state(
                     Some(task.window_title.clone()),
                     Some(task.is_focused),
                 ));
+            } else if req.estimated_duration.is_some() || req.current_stage.is_some() {
+                debug!(task_id = %req.task_id, "Skipping backend progress sync for no-op update");
             }
         } else {
             return (
@@ -936,6 +1266,8 @@ async fn update_state_by_path(
         });
 
         if let Some(task) = found {
+            let backend_state_before = BackendStateSnapshot::from(&*task);
+
             if !can_update_source(&task.source, request_source) {
                 info!(project_path = %req.project_path, "Ignoring update_state_by_path - lower priority");
                 return (
@@ -958,40 +1290,23 @@ async fn update_state_by_path(
                     );
                 }
 
-                let old_status = task.status.clone();
-                task.status = status.clone();
-
-                if status == "running" {
-                    if old_status == "completed"
-                        || old_status == "error"
-                        || old_status == "cancelled"
-                    {
-                        task.start_time = now_millis();
-                        task.end_time = None;
-                        task.estimated_duration = None;
-                        task.current_stage = task.active_file.clone();
-                    } else if task.start_time == 0 {
-                        task.start_time = now_millis();
-                    }
-                }
-
-                if status == "completed" || status == "error" || status == "cancelled" {
-                    task.end_time = Some(now_millis());
-                    if status == "completed" {
-                        task.current_stage = Some("__completed__".to_string());
-                    }
-                }
+                apply_task_status_transition(task, status, false, false);
             }
 
-            Some((
-                task.id.clone(),
-                task.status.clone(),
-                task.project_path.clone(),
-                task.active_file.clone(),
-                task.current_stage.clone(),
-                Some(task.window_title.clone()),
-                Some(task.is_focused),
-            ))
+            if has_backend_state_changed(&backend_state_before, task) {
+                Some((
+                    task.id.clone(),
+                    task.status.clone(),
+                    task.project_path.clone(),
+                    task.active_file.clone(),
+                    task.current_stage.clone(),
+                    Some(task.window_title.clone()),
+                    Some(task.is_focused),
+                ))
+            } else {
+                debug!(project_path = %req.project_path, "Skipping backend state sync for no-op path update");
+                None
+            }
         } else {
             return (
                 StatusCode::NOT_FOUND,
@@ -1036,6 +1351,19 @@ struct McpRequest {
     id: Option<serde_json::Value>,
     method: String,
     params: Option<serde_json::Value>,
+}
+
+async fn mcp_get_handler() -> (StatusCode, Json<serde_json::Value>) {
+    (
+        StatusCode::METHOD_NOT_ALLOWED,
+        Json(serde_json::json!({
+            "jsonrpc": "2.0",
+            "error": {
+                "code": -32000,
+                "message": "This MCP endpoint only supports HTTP POST JSON-RPC requests. SSE transport is not implemented."
+            }
+        })),
+    )
 }
 
 async fn mcp_handler(
@@ -1402,12 +1730,13 @@ fn create_cors_layer() -> CorsLayer {
 fn create_app(state: Arc<SharedState>) -> Router {
     Router::new()
         .route("/api/status", get(get_status))
+        .route("/api/task/:task_id/stages", get(get_task_stages))
         .route("/api/task/report", post(report_task))
         .route("/api/task/update_state", post(update_state))
         .route("/api/task/update_state_by_path", post(update_state_by_path))
         .route("/api/task/delete", post(delete_task))
         .route("/api/reset", post(reset_tasks))
-        .route("/mcp", post(mcp_handler))
+        .route("/mcp", get(mcp_get_handler).post(mcp_handler))
         .layer(create_cors_layer())
         .with_state(state)
 }

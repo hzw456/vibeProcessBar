@@ -1,12 +1,14 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { useAuthStore } from '../stores/auth'
+import { useProgressStore } from '../stores/progressStore'
 
 const emit = defineEmits<{
   (e: 'switch-to-login'): void
 }>()
 
 const authStore = useAuthStore()
+const progressStore = useProgressStore()
 
 const email = ref('')
 const password = ref('')
@@ -19,6 +21,7 @@ async function handleSubmit() {
 
   try {
     await authStore.register(email.value, password.value)
+    progressStore.setApiKey(authStore.apiKey)
   } catch (err) {
     error.value = err instanceof Error ? err.message : 'Registration failed'
   } finally {

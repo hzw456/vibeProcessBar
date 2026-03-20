@@ -6,6 +6,7 @@ import { useAuthStore } from './stores/auth';
 import Login from './components/Login.vue';
 import Register from './components/Register.vue';
 import SettingsPanel from './components/SettingsPanel.vue';
+import HistoryPanel from './components/HistoryPanel.vue';
 import { debug, error } from './utils/logger';
 import { playCompletionSound } from './utils/notifications';
 import { shouldDisplayTask } from './utils/taskFilters';
@@ -41,14 +42,16 @@ async function getWindow() {
 
 // Check if this is the settings window
 const isSettingsWindow = ref(window.location.search.includes('type=settings'));
-if (isTauri && !isSettingsWindow.value) {
+const isHistoryWindow = ref(window.location.search.includes('type=history'));
+if (isTauri && !isSettingsWindow.value && !isHistoryWindow.value) {
     // Double check with label for main window, just in case, but rely on query param primarily
     getCurrentWindowLabel().then(label => {
         if (label === 'settings') isSettingsWindow.value = true;
-        debug('Window label check', { label, isSettings: isSettingsWindow.value });
+        if (label === 'history') isHistoryWindow.value = true;
+        debug('Window label check', { label, isSettings: isSettingsWindow.value, isHistory: isHistoryWindow.value });
     });
 } else {
-    debug('Window type detected from URL', { isSettings: isSettingsWindow.value });
+    debug('Window type detected from URL', { isSettings: isSettingsWindow.value, isHistory: isHistoryWindow.value });
 }
 
 interface IdeWindow {
@@ -294,7 +297,11 @@ function handleBgContextMenu(event: MouseEvent) {
   event.preventDefault();
   // Only show on background, not on task rows
   const target = event.target as HTMLElement;
-  if (target.closest('.task-row') || target.closest('.collapsed-single-task') || target.closest('.task-context-menu')) {
+  if (
+    target.closest('.task-row') ||
+    target.closest('.collapsed-single-task') ||
+    target.closest('.task-context-menu')
+  ) {
     return;
   }
   bgMenu.value = { show: true, x: event.clientX, y: event.clientY };
@@ -329,20 +336,14 @@ function handleShowAllTasks() {
   saveHiddenTaskIds();
 }
 
-// Cancel a running/completed task -> reset to armed
+// Cancel a running/completed task -> keep cancelled state visible
 async function handleCancelTask() {
   const task = contextMenu.value.task;
   if (!task) return;
   closeContextMenu();
   try {
-    const port = store.settings.httpPort || 31415;
-    const host = store.settings.httpHost || '127.0.0.1';
-    await fetch(`http://${host}:${port}/api/task/update_state`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ task_id: task.id, status: 'armed', source: 'hook' })
-    });
-    debug('Task reset to armed', { taskId: task.id });
+    await safeInvoke('cancel_task', { taskId: task.id });
+    debug('Task cancelled', { taskId: task.id });
   } catch (err) {
     error('Failed to cancel task', { error: String(err) });
   }
@@ -387,7 +388,14 @@ function confirmRenameIde() {
 async function handleMouseDown(event: MouseEvent) {
   // Only start drag if clicking on the container itself (not buttons or interactive elements)
   const target = event.target as HTMLElement;
-  if (target.closest('button') || target.closest('.task-row') || target.closest('.menu-item') || target.closest('.task-context-menu')) {
+  if (
+    target.closest('button') ||
+    target.closest('input') ||
+    target.closest('select') ||
+    target.closest('.task-row') ||
+    target.closest('.menu-item') ||
+    target.closest('.task-context-menu')
+  ) {
     return;
   }
   try {
@@ -456,7 +464,7 @@ async function updatePositionDisplay() {
 function getTimeStr(task: ProgressTask): string {
   // Focused state does NOT affect time display - only the icon changes
   if (task.status === 'armed') return '';
-  if (task.status === 'completed' && task.start_time > 0) {
+  if ((task.status === 'completed' || task.status === 'cancelled') && task.start_time > 0) {
     const elapsed = (task.end_time || Date.now()) - task.start_time;
     const minutes = Math.floor(elapsed / 60000);
     const seconds = Math.floor((elapsed % 60000) / 1000);
@@ -501,6 +509,7 @@ function getStatusIcon(task: ProgressTask): string {
   switch (task.status) {
     case 'running': return '◉';
     case 'completed': return '✓';
+    case 'cancelled': return '✕';
     case 'armed': return '◎';
     default: return '○';
   }
@@ -601,7 +610,7 @@ watch(() => store.tasks, (newTasks) => {
 
 // Dynamic window resize
 watch([displayTasks, isCollapsed, isCollapseTransition], async () => {
-  // Skip resizing for settings window
+  // Skip resizing for settings/history window
   if (isSettingsWindow.value) return;
   if (isCollapseTransition.value) return;
 
@@ -688,6 +697,11 @@ onMounted(async () => {
     <SettingsPanel :is-standalone="true" />
   </div>
 
+  <!-- History Window -->
+  <div v-else-if="isHistoryWindow" class="settings-window-container">
+    <HistoryPanel :is-main-view="true" />
+  </div>
+
   <!-- Auth Container -->
   <div v-else-if="!authStore.isAuthenticated" class="auth-container">
     <Register v-if="showRegister" @switch-to-login="showRegister = false" />
@@ -725,6 +739,7 @@ onMounted(async () => {
           'task-row',
           { completed: task.status === 'completed' && !clickedCompletedTasks.has(task.id) },
           { 'completed-clicked': clickedCompletedTasks.has(task.id) },
+          { cancelled: task.status === 'cancelled' },
           { armed: task.status === 'armed' },
           { 'focused-state': task.is_focused }
         ]"
@@ -744,8 +759,8 @@ onMounted(async () => {
         <!-- Expanded: show task name without IDE prefix -->
         <template v-else>
           <span class="task-name-mini" :title="getDisplayName(task)">{{ getDisplayName(task) }}</span>
-          <span :class="['task-time-mini', { 'completed-time': task.status === 'completed', 'armed-time': task.status === 'armed' }]">
-            {{ task.status === 'completed' ? `✓ ${getTimeStr(task)}` : getTimeStr(task) }}
+          <span :class="['task-time-mini', { 'completed-time': task.status === 'completed', 'cancelled-time': task.status === 'cancelled', 'armed-time': task.status === 'armed' }]">
+            {{ task.status === 'completed' ? `✓ ${getTimeStr(task)}` : task.status === 'cancelled' ? `✕ ${getTimeStr(task)}` : getTimeStr(task) }}
           </span>
           <span v-if="task.ide || taskCustomTitles[task.id]" :class="['ide-badge-mini', getIdeColorClass(task.ide)]" :title="getTaskBadgeTitle(task)">{{ getTaskBadgeTitle(task) }}</span>
         </template>
@@ -775,6 +790,7 @@ onMounted(async () => {
           'single-task-row',
           { completed: singleTask.status === 'completed' && !clickedCompletedTasks.has(singleTask.id) },
           { 'completed-clicked': clickedCompletedTasks.has(singleTask.id) },
+          { cancelled: singleTask.status === 'cancelled' },
           { armed: singleTask.status === 'armed' },
           { 'focused-state': singleTask.is_focused }
         ]"
@@ -786,8 +802,8 @@ onMounted(async () => {
           {{ getStatusIcon(singleTask) }}
         </span>
         <span class="task-name-mini" :title="getDisplayName(singleTask)">{{ getDisplayName(singleTask) }}</span>
-        <span :class="['task-time-mini', { 'completed-time': singleTask.status === 'completed', 'armed-time': singleTask.status === 'armed' }]">
-          {{ singleTask.status === 'completed' ? `✓ ${getTimeStr(singleTask)}` : getTimeStr(singleTask) }}
+        <span :class="['task-time-mini', { 'completed-time': singleTask.status === 'completed', 'cancelled-time': singleTask.status === 'cancelled', 'armed-time': singleTask.status === 'armed' }]">
+          {{ singleTask.status === 'completed' ? `✓ ${getTimeStr(singleTask)}` : singleTask.status === 'cancelled' ? `✕ ${getTimeStr(singleTask)}` : getTimeStr(singleTask) }}
         </span>
         <span v-if="singleTask.ide || taskCustomTitles[singleTask.id]" :class="['ide-badge-mini', getIdeColorClass(singleTask.ide)]" :title="getTaskBadgeTitle(singleTask)">{{ getTaskBadgeTitle(singleTask) }}</span>
       </div>

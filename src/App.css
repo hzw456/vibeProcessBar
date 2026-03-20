@@ -173,6 +173,24 @@
   color: var(--success-color);
 }
 
+.task-row.cancelled {
+  background: linear-gradient(135deg, rgba(248, 113, 113, 0.22), rgba(239, 68, 68, 0.08));
+  border: 2px solid rgba(248, 113, 113, 0.65);
+  border-left: 3px solid #f87171;
+  padding: 8px 10px;
+}
+
+.task-row.cancelled .task-name-mini,
+.task-row.cancelled .task-progress-mini,
+.task-row.cancelled .task-time-mini {
+  color: #fca5a5;
+}
+
+.task-row.cancelled .mini-status {
+  color: #f87171;
+  text-shadow: 0 0 8px rgba(248, 113, 113, 0.35);
+}
+
 .mini-status {
   font-size: 12px;
   line-height: 1;
@@ -223,6 +241,10 @@
 
 .task-time-mini.completed-time {
   color: var(--success-color);
+}
+
+.task-time-mini.cancelled-time {
+  color: #fca5a5;
 }
 
 .ide-badge-mini {
@@ -561,4 +583,3 @@
   height: 100%;
   background: var(--bg-color);
 }
-
