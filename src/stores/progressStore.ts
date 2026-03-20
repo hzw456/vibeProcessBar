@@ -65,7 +65,7 @@ const defaultSettings: AppSettings = {
   httpHost: '127.0.0.1',
   httpPort: 31415,
   apiKey: '',
-  backendServerUrl: 'https://home.haozw.top:3010',
+  backendServerUrl: 'http://192.168.1.28:3010',
   windowVisible: true,
   blockPluginStatus: true,
   windowX: null,

@@ -25,7 +25,7 @@ type TabType = 'general' | 'appearance' | 'account';
 const activeTab = ref<TabType>('general');
 
 const themes = ['dark', 'purple', 'ocean', 'forest', 'midnight'] as const;
-const defaultBackendServerUrl = 'https://home.haozw.top:3010';
+const defaultBackendServerUrl = 'http://192.168.1.28:3010';
 
 // App version
 const appVersion = '1.0.1';

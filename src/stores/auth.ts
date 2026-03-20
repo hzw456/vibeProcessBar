@@ -2,7 +2,7 @@ import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
 
 // API URL - can be updated from settings
-let apiBaseUrl = 'https://home.haozw.top:3010';
+let apiBaseUrl = 'http://192.168.1.28:3010';
 
 export const setApiBaseUrl = (url: string) => {
   apiBaseUrl = url;
