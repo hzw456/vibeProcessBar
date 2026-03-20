@@ -89,14 +89,12 @@ export const useProgressStore = defineStore('progress', () => {
         const messages = await response.json();
         const tray = messages.tray || {};
         await safeInvoke('update_tray_translations', {
-          translations: {
-            showWindow: tray.showWindow || '☀ Show Window',
-            hideWindow: tray.hideWindow || '☾ Hide Window',
-            settings: tray.settings || 'Settings',
-            quit: tray.quit || 'Quit',
-            noTasks: tray.noTasks || 'No tasks',
-            tasks: tray.tasks || 'Tasks',
-          }
+          showWindow: tray.showWindow || '☀ Show Window',
+          hideWindow: tray.hideWindow || '☾ Hide Window',
+          settings: tray.settings || 'Settings',
+          quit: tray.quit || 'Quit',
+          noTasks: tray.noTasks || 'No tasks',
+          tasks: tray.tasks || 'Tasks',
         });
       }
     } catch (err) {
