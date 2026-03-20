@@ -69,7 +69,7 @@ impl Default for AppSettings {
             api_key: String::new(),
             window_visible: true,
             language: "en".to_string(),
-            block_plugin_status: true,
+            block_plugin_status: false,
             window_x: None,
             window_y: None,
             show_only_when_running: false,
