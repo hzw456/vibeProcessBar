@@ -67,7 +67,7 @@ const defaultSettings: AppSettings = {
   apiKey: '',
   backendServerUrl: 'http://192.168.1.28:3010',
   windowVisible: true,
-  blockPluginStatus: true,
+  blockPluginStatus: false,
   windowX: null,
   windowY: null,
   showOnlyWhenRunning: false,

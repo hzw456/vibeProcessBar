@@ -223,7 +223,7 @@ impl SharedState {
     pub fn new() -> Self {
         SharedState {
             tasks: Mutex::new(Vec::new()),
-            block_plugin_status: Mutex::new(true),
+            block_plugin_status: Mutex::new(false),
         }
     }
 }
