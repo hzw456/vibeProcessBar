@@ -378,8 +378,8 @@ fn open_url(url: String) -> Result<(), String> {
 }
 
 #[tauri::command]
-async fn start_http_server<R: Runtime>(_app: tauri::AppHandle<R>, port: u16) -> Result<(), String> {
-    http_server::start_server_background("127.0.0.1".to_string(), port);
+async fn start_http_server<R: Runtime>(_app: tauri::AppHandle<R>, host: String, port: u16) -> Result<(), String> {
+    http_server::start_server_background(host, port);
     Ok(())
 }
 
