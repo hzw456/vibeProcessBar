@@ -170,9 +170,8 @@ export const useProgressStore = defineStore('progress', () => {
     document.documentElement.style.setProperty('--app-font-size', `${newSettings.fontSize}px`);
     document.documentElement.style.setProperty('--app-opacity', newSettings.opacity.toString());
 
-    if (oldLanguage !== newSettings.language) {
-      updateTrayTranslations(newSettings.language);
-    }
+    // Always update tray translations when settings are applied
+    updateTrayTranslations(newSettings.language);
   }
 
   // 加载设置
