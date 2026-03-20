@@ -68,7 +68,7 @@ impl Default for AppSettings {
             backend_server_url: default_backend_server_url(),
             api_key: String::new(),
             window_visible: true,
-            language: "en".to_string(),
+            language: "zh-CN".to_string(),
             block_plugin_status: false,
             window_x: None,
             window_y: None,

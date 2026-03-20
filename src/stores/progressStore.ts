@@ -54,7 +54,7 @@ export interface AppSettings {
 }
 
 const defaultSettings: AppSettings = {
-  language: 'en',
+  language: 'zh-CN',
   theme: 'dark',
   fontSize: 14,
   opacity: 0.85,
@@ -185,6 +185,20 @@ export const useProgressStore = defineStore('progress', () => {
       }
     } catch (err) {
       error('Failed to fetch tasks', { error: String(err) });
+    }
+  }
+
+  async function fetchHistory() {
+    try {
+      const taskList = await safeInvoke<ProgressTask[]>('get_tasks');
+      if (taskList) {
+        // Filter completed/cancelled tasks as history
+        const completedTasks = taskList.filter(t => t.status === 'completed' || t.status === 'cancelled');
+        history.value = completedTasks;
+        debug('Fetched history from Rust', { count: completedTasks.length });
+      }
+    } catch (err) {
+      error('Failed to fetch history', { error: String(err) });
     }
   }
 
@@ -431,6 +445,7 @@ export const useProgressStore = defineStore('progress', () => {
     clearHistory,
     syncFromHttpApi,
     fetchTasks,
+    fetchHistory,
     initEventListeners,
     cleanupEventListeners,
   };
