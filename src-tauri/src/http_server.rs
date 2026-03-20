@@ -1353,17 +1353,14 @@ struct McpRequest {
     params: Option<serde_json::Value>,
 }
 
-async fn mcp_get_handler() -> (StatusCode, Json<serde_json::Value>) {
-    (
-        StatusCode::METHOD_NOT_ALLOWED,
-        Json(serde_json::json!({
-            "jsonrpc": "2.0",
-            "error": {
-                "code": -32000,
-                "message": "This MCP endpoint only supports HTTP POST JSON-RPC requests. SSE transport is not implemented."
-            }
-        })),
-    )
+use axum::response::sse::{Event, Sse, KeepAlive};
+use futures::stream;
+
+async fn mcp_get_handler() -> Sse<impl futures::Stream<Item = Result<Event, std::convert::Infallible>>> {
+    // MCP SSE endpoint - sends keepalive comments to keep connection open
+    let event = Event::default().comment("MCP SSE connection established");
+    Sse::new(stream::once(async move { Ok::<_, std::convert::Infallible>(event) }))
+        .keep_alive(KeepAlive::default())
 }
 
 async fn mcp_handler(
