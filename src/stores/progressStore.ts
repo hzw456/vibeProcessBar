@@ -114,7 +114,19 @@ export const useProgressStore = defineStore('progress', () => {
       // 监听任务更新事件
       unlistenTasks = await listen<ProgressTask[]>('tasks-updated', (event) => {
         debug('Received tasks-updated event', { count: event.payload.length });
-        tasks.value = event.payload;
+        
+        // Check for completed/cancelled tasks to add to history
+        const newTasks = event.payload;
+        const existingIds = new Set(tasks.value.map(t => t.id));
+        
+        for (const task of newTasks) {
+          if ((task.status === 'completed' || task.status === 'cancelled') && !existingIds.has(task.id)) {
+            // New completed task - add to history
+            addToHistory(task);
+          }
+        }
+        
+        tasks.value = newTasks;
       });
 
       // 监听设置更新事件
