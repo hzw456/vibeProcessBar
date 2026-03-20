@@ -1727,7 +1727,7 @@ fn create_cors_layer() -> CorsLayer {
 fn create_app(state: Arc<SharedState>) -> Router {
     Router::new()
         .route("/api/status", get(get_status))
-        .route("/api/task/:task_id/stages", get(get_task_stages))
+        .route("/api/task/{task_id}/stages", get(get_task_stages))
         .route("/api/task/report", post(report_task))
         .route("/api/task/update_state", post(update_state))
         .route("/api/task/update_state_by_path", post(update_state_by_path))
