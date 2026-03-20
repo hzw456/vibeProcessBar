@@ -70,7 +70,7 @@ const defaultSettings: AppSettings = {
   blockPluginStatus: false,
   windowX: null,
   windowY: null,
-  showOnlyWhenRunning: false,
+  showOnlyWhenRunning: true,
 };
 
 export const useProgressStore = defineStore('progress', () => {
