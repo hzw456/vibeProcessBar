@@ -89,11 +89,12 @@ export const useProgressStore = defineStore('progress', () => {
         const messages = await response.json();
         const tray = messages.tray || {};
         await safeInvoke('update_tray_translations', {
-          showWindow: tray.showWindow || '☀ Show Window',
-          hideWindow: tray.hideWindow || '☾ Hide Window',
+          show_window: tray.showWindow || '☀ Show Window',
+          hide_window: tray.hideWindow || '☾ Hide Window',
+          history: tray.history || 'History',
           settings: tray.settings || 'Settings',
           quit: tray.quit || 'Quit',
-          noTasks: tray.noTasks || 'No tasks',
+          no_tasks: tray.noTasks || 'No tasks',
           tasks: tray.tasks || 'Tasks',
         });
       }
@@ -153,7 +154,6 @@ export const useProgressStore = defineStore('progress', () => {
 
   // 应用设置
   function applySettings(newSettings: AppSettings) {
-    const oldLanguage = settings.value.language;
     const authStore = useAuthStore();
     settings.value = newSettings;
     authStore.setApiKey(newSettings.apiKey);
