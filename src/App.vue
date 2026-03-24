@@ -159,6 +159,7 @@ const displayTasks = computed(() => {
       task,
       hiddenTaskIds.value,
       store.settings.showOnlyWhenRunning,
+      clickedCompletedTasks.value,
     )
   );
 });

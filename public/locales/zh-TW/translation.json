@@ -136,6 +136,7 @@
   "tray": {
     "showWindow": "☀ 顯示窗口",
     "hideWindow": "☾ 隱藏窗口",
+    "history": "任務歷史",
     "settings": "設置",
     "quit": "退出",
     "noTasks": "無任務",

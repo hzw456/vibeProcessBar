@@ -12,6 +12,7 @@ export function shouldDisplayTask(
   task: ProgressTask,
   hiddenTaskIds: Set<string>,
   showOnlyWhenRunning: boolean,
+  clickedCompletedTasks?: Set<string>,
 ): boolean {
   if (hiddenTaskIds.has(task.id)) {
     return false;
@@ -22,7 +23,11 @@ export function shouldDisplayTask(
   }
 
   if (showOnlyWhenRunning) {
-    return task.status === 'running' || task.is_focused === true;
+    // Completed tasks are visible unless the user has double-clicked on them
+    if (task.status === 'completed' && clickedCompletedTasks?.has(task.id)) {
+      return false;
+    }
+    return task.status === 'running';
   }
 
   return true;

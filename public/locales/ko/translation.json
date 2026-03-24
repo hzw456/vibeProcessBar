@@ -136,6 +136,7 @@
   "tray": {
     "showWindow": "☀ 창 표시",
     "hideWindow": "☾ 창 숨기기",
+    "history": "작업 기록",
     "settings": "설정",
     "quit": "종료",
     "noTasks": "작업 없음",
