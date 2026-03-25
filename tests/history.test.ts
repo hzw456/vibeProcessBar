@@ -45,7 +45,27 @@ describe('history utils', () => {
     expect(events[1]).toMatchObject({
       kind: 'completed',
       title: 'completed',
+      startedAt: 1_710_000_000_000,
+      endedAt: 1_710_000_060_000,
+      duration: 60_000,
+    });
+  });
+
+  it('falls back to end time when a terminal task is missing start_time', () => {
+    const events = normalizeTaskHistory(
+      createTask({
+        start_time: 0,
+        end_time: 1_710_000_060_000,
+      }),
+      [],
+    );
+
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({
+      kind: 'completed',
       startedAt: 1_710_000_060_000,
+      endedAt: 1_710_000_060_000,
+      duration: 0,
     });
   });
 

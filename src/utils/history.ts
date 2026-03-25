@@ -129,13 +129,21 @@ function toTerminalEvent(task: ProgressTask): HistoryTimelineEvent | null {
     return null;
   }
 
+  const startedAt = task.start_time > 0 ? task.start_time : task.end_time;
+  const endedAt = task.end_time;
+  const duration = (
+    startedAt !== undefined && endedAt !== undefined
+      ? Math.max(0, endedAt - startedAt)
+      : undefined
+  );
+
   return {
     key: `terminal-${task.id}-${task.status}-${task.end_time ?? 'na'}`,
     kind: TERMINAL_EVENT_KINDS[task.status],
     title: task.status,
-    startedAt: task.end_time,
-    endedAt: task.end_time,
-    duration: 0,
+    startedAt,
+    endedAt,
+    duration,
   };
 }
 
