@@ -85,19 +85,22 @@ export const useProgressStore = defineStore('progress', () => {
   async function updateTrayTranslations(language: SupportedLanguage) {
     try {
       const response = await fetch(`/locales/${language}/translation.json`);
-      if (response.ok) {
-        const messages = await response.json();
-        const tray = messages.tray || {};
-        await safeInvoke('update_tray_translations', {
-          showWindow: tray.showWindow || '☀ Show Window',
-          hideWindow: tray.hideWindow || '☾ Hide Window',
-          history: tray.history || 'History',
-          settings: tray.settings || 'Settings',
-          quit: tray.quit || 'Quit',
-          noTasks: tray.noTasks || 'No tasks',
-          tasks: tray.tasks || 'Tasks',
-        });
+      if (!response.ok) {
+        throw new Error(`Failed to fetch tray translations: ${response.status} ${response.statusText}`);
       }
+
+      const messages = await response.json();
+      const tray = messages.tray || {};
+
+      await safeInvoke('update_tray_translations', {
+        showWindow: tray.showWindow || '☀ Show Window',
+        hideWindow: tray.hideWindow || '☾ Hide Window',
+        history: tray.history || 'History',
+        settings: tray.settings || 'Settings',
+        quit: tray.quit || 'Quit',
+        noTasks: tray.noTasks || 'No tasks',
+        tasks: tray.tasks || 'Tasks',
+      });
     } catch (err) {
       error('Failed to update tray translations', { error: String(err) });
     }

@@ -457,9 +457,20 @@ async fn get_current_language(state: tauri::State<'_, SettingsState>) -> Result<
 
 fn update_tray_menu<R: Runtime>(app: &tauri::AppHandle<R>) {
     let trans = get_tray_translations_internal();
+    let window_toggle_label = app
+        .get_webview_window("main")
+        .and_then(|window| window.is_visible().ok())
+        .map(|is_visible| {
+            if is_visible {
+                trans.hide_window.clone()
+            } else {
+                trans.show_window.clone()
+            }
+        })
+        .unwrap_or_else(|| trans.show_window.clone());
 
     let window_toggle =
-        MenuItem::with_id(app, "toggle-window", &trans.show_window, true, None::<&str>).ok();
+        MenuItem::with_id(app, "toggle-window", &window_toggle_label, true, None::<&str>).ok();
     let history_item =
         MenuItem::with_id(app, "history", &trans.history, true, None::<&str>).ok();
     let settings_item =
