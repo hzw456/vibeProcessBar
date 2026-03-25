@@ -9,7 +9,7 @@
     "running": "Ejecutando...",
     "completed": "Listo",
     "error": "Error",
-    "completedWithTime": "{{taskName}} - {{elapsedTime}}"
+    "completedWithTime": "{taskName} - {elapsedTime}"
   },
   "menu": {
     "title": "Tareas",
@@ -24,7 +24,7 @@
     "closeMenu": "Cerrar Menú"
   },
   "notification": {
-    "taskCompleted": "¡{{taskName}} Completada!"
+    "taskCompleted": "¡{taskName} Completada!"
   },
   "contextMenu": {
     "cancelTask": "Cancelar tarea",
@@ -61,8 +61,8 @@
         "forest": "Bosque",
         "midnight": "Medianoche"
       },
-      "fontSize": "Tamaño de fuente: {{size}}px",
-      "opacity": "Opacidad: {{percentage}}%",
+      "fontSize": "Tamaño de fuente: {size}px",
+      "opacity": "Opacidad: {percentage}%",
       "customPrimaryColor": "Color principal personalizado",
       "customBackground": "Fondo personalizado",
       "resetColors": "Restablecer colores personalizados",
@@ -71,15 +71,15 @@
     "notifications": {
       "desktopNotifications": "Notificaciones de escritorio",
       "soundAlerts": "Alertas de sonido",
-      "volume": "Volumen: {{percentage}}%",
-      "completionThreshold": "Umbral de finalización: {{percentage}}%",
+      "volume": "Volumen: {percentage}%",
+      "completionThreshold": "Umbral de finalización: {percentage}%",
       "doNotDisturb": "No molestar",
       "startTime": "Hora de inicio",
       "endTime": "Hora de fin"
     },
     "tasks": {
       "history": "Historial de tareas",
-      "historyCount": "{{count}} tareas",
+      "historyCount": "{count} tareas",
       "clearHistory": "Borrar historial",
       "clear": "Borrar"
     },
@@ -98,7 +98,7 @@
       "cancel": "Cancelar"
     },
     "footer": {
-      "version": "Barra de Proceso Vibe v{{version}}",
+      "version": "Barra de Proceso Vibe v{version}",
       "resetDefaults": "Restablecer valores predeterminados"
     },
     "account": {
@@ -114,8 +114,8 @@
     }
   },
   "time": {
-    "minutesSeconds": "{{minutes}}m {{seconds}}s",
-    "seconds": "{{seconds}}s",
+    "minutesSeconds": "{minutes}m {seconds}s",
+    "seconds": "{seconds}s",
     "waiting": "⏳",
     "active": "👁"
   },

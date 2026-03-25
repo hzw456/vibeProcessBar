@@ -9,7 +9,7 @@
     "running": "En cours...",
     "completed": "Terminé",
     "error": "Erreur",
-    "completedWithTime": "{{taskName}} - {{elapsedTime}}"
+    "completedWithTime": "{taskName} - {elapsedTime}"
   },
   "menu": {
     "title": "Tâches",
@@ -24,7 +24,7 @@
     "closeMenu": "Fermer le Menu"
   },
   "notification": {
-    "taskCompleted": "{{taskName}} Terminée!"
+    "taskCompleted": "{taskName} Terminée!"
   },
   "contextMenu": {
     "cancelTask": "Annuler la tâche",
@@ -61,8 +61,8 @@
         "forest": "Forêt",
         "midnight": "Minuit"
       },
-      "fontSize": "Taille de police: {{size}}px",
-      "opacity": "Opacité: {{percentage}}%",
+      "fontSize": "Taille de police: {size}px",
+      "opacity": "Opacité: {percentage}%",
       "customPrimaryColor": "Couleur principale personnalisée",
       "customBackground": "Arrière-plan personnalisé",
       "resetColors": "Réinitialiser les couleurs personnalisées",
@@ -71,15 +71,15 @@
     "notifications": {
       "desktopNotifications": "Notifications de bureau",
       "soundAlerts": "Alertes sonores",
-      "volume": "Volume: {{percentage}}%",
-      "completionThreshold": "Seuil de completion: {{percentage}}%",
+      "volume": "Volume: {percentage}%",
+      "completionThreshold": "Seuil de completion: {percentage}%",
       "doNotDisturb": "Ne pas déranger",
       "startTime": "Heure de début",
       "endTime": "Heure de fin"
     },
     "tasks": {
       "history": "Historique des tâches",
-      "historyCount": "{{count}} tâches",
+      "historyCount": "{count} tâches",
       "clearHistory": "Effacer l'historique",
       "clear": "Effacer"
     },
@@ -98,7 +98,7 @@
       "cancel": "Annuler"
     },
     "footer": {
-      "version": "Barre de Progression Vibe v{{version}}",
+      "version": "Barre de Progression Vibe v{version}",
       "resetDefaults": "Réinitialiser les paramètres par défaut"
     },
     "account": {
@@ -114,8 +114,8 @@
     }
   },
   "time": {
-    "minutesSeconds": "{{minutes}}m {{seconds}}s",
-    "seconds": "{{seconds}}s",
+    "minutesSeconds": "{minutes}m {seconds}s",
+    "seconds": "{seconds}s",
     "waiting": "⏳",
     "active": "👁"
   },

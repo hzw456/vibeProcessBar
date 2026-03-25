@@ -9,7 +9,7 @@
     "running": "運行中...",
     "completed": "完成",
     "error": "錯誤",
-    "completedWithTime": "{{taskName}} - {{elapsedTime}}"
+    "completedWithTime": "{taskName} - {elapsedTime}"
   },
   "menu": {
     "title": "任務",
@@ -24,7 +24,7 @@
     "closeMenu": "關閉菜單"
   },
   "notification": {
-    "taskCompleted": "{{taskName}} 已完成！"
+    "taskCompleted": "{taskName} 已完成！"
   },
   "contextMenu": {
     "cancelTask": "取消任務",
@@ -61,8 +61,8 @@
         "forest": "森林",
         "midnight": "午夜"
       },
-      "fontSize": "字體大小: {{size}}px",
-      "opacity": "透明度: {{percentage}}%",
+      "fontSize": "字體大小: {size}px",
+      "opacity": "透明度: {percentage}%",
       "customPrimaryColor": "自定義主色",
       "customBackground": "自定義背景",
       "resetColors": "重置自定義顏色",
@@ -71,15 +71,15 @@
     "notifications": {
       "desktopNotifications": "桌面通知",
       "soundAlerts": "聲音提醒",
-      "volume": "音量: {{percentage}}%",
-      "completionThreshold": "完成閾值: {{percentage}}%",
+      "volume": "音量: {percentage}%",
+      "completionThreshold": "完成閾值: {percentage}%",
       "doNotDisturb": "勿擾模式",
       "startTime": "開始時間",
       "endTime": "結束時間"
     },
     "tasks": {
       "history": "任務歷史",
-      "historyCount": "{{count}} 個任務",
+      "historyCount": "{count} 個任務",
       "clearHistory": "清除歷史",
       "clear": "清除"
     },
@@ -98,7 +98,7 @@
       "cancel": "取消"
     },
     "footer": {
-      "version": "Vibe 進度條 v{{version}}",
+      "version": "Vibe 進度條 v{version}",
       "resetDefaults": "重置為默認"
     },
     "account": {
@@ -114,8 +114,8 @@
     }
   },
   "time": {
-    "minutesSeconds": "{{minutes}}分{{seconds}}秒",
-    "seconds": "{{seconds}}秒",
+    "minutesSeconds": "{minutes}分{seconds}秒",
+    "seconds": "{seconds}秒",
     "waiting": "⏳",
     "active": "👁"
   },

@@ -9,7 +9,7 @@
     "running": "실행 중...",
     "completed": "완료",
     "error": "오류",
-    "completedWithTime": "{{taskName}} - {{elapsedTime}}"
+    "completedWithTime": "{taskName} - {elapsedTime}"
   },
   "menu": {
     "title": "작업",
@@ -24,7 +24,7 @@
     "closeMenu": "메뉴 닫기"
   },
   "notification": {
-    "taskCompleted": "{{taskName}} 완료됨!"
+    "taskCompleted": "{taskName} 완료됨!"
   },
   "contextMenu": {
     "cancelTask": "작업 취소",
@@ -61,8 +61,8 @@
         "forest": "포레스트",
         "midnight": "미드나잇"
       },
-      "fontSize": "글꼴 크기: {{size}}px",
-      "opacity": "불투명도: {{percentage}}%",
+      "fontSize": "글꼴 크기: {size}px",
+      "opacity": "불투명도: {percentage}%",
       "customPrimaryColor": "사용자 지정 주 색상",
       "customBackground": "사용자 지정 배경",
       "resetColors": "사용자 지정 색상 재설정",
@@ -71,15 +71,15 @@
     "notifications": {
       "desktopNotifications": "데스크톱 알림",
       "soundAlerts": "소리 알림",
-      "volume": "볼륨: {{percentage}}%",
-      "completionThreshold": "완료 임계값: {{percentage}}%",
+      "volume": "볼륨: {percentage}%",
+      "completionThreshold": "완료 임계값: {percentage}%",
       "doNotDisturb": "방해 금지",
       "startTime": "시작 시간",
       "endTime": "종료 시간"
     },
     "tasks": {
       "history": "작업 기록",
-      "historyCount": "{{count}} 작업",
+      "historyCount": "{count} 작업",
       "clearHistory": "기록 지우기",
       "clear": "지우기"
     },
@@ -98,7 +98,7 @@
       "cancel": "취소"
     },
     "footer": {
-      "version": "Vibe 진행 표시줄 v{{version}}",
+      "version": "Vibe 진행 표시줄 v{version}",
       "resetDefaults": "기본값으로 재설정"
     },
     "account": {
@@ -114,8 +114,8 @@
     }
   },
   "time": {
-    "minutesSeconds": "{{minutes}}분 {{seconds}}초",
-    "seconds": "{{seconds}}초",
+    "minutesSeconds": "{minutes}분 {seconds}초",
+    "seconds": "{seconds}초",
     "waiting": "⏳",
     "active": "👁"
   },

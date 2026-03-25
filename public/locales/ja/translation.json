@@ -9,7 +9,7 @@
     "running": "実行中...",
     "completed": "完了",
     "error": "エラー",
-    "completedWithTime": "{{taskName}} - {{elapsedTime}}"
+    "completedWithTime": "{taskName} - {elapsedTime}"
   },
   "menu": {
     "title": "タスク",
@@ -24,7 +24,7 @@
     "closeMenu": "メニューを閉じる"
   },
   "notification": {
-    "taskCompleted": "{{taskName}} 完了！"
+    "taskCompleted": "{taskName} 完了！"
   },
   "contextMenu": {
     "cancelTask": "タスクをキャンセル",
@@ -61,8 +61,8 @@
         "forest": "フォレスト",
         "midnight": "ミッドナイト"
       },
-      "fontSize": "フォントサイズ: {{size}}px",
-      "opacity": "不透明度: {{percentage}}%",
+      "fontSize": "フォントサイズ: {size}px",
+      "opacity": "不透明度: {percentage}%",
       "customPrimaryColor": "カスタムプライマリカラー",
       "customBackground": "カスタム背景",
       "resetColors": "カスタム色をリセット",
@@ -71,15 +71,15 @@
     "notifications": {
       "desktopNotifications": "デスクトップ通知",
       "soundAlerts": "サウンドアラート",
-      "volume": "音量: {{percentage}}%",
-      "completionThreshold": "完了閾値: {{percentage}}%",
+      "volume": "音量: {percentage}%",
+      "completionThreshold": "完了閾値: {percentage}%",
       "doNotDisturb": "集中モード",
       "startTime": "開始時間",
       "endTime": "終了時間"
     },
     "tasks": {
       "history": "タスク履歴",
-      "historyCount": "{{count}} タスク",
+      "historyCount": "{count} タスク",
       "clearHistory": "履歴をクリア",
       "clear": "クリア"
     },
@@ -98,7 +98,7 @@
       "cancel": "キャンセル"
     },
     "footer": {
-      "version": "Vibe プロセンバー v{{version}}",
+      "version": "Vibe プロセンバー v{version}",
       "resetDefaults": "デフォルトにリセット"
     },
     "account": {
@@ -114,8 +114,8 @@
     }
   },
   "time": {
-    "minutesSeconds": "{{minutes}}分{{seconds}}秒",
-    "seconds": "{{seconds}}秒",
+    "minutesSeconds": "{minutes}分{seconds}秒",
+    "seconds": "{seconds}秒",
     "waiting": "⏳",
     "active": "👁"
   },

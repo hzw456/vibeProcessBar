@@ -130,15 +130,13 @@ export const useProgressStore = defineStore('progress', () => {
       }
 
       await safeInvoke('update_tray_translations', {
-        translations: {
-          showWindow: trayTranslations.showWindow,
-          hideWindow: trayTranslations.hideWindow,
-          history: trayTranslations.history,
-          settings: trayTranslations.settings,
-          quit: trayTranslations.quit,
-          noTasks: trayTranslations.noTasks,
-          tasks: trayTranslations.tasks,
-        },
+        showWindow: trayTranslations.showWindow,
+        hideWindow: trayTranslations.hideWindow,
+        history: trayTranslations.history,
+        settings: trayTranslations.settings,
+        quit: trayTranslations.quit,
+        noTasks: trayTranslations.noTasks,
+        tasks: trayTranslations.tasks,
       });
     } catch (err) {
       error('Failed to update tray translations', { error: String(err) });

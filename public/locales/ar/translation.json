@@ -9,7 +9,7 @@
     "running": "قيد التشغيل...",
     "completed": "مكتمل",
     "error": "خطأ",
-    "completedWithTime": "{{taskName}} - {{elapsedTime}}"
+    "completedWithTime": "{taskName} - {elapsedTime}"
   },
   "menu": {
     "title": "المهام",
@@ -24,7 +24,7 @@
     "closeMenu": "إغلاق القائمة"
   },
   "notification": {
-    "taskCompleted": "{{taskName}} اكتمل!"
+    "taskCompleted": "{taskName} اكتمل!"
   },
   "contextMenu": {
     "cancelTask": "إلغاء المهمة",
@@ -61,8 +61,8 @@
         "forest": "غابة",
         "midnight": "منتصف الليل"
       },
-      "fontSize": "حجم الخط: {{size}}px",
-      "opacity": "الشفافية: {{percentage}}%",
+      "fontSize": "حجم الخط: {size}px",
+      "opacity": "الشفافية: {percentage}%",
       "customPrimaryColor": "لون أساسي مخصص",
       "customBackground": "خلفية مخصصة",
       "resetColors": "إعادة تعيين الألوان المخصصة",
@@ -71,15 +71,15 @@
     "notifications": {
       "desktopNotifications": "إشعارات سطح المكتب",
       "soundAlerts": "تنبيهات صوتية",
-      "volume": "مستوى الصوت: {{percentage}}%",
-      "completionThreshold": "عتبة الإكمال: {{percentage}}%",
+      "volume": "مستوى الصوت: {percentage}%",
+      "completionThreshold": "عتبة الإكمال: {percentage}%",
       "doNotDisturb": "عدم الإزعاج",
       "startTime": "وقت البدء",
       "endTime": "وقت الانتهاء"
     },
     "tasks": {
       "history": "سجل المهام",
-      "historyCount": "{{count}} مهام",
+      "historyCount": "{count} مهام",
       "clearHistory": "مسح السجل",
       "clear": "مسح"
     },
@@ -98,7 +98,7 @@
       "cancel": "إلغاء"
     },
     "footer": {
-      "version": "شريط تقدم Vibe v{{version}}",
+      "version": "شريط تقدم Vibe v{version}",
       "resetDefaults": "إعادة تعيين للإعدادات الافتراضية"
     },
     "account": {
@@ -114,8 +114,8 @@
     }
   },
   "time": {
-    "minutesSeconds": "{{minutes}}د {{seconds}}ث",
-    "seconds": "{{seconds}}ث",
+    "minutesSeconds": "{minutes}د {seconds}ث",
+    "seconds": "{seconds}ث",
     "waiting": "⏳",
     "active": "👁"
   },

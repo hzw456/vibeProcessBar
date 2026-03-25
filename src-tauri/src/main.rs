@@ -536,8 +536,24 @@ fn set_tray_translations_internal(translations: TrayTranslations) {
 #[tauri::command]
 async fn update_tray_translations<R: Runtime>(
     app: tauri::AppHandle<R>,
-    translations: TrayTranslations,
+    show_window: String,
+    hide_window: String,
+    history: String,
+    settings: String,
+    quit: String,
+    no_tasks: String,
+    tasks: String,
 ) -> Result<(), String> {
+    let translations = TrayTranslations {
+        show_window,
+        hide_window,
+        history,
+        settings,
+        quit,
+        no_tasks,
+        tasks,
+    };
+
     if let Ok(mut trans) = TRAY_TRANSLATIONS.lock() {
         if *trans == translations {
             return Ok(());

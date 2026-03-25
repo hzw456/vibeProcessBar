@@ -9,7 +9,7 @@
     "running": "Läuft...",
     "completed": "Fertig",
     "error": "Fehler",
-    "completedWithTime": "{{taskName}} - {{elapsedTime}}"
+    "completedWithTime": "{taskName} - {elapsedTime}"
   },
   "menu": {
     "title": "Aufgaben",
@@ -24,7 +24,7 @@
     "closeMenu": "Menü Schließen"
   },
   "notification": {
-    "taskCompleted": "{{taskName}} Abgeschlossen!"
+    "taskCompleted": "{taskName} Abgeschlossen!"
   },
   "contextMenu": {
     "cancelTask": "Aufgabe abbrechen",
@@ -61,8 +61,8 @@
         "forest": "Wald",
         "midnight": "Mitternacht"
       },
-      "fontSize": "Schriftgröße: {{size}}px",
-      "opacity": "Deckkraft: {{percentage}}%",
+      "fontSize": "Schriftgröße: {size}px",
+      "opacity": "Deckkraft: {percentage}%",
       "customPrimaryColor": "Benutzerdefinierte Hauptfarbe",
       "customBackground": "Benutzerdefinierter Hintergrund",
       "resetColors": "Benutzerdefinierte Farben zurücksetzen",
@@ -71,15 +71,15 @@
     "notifications": {
       "desktopNotifications": "Desktop-Benachrichtigungen",
       "soundAlerts": "Tonalarme",
-      "volume": "Lautstärke: {{percentage}}%",
-      "completionThreshold": "Abschlussschwelle: {{percentage}}%",
+      "volume": "Lautstärke: {percentage}%",
+      "completionThreshold": "Abschlussschwelle: {percentage}%",
       "doNotDisturb": "Nicht stören",
       "startTime": "Startzeit",
       "endTime": "Endzeit"
     },
     "tasks": {
       "history": "Aufgabenverlauf",
-      "historyCount": "{{count}} Aufgaben",
+      "historyCount": "{count} Aufgaben",
       "clearHistory": "Verlauf löschen",
       "clear": "Löschen"
     },
@@ -98,7 +98,7 @@
       "cancel": "Abbrechen"
     },
     "footer": {
-      "version": "Vibe Fortschrittsleiste v{{version}}",
+      "version": "Vibe Fortschrittsleiste v{version}",
       "resetDefaults": "Auf Standardwerte zurücksetzen"
     },
     "account": {
@@ -114,8 +114,8 @@
     }
   },
   "time": {
-    "minutesSeconds": "{{minutes}}m {{seconds}}s",
-    "seconds": "{{seconds}}s",
+    "minutesSeconds": "{minutes}m {seconds}s",
+    "seconds": "{seconds}s",
     "waiting": "⏳",
     "active": "👁"
   },

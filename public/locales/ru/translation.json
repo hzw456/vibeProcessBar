@@ -9,7 +9,7 @@
     "running": "Выполняется...",
     "completed": "Готово",
     "error": "Ошибка",
-    "completedWithTime": "{{taskName}} - {{elapsedTime}}"
+    "completedWithTime": "{taskName} - {elapsedTime}"
   },
   "menu": {
     "title": "Задачи",
@@ -24,7 +24,7 @@
     "closeMenu": "Закрыть меню"
   },
   "notification": {
-    "taskCompleted": "{{taskName}} Завершено!"
+    "taskCompleted": "{taskName} Завершено!"
   },
   "contextMenu": {
     "cancelTask": "Отменить задачу",
@@ -61,8 +61,8 @@
         "forest": "Лес",
         "midnight": "Полночь"
       },
-      "fontSize": "Размер шрифта: {{size}}px",
-      "opacity": "Прозрачность: {{percentage}}%",
+      "fontSize": "Размер шрифта: {size}px",
+      "opacity": "Прозрачность: {percentage}%",
       "customPrimaryColor": "Пользовательский основной цвет",
       "customBackground": "Пользовательский фон",
       "resetColors": "Сбросить пользовательские цвета",
@@ -71,15 +71,15 @@
     "notifications": {
       "desktopNotifications": "Уведомления рабочего стола",
       "soundAlerts": "Звуковые сигналы",
-      "volume": "Громкость: {{percentage}}%",
-      "completionThreshold": "Порог завершения: {{percentage}}%",
+      "volume": "Громкость: {percentage}%",
+      "completionThreshold": "Порог завершения: {percentage}%",
       "doNotDisturb": "Не беспокоить",
       "startTime": "Время начала",
       "endTime": "Время окончания"
     },
     "tasks": {
       "history": "История задач",
-      "historyCount": "{{count}} задач",
+      "historyCount": "{count} задач",
       "clearHistory": "Очистить историю",
       "clear": "Очистить"
     },
@@ -98,7 +98,7 @@
       "cancel": "Отмена"
     },
     "footer": {
-      "version": "Vibe Индикатор прогресса v{{version}}",
+      "version": "Vibe Индикатор прогресса v{version}",
       "resetDefaults": "Сбросить настройки"
     },
     "account": {
@@ -114,8 +114,8 @@
     }
   },
   "time": {
-    "minutesSeconds": "{{minutes}}м {{seconds}}с",
-    "seconds": "{{seconds}}с",
+    "minutesSeconds": "{minutes}м {seconds}с",
+    "seconds": "{seconds}с",
     "waiting": "⏳",
     "active": "👁"
   },
