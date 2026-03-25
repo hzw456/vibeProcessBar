@@ -144,6 +144,8 @@ async fn update_app_settings<R: Runtime>(
     state: tauri::State<'_, SettingsState>,
     new_settings: AppSettings,
 ) -> Result<(), String> {
+    let previous_language = state.get_settings().language;
+
     // 更新 HTTP server 的屏蔽设置
     http_server::set_block_plugin_status(new_settings.block_plugin_status);
     http_server::set_backend_email(new_settings.backend_email.clone());
@@ -157,6 +159,11 @@ async fn update_app_settings<R: Runtime>(
     // 通过 emit 发送到所有窗口
     app.emit("settings-changed", &saved_settings)
         .map_err(|e| e.to_string())?;
+
+    if previous_language != saved_settings.language {
+        set_tray_translations_internal(load_tray_translations_for_language(&saved_settings.language));
+        update_tray_menu(&app);
+    }
 
     Ok(())
 }
@@ -178,6 +185,7 @@ async fn set_window_visibility<R: Runtime>(
 
     app.emit("window-visibility-changed", visible)
         .map_err(|e| e.to_string())?;
+    update_tray_menu(&app);
 
     Ok(())
 }
@@ -293,19 +301,22 @@ fn set_window_opacity(_window: tauri::Window, _opacity: f64) {}
 fn set_window_transparency(_window: tauri::Window, _transparent: bool) {}
 
 #[tauri::command]
-fn show_window(window: tauri::Window) {
+fn show_window<R: Runtime>(app: tauri::AppHandle<R>, window: tauri::Window<R>) {
     let _ = window.show();
     let _ = window.set_focus();
+    update_tray_menu(&app);
 }
 
 #[tauri::command]
-fn show_window_without_focus(window: tauri::Window) {
+fn show_window_without_focus<R: Runtime>(app: tauri::AppHandle<R>, window: tauri::Window<R>) {
     let _ = window.show();
+    update_tray_menu(&app);
 }
 
 #[tauri::command]
-fn hide_window(window: tauri::Window) {
+fn hide_window<R: Runtime>(app: tauri::AppHandle<R>, window: tauri::Window<R>) {
     let _ = window.hide();
+    update_tray_menu(&app);
 }
 
 #[tauri::command]
@@ -408,31 +419,118 @@ pub struct TrayTranslations {
     pub tasks: String,
 }
 
+impl Default for TrayTranslations {
+    fn default() -> Self {
+        Self {
+            show_window: "Show/Hide".to_string(),
+            hide_window: "Show/Hide".to_string(),
+            history: "Task History".to_string(),
+            settings: "Settings".to_string(),
+            quit: "Quit".to_string(),
+            no_tasks: "No tasks".to_string(),
+            tasks: "Tasks".to_string(),
+        }
+    }
+}
+
+#[derive(Debug, Default, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct PartialTrayTranslations {
+    show_window: Option<String>,
+    hide_window: Option<String>,
+    history: Option<String>,
+    settings: Option<String>,
+    quit: Option<String>,
+    no_tasks: Option<String>,
+    tasks: Option<String>,
+}
+
+#[derive(Debug, Default, serde::Deserialize)]
+struct LocaleMessages {
+    tray: Option<PartialTrayTranslations>,
+}
+
 lazy_static::lazy_static! {
-    static ref TRAY_TRANSLATIONS: std::sync::Mutex<TrayTranslations> = std::sync::Mutex::new(TrayTranslations {
-        show_window: "Show/Hide".to_string(),
-        hide_window: "Show/Hide".to_string(),
-        history: "History".to_string(),
-        settings: "Settings".to_string(),
-        quit: "Quit".to_string(),
-        no_tasks: "No tasks".to_string(),
-        tasks: "Tasks".to_string(),
-    });
+    static ref TRAY_TRANSLATIONS: std::sync::Mutex<TrayTranslations> =
+        std::sync::Mutex::new(TrayTranslations::default());
 }
 
 fn get_tray_translations_internal() -> TrayTranslations {
     TRAY_TRANSLATIONS
         .lock()
         .map(|t| t.clone())
-        .unwrap_or_else(|_| TrayTranslations {
-            show_window: "Show/Hide".to_string(),
-            hide_window: "Show/Hide".to_string(),
-            history: "History".to_string(),
-            settings: "Settings".to_string(),
-            quit: "Quit".to_string(),
-            no_tasks: "No tasks".to_string(),
-            tasks: "Tasks".to_string(),
-        })
+        .unwrap_or_else(|_| TrayTranslations::default())
+}
+
+impl TrayTranslations {
+    fn apply_partial(&mut self, partial: PartialTrayTranslations) {
+        if let Some(value) = partial.show_window {
+            self.show_window = value;
+        }
+        if let Some(value) = partial.hide_window {
+            self.hide_window = value;
+        }
+        if let Some(value) = partial.history {
+            self.history = value;
+        }
+        if let Some(value) = partial.settings {
+            self.settings = value;
+        }
+        if let Some(value) = partial.quit {
+            self.quit = value;
+        }
+        if let Some(value) = partial.no_tasks {
+            self.no_tasks = value;
+        }
+        if let Some(value) = partial.tasks {
+            self.tasks = value;
+        }
+    }
+}
+
+fn bundled_locale_json(language: &str) -> Option<&'static str> {
+    match language {
+        "en" => Some(include_str!("../../public/locales/en/translation.json")),
+        "zh-CN" => Some(include_str!("../../public/locales/zh-CN/translation.json")),
+        "zh-TW" => Some(include_str!("../../public/locales/zh-TW/translation.json")),
+        "es" => Some(include_str!("../../public/locales/es/translation.json")),
+        "fr" => Some(include_str!("../../public/locales/fr/translation.json")),
+        "de" => Some(include_str!("../../public/locales/de/translation.json")),
+        "ja" => Some(include_str!("../../public/locales/ja/translation.json")),
+        "ko" => Some(include_str!("../../public/locales/ko/translation.json")),
+        "ru" => Some(include_str!("../../public/locales/ru/translation.json")),
+        "pt" => Some(include_str!("../../public/locales/pt/translation.json")),
+        "ar" => Some(include_str!("../../public/locales/ar/translation.json")),
+        _ => None,
+    }
+}
+
+fn load_partial_tray_translations(language: &str) -> Option<PartialTrayTranslations> {
+    let locale_json = bundled_locale_json(language)?;
+    let messages: LocaleMessages = serde_json::from_str(locale_json).ok()?;
+    messages.tray
+}
+
+fn load_tray_translations_for_language(language: &str) -> TrayTranslations {
+    let mut translations = TrayTranslations::default();
+
+    if let Some(fallback) = load_partial_tray_translations("en") {
+        translations.apply_partial(fallback);
+    }
+
+    if language != "en" {
+        if let Some(locale) = load_partial_tray_translations(language) {
+            translations.apply_partial(locale);
+        }
+    }
+
+    translations
+}
+
+fn set_tray_translations_internal(translations: TrayTranslations) {
+    if let Ok(mut current) = TRAY_TRANSLATIONS.lock() {
+        *current = translations;
+    }
 }
 
 #[tauri::command]
@@ -511,6 +609,7 @@ fn main() {
             if let Some(main_window) = app.get_webview_window("main") {
                 let _ = main_window.show();
                 let _ = main_window.set_focus();
+                update_tray_menu(app);
             }
             if let Some(settings_window) = app.get_webview_window("settings") {
                 let _ = settings_window.show();
@@ -561,6 +660,7 @@ fn main() {
             let settings_state = SettingsState::new(&app_handle);
             let current_settings = settings_state.get_settings();
             app.manage(settings_state);
+            set_tray_translations_internal(load_tray_translations_for_language(&current_settings.language));
 
             let window = app_handle.get_webview_window("main").unwrap();
 
@@ -605,7 +705,11 @@ fn main() {
             let window_toggle_item = MenuItem::with_id(
                 &app_handle,
                 "toggle-window",
-                &trans.hide_window,
+                if current_settings.window_visible {
+                    &trans.hide_window
+                } else {
+                    &trans.show_window
+                },
                 true,
                 None::<&str>,
             )?;
@@ -646,6 +750,7 @@ fn main() {
                                 let _ = settings_state.update_settings(settings);
                                 let _ = app.tray_by_id("main-tray").unwrap()
                                     .set_tooltip(Some("Vibe Process Bar (Hidden)"));
+                                update_tray_menu(app);
                             } else {
                                 let _ = window.show();
                                 let mut settings = settings_state.get_settings();
@@ -653,6 +758,7 @@ fn main() {
                                 let _ = settings_state.update_settings(settings);
                                 let _ = app.tray_by_id("main-tray").unwrap()
                                     .set_tooltip(Some("Vibe Process Bar"));
+                                update_tray_menu(app);
                             }
                         }
                         "history" => {
@@ -683,6 +789,7 @@ fn main() {
                     settings.window_visible = false;
                     let _ = settings_state.update_settings(settings);
                     let _ = window_clone.hide();
+                    update_tray_menu(&app_handle_clone);
                 }
             });
 
@@ -690,4 +797,28 @@ fn main() {
         })
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::load_tray_translations_for_language;
+
+    #[test]
+    fn loads_traditional_chinese_tray_translations() {
+        let translations = load_tray_translations_for_language("zh-TW");
+
+        assert_eq!(translations.show_window, "☀ 顯示窗口");
+        assert_eq!(translations.hide_window, "☾ 隱藏窗口");
+        assert_eq!(translations.history, "任務歷史");
+        assert_eq!(translations.settings, "設置");
+    }
+
+    #[test]
+    fn falls_back_to_english_for_unknown_language() {
+        let translations = load_tray_translations_for_language("xx");
+
+        assert_eq!(translations.show_window, "Show/Hide");
+        assert_eq!(translations.history, "Task History");
+        assert_eq!(translations.quit, "Quit");
+    }
 }

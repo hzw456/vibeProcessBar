@@ -136,6 +136,7 @@
   "tray": {
     "showWindow": "☀ Fenster anzeigen",
     "hideWindow": "☾ Fenster ausblenden",
+    "history": "Aufgabenverlauf",
     "settings": "Einstellungen",
     "quit": "Beenden",
     "noTasks": "Keine Aufgaben",

@@ -136,6 +136,7 @@
   "tray": {
     "showWindow": "☀ Mostrar ventana",
     "hideWindow": "☾ Ocultar ventana",
+    "history": "Historial de tareas",
     "settings": "Configuración",
     "quit": "Salir",
     "noTasks": "Sin tareas",

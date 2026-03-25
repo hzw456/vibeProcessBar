@@ -136,6 +136,7 @@
   "tray": {
     "showWindow": "☀ إظهار النافذة",
     "hideWindow": "☾ إخفاء النافذة",
+    "history": "سجل المهام",
     "settings": "الإعدادات",
     "quit": "خروج",
     "noTasks": "لا توجد مهام",

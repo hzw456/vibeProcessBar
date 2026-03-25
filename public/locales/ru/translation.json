@@ -136,6 +136,7 @@
   "tray": {
     "showWindow": "☀ Показать окно",
     "hideWindow": "☾ Скрыть окно",
+    "history": "История задач",
     "settings": "Настройки",
     "quit": "Выйти",
     "noTasks": "Нет задач",

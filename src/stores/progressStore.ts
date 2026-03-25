@@ -77,29 +77,68 @@ export const useProgressStore = defineStore('progress', () => {
   const tasks = ref<ProgressTask[]>([]);
   const history = ref<ProgressTask[]>([]);
   const settings = ref<AppSettings>({ ...defaultSettings });
+
+  const defaultTrayTranslations = {
+    showWindow: 'Show/Hide',
+    hideWindow: 'Show/Hide',
+    history: 'Task History',
+    settings: 'Settings',
+    quit: 'Quit',
+    noTasks: 'No tasks',
+    tasks: 'Tasks',
+  } as const;
   
   let unlistenTasks: (() => void) | null = null;
   let unlistenSettings: (() => void) | null = null;
+  let trayTranslationRequestId = 0;
+
+  async function loadTrayTranslations(language: SupportedLanguage) {
+    const [fallbackResponse, localeResponse] = await Promise.all([
+      fetch('/locales/en/translation.json'),
+      fetch(`/locales/${language}/translation.json`),
+    ]);
+
+    if (!fallbackResponse.ok) {
+      throw new Error(`Failed to fetch fallback tray translations: ${fallbackResponse.status} ${fallbackResponse.statusText}`);
+    }
+
+    if (!localeResponse.ok) {
+      throw new Error(`Failed to fetch tray translations: ${localeResponse.status} ${localeResponse.statusText}`);
+    }
+
+    const [fallbackMessages, localeMessages] = await Promise.all([
+      fallbackResponse.json(),
+      localeResponse.json(),
+    ]);
+
+    return {
+      ...defaultTrayTranslations,
+      ...(fallbackMessages.tray || {}),
+      ...(localeMessages.tray || {}),
+    };
+  }
 
   // 更新托盘菜单翻译
   async function updateTrayTranslations(language: SupportedLanguage) {
+    const requestId = ++trayTranslationRequestId;
+
     try {
-      const response = await fetch(`/locales/${language}/translation.json`);
-      if (!response.ok) {
-        throw new Error(`Failed to fetch tray translations: ${response.status} ${response.statusText}`);
+      const trayTranslations = await loadTrayTranslations(language);
+
+      if (requestId !== trayTranslationRequestId) {
+        return;
       }
 
-      const messages = await response.json();
-      const tray = messages.tray || {};
-
       await safeInvoke('update_tray_translations', {
-        showWindow: tray.showWindow || '☀ Show Window',
-        hideWindow: tray.hideWindow || '☾ Hide Window',
-        history: tray.history || 'History',
-        settings: tray.settings || 'Settings',
-        quit: tray.quit || 'Quit',
-        noTasks: tray.noTasks || 'No tasks',
-        tasks: tray.tasks || 'Tasks',
+        translations: {
+          showWindow: trayTranslations.showWindow,
+          hideWindow: trayTranslations.hideWindow,
+          history: trayTranslations.history,
+          settings: trayTranslations.settings,
+          quit: trayTranslations.quit,
+          noTasks: trayTranslations.noTasks,
+          tasks: trayTranslations.tasks,
+        },
       });
     } catch (err) {
       error('Failed to update tray translations', { error: String(err) });
@@ -134,7 +173,7 @@ export const useProgressStore = defineStore('progress', () => {
       // 监听设置更新事件
       unlistenSettings = await listen<AppSettings>('settings-changed', (event) => {
         debug('Received settings-changed event');
-        applySettings(event.payload);
+        void applySettings(event.payload);
       });
 
       debug('Event listeners initialized');
@@ -156,7 +195,7 @@ export const useProgressStore = defineStore('progress', () => {
   }
 
   // 应用设置
-  function applySettings(newSettings: AppSettings) {
+  async function applySettings(newSettings: AppSettings) {
     const authStore = useAuthStore();
     settings.value = newSettings;
     authStore.setApiKey(newSettings.apiKey);
@@ -166,13 +205,13 @@ export const useProgressStore = defineStore('progress', () => {
       setApiBaseUrl(newSettings.backendServerUrl);
     }
 
-    setI18nLanguage(newSettings.language);
+    await setI18nLanguage(newSettings.language);
     document.documentElement.setAttribute('data-theme', newSettings.theme);
     document.documentElement.style.setProperty('--app-font-size', `${newSettings.fontSize}px`);
     document.documentElement.style.setProperty('--app-opacity', newSettings.opacity.toString());
 
     // Always update tray translations when settings are applied
-    updateTrayTranslations(newSettings.language);
+    await updateTrayTranslations(newSettings.language);
   }
 
   // 加载设置
@@ -180,7 +219,7 @@ export const useProgressStore = defineStore('progress', () => {
     try {
       const loadedSettings = await safeInvoke<AppSettings>('get_app_settings');
       if (loadedSettings) {
-        applySettings(loadedSettings);
+        await applySettings(loadedSettings);
       }
     } catch (err) {
       error('Failed to load settings', { error: String(err) });
@@ -242,7 +281,7 @@ export const useProgressStore = defineStore('progress', () => {
   }
 
   function setSettings(newSettings: AppSettings) {
-    applySettings(newSettings);
+    void applySettings(newSettings);
   }
 
   function addTask(name: string, adapter?: string, ide?: string, windowTitle?: string): string {
@@ -316,10 +355,10 @@ export const useProgressStore = defineStore('progress', () => {
     }
   }
 
-  function setLanguage(language: SupportedLanguage) {
-    updateSettingAndSync('language', language);
-    setI18nLanguage(language);
-    updateTrayTranslations(language);
+  async function setLanguage(language: SupportedLanguage) {
+    await updateSettingAndSync('language', language);
+    await setI18nLanguage(language);
+    await updateTrayTranslations(language);
   }
 
   function setTheme(theme: AppSettings['theme']) {
