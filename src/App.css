@@ -210,20 +210,13 @@
 
 .task-name-mini {
   flex: 1;
+  min-width: 0;
   font-size: 12px;
   color: var(--text-color);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   max-width: 130px;
-  transition: max-width 0.2s ease;
-}
-
-/* Hover: show full text */
-.task-row:hover .task-name-mini {
-  max-width: none;
-  overflow: visible;
-  text-overflow: unset;
 }
 
 .task-progress-mini,
@@ -261,13 +254,6 @@
   text-overflow: ellipsis;
   max-width: 70px;
   flex-shrink: 0;
-}
-
-/* Hover: show full badge text */
-.task-row:hover .ide-badge-mini {
-  max-width: none;
-  overflow: visible;
-  text-overflow: unset;
 }
 
 /* Collapsed state uses wider badge */
@@ -356,6 +342,7 @@
 /* Collapsed task IDE name display */
 .task-ide-collapsed {
   flex: 1;
+  min-width: 0;
   font-size: 11px;
   color: var(--text-color);
   font-weight: 500;
@@ -371,6 +358,28 @@
   color: var(--text-secondary);
   white-space: nowrap;
   flex-shrink: 0;
+}
+
+.tooltip-target {
+  min-width: 0;
+}
+
+.hover-tooltip {
+  position: fixed;
+  max-width: 240px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  background: rgba(15, 23, 42, 0.96);
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  color: #f8fafc;
+  font-size: 11px;
+  line-height: 1.4;
+  white-space: normal;
+  word-break: break-word;
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.35);
+  pointer-events: none;
+  z-index: 11000;
+  transform: translate(10px, calc(-100% - 10px));
 }
 
 /* Single task collapsed view */

@@ -74,6 +74,12 @@ const isCollapseTransition = ref(false);
 const ideWindows = ref<IdeWindow[]>([]);
 const prevTasks = ref<ProgressTask[]>([]);
 const isActivatingRef = ref(false);
+const hoverTooltip = ref({
+  show: false,
+  text: '',
+  x: 0,
+  y: 0,
+});
 
 // Right-click context menu state
 const contextMenu = ref<{ show: boolean; x: number; y: number; task: ProgressTask | null }>({
@@ -108,6 +114,35 @@ function saveTaskCustomTitles() {
 function getTaskBadgeTitle(task: ProgressTask): string {
   if (taskCustomTitles.value[task.id]) return taskCustomTitles.value[task.id];
   return task.ide || '';
+}
+
+function updateTooltipPosition(event: MouseEvent) {
+  hoverTooltip.value.x = event.clientX;
+  hoverTooltip.value.y = event.clientY;
+}
+
+function showHoverTooltip(event: MouseEvent, text: string) {
+  const target = event.currentTarget as HTMLElement | null;
+  if (!target || !text.trim()) return;
+
+  const isTruncated = target.scrollWidth > target.clientWidth || target.scrollHeight > target.clientHeight;
+  if (!isTruncated) {
+    hideHoverTooltip();
+    return;
+  }
+
+  hoverTooltip.value.show = true;
+  hoverTooltip.value.text = text;
+  updateTooltipPosition(event);
+}
+
+function handleTooltipMove(event: MouseEvent) {
+  if (!hoverTooltip.value.show) return;
+  updateTooltipPosition(event);
+}
+
+function hideHoverTooltip() {
+  hoverTooltip.value.show = false;
 }
 
 // Computed - 确保透明度响应式更新
@@ -686,6 +721,7 @@ onMounted(async () => {
     if (scanInterval) clearInterval(scanInterval);
     if (settingsPollInterval) clearInterval(settingsPollInterval);
     if (unlistenMove) unlistenMove();
+    hideHoverTooltip();
     store.cleanupEventListeners();
   });
 </script>
@@ -753,17 +789,40 @@ onMounted(async () => {
         </span>
         <!-- Collapsed: show status + IDE badge + time -->
         <template v-if="isCollapsed">
-          <span v-if="task.ide || taskCustomTitles[task.id]" :class="['ide-badge-mini', getIdeColorClass(task.ide)]" :title="getTaskBadgeTitle(task)">{{ getTaskBadgeTitle(task) }}</span>
-          <span v-else class="task-ide-collapsed" :title="task.name">{{ task.name }}</span>
+          <span
+            v-if="task.ide || taskCustomTitles[task.id]"
+            :class="['ide-badge-mini', 'tooltip-target', getIdeColorClass(task.ide)]"
+            @mouseenter="showHoverTooltip($event, getTaskBadgeTitle(task))"
+            @mousemove="handleTooltipMove"
+            @mouseleave="hideHoverTooltip"
+          >{{ getTaskBadgeTitle(task) }}</span>
+          <span
+            v-else
+            class="task-ide-collapsed tooltip-target"
+            @mouseenter="showHoverTooltip($event, task.name)"
+            @mousemove="handleTooltipMove"
+            @mouseleave="hideHoverTooltip"
+          >{{ task.name }}</span>
           <span v-if="getTimeStr(task)" class="collapsed-time">{{ getTimeStr(task) }}</span>
         </template>
         <!-- Expanded: show task name without IDE prefix -->
         <template v-else>
-          <span class="task-name-mini" :title="getDisplayName(task)">{{ getDisplayName(task) }}</span>
+          <span
+            class="task-name-mini tooltip-target"
+            @mouseenter="showHoverTooltip($event, getDisplayName(task))"
+            @mousemove="handleTooltipMove"
+            @mouseleave="hideHoverTooltip"
+          >{{ getDisplayName(task) }}</span>
           <span :class="['task-time-mini', { 'completed-time': task.status === 'completed', 'cancelled-time': task.status === 'cancelled', 'armed-time': task.status === 'armed' }]">
             {{ task.status === 'completed' ? `✓ ${getTimeStr(task)}` : task.status === 'cancelled' ? `✕ ${getTimeStr(task)}` : getTimeStr(task) }}
           </span>
-          <span v-if="task.ide || taskCustomTitles[task.id]" :class="['ide-badge-mini', getIdeColorClass(task.ide)]" :title="getTaskBadgeTitle(task)">{{ getTaskBadgeTitle(task) }}</span>
+          <span
+            v-if="task.ide || taskCustomTitles[task.id]"
+            :class="['ide-badge-mini', 'tooltip-target', getIdeColorClass(task.ide)]"
+            @mouseenter="showHoverTooltip($event, getTaskBadgeTitle(task))"
+            @mousemove="handleTooltipMove"
+            @mouseleave="hideHoverTooltip"
+          >{{ getTaskBadgeTitle(task) }}</span>
         </template>
       </div>
     </div>
@@ -779,8 +838,20 @@ onMounted(async () => {
         <span :class="['mini-status', `status-${singleTask.status}`]">
           {{ getStatusIcon(singleTask) }}
         </span>
-        <span v-if="singleTask.ide || taskCustomTitles[singleTask.id]" :class="['ide-badge-mini', getIdeColorClass(singleTask.ide)]" :title="getTaskBadgeTitle(singleTask)">{{ getTaskBadgeTitle(singleTask) }}</span>
-        <span v-else class="task-ide-collapsed" :title="singleTask.name">{{ singleTask.name }}</span>
+        <span
+          v-if="singleTask.ide || taskCustomTitles[singleTask.id]"
+          :class="['ide-badge-mini', 'tooltip-target', getIdeColorClass(singleTask.ide)]"
+          @mouseenter="showHoverTooltip($event, getTaskBadgeTitle(singleTask))"
+          @mousemove="handleTooltipMove"
+          @mouseleave="hideHoverTooltip"
+        >{{ getTaskBadgeTitle(singleTask) }}</span>
+        <span
+          v-else
+          class="task-ide-collapsed tooltip-target"
+          @mouseenter="showHoverTooltip($event, singleTask.name)"
+          @mousemove="handleTooltipMove"
+          @mouseleave="hideHoverTooltip"
+        >{{ singleTask.name }}</span>
         <span v-if="getTimeStr(singleTask)" class="collapsed-time">{{ getTimeStr(singleTask) }}</span>
       </div>
       <!-- Expanded: show full status text (same layout as multi-task) -->
@@ -802,13 +873,34 @@ onMounted(async () => {
         <span :class="['mini-status', `status-${singleTask.status}`]">
           {{ getStatusIcon(singleTask) }}
         </span>
-        <span class="task-name-mini" :title="getDisplayName(singleTask)">{{ getDisplayName(singleTask) }}</span>
+        <span
+          class="task-name-mini tooltip-target"
+          @mouseenter="showHoverTooltip($event, getDisplayName(singleTask))"
+          @mousemove="handleTooltipMove"
+          @mouseleave="hideHoverTooltip"
+        >{{ getDisplayName(singleTask) }}</span>
         <span :class="['task-time-mini', { 'completed-time': singleTask.status === 'completed', 'cancelled-time': singleTask.status === 'cancelled', 'armed-time': singleTask.status === 'armed' }]">
           {{ singleTask.status === 'completed' ? `✓ ${getTimeStr(singleTask)}` : singleTask.status === 'cancelled' ? `✕ ${getTimeStr(singleTask)}` : getTimeStr(singleTask) }}
         </span>
-        <span v-if="singleTask.ide || taskCustomTitles[singleTask.id]" :class="['ide-badge-mini', getIdeColorClass(singleTask.ide)]" :title="getTaskBadgeTitle(singleTask)">{{ getTaskBadgeTitle(singleTask) }}</span>
+        <span
+          v-if="singleTask.ide || taskCustomTitles[singleTask.id]"
+          :class="['ide-badge-mini', 'tooltip-target', getIdeColorClass(singleTask.ide)]"
+          @mouseenter="showHoverTooltip($event, getTaskBadgeTitle(singleTask))"
+          @mousemove="handleTooltipMove"
+          @mouseleave="hideHoverTooltip"
+        >{{ getTaskBadgeTitle(singleTask) }}</span>
       </div>
     </template>
+
+    <Teleport to="body">
+      <div
+        v-if="hoverTooltip.show"
+        class="hover-tooltip"
+        :style="{ left: `${hoverTooltip.x}px`, top: `${hoverTooltip.y}px` }"
+      >
+        {{ hoverTooltip.text }}
+      </div>
+    </Teleport>
 
     <!-- Task right-click context menu (teleported to body to avoid overflow clipping) -->
     <Teleport to="body">
