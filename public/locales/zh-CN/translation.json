@@ -9,7 +9,7 @@
     "running": "运行中...",
     "completed": "完成",
     "error": "错误",
-    "completedWithTime": "{taskName} - {elapsedTime}"
+    "completedWithTime": "{{taskName}} - {{elapsedTime}}"
   },
   "menu": {
     "title": "任务",
@@ -24,7 +24,7 @@
     "closeMenu": "关闭菜单"
   },
   "notification": {
-    "taskCompleted": "{taskName} 已完成！"
+    "taskCompleted": "{{taskName}} 已完成！"
   },
   "contextMenu": {
     "cancelTask": "取消任务",
@@ -81,8 +81,8 @@
         "forest": "森林",
         "midnight": "午夜"
       },
-      "fontSize": "字体大小: {size}px",
-      "opacity": "透明度: {percentage}%",
+      "fontSize": "字体大小: {{size}}px",
+      "opacity": "透明度: {{percentage}}%",
       "windowPosition": "悬浮窗位置",
       "windowPositionHint": "拖动窗口设置位置，或输入坐标",
       "positionX": "X",
@@ -94,8 +94,8 @@
     "notifications": {
       "desktopNotifications": "桌面通知",
       "soundAlerts": "声音提醒",
-      "volume": "音量: {percentage}%",
-      "completionThreshold": "完成阈值: {percentage}%",
+      "volume": "音量: {{percentage}}%",
+      "completionThreshold": "完成阈值: {{percentage}}%",
       "doNotDisturb": "勿扰模式",
       "startTime": "开始时间",
       "endTime": "结束时间",

@@ -9,7 +9,7 @@
     "running": "Running...",
     "completed": "Done",
     "error": "Error",
-    "completedWithTime": "{taskName} - {elapsedTime}"
+    "completedWithTime": "{{taskName}} - {{elapsedTime}}"
   },
   "menu": {
     "title": "Tasks",
@@ -24,7 +24,7 @@
     "closeMenu": "Close Menu"
   },
   "notification": {
-    "taskCompleted": "{taskName} Completed!"
+    "taskCompleted": "{{taskName}} Completed!"
   },
   "contextMenu": {
     "cancelTask": "Cancel Task",
@@ -81,8 +81,8 @@
         "forest": "Forest",
         "midnight": "Midnight"
       },
-      "fontSize": "Font Size: {size}px",
-      "opacity": "Opacity: {percentage}%",
+      "fontSize": "Font Size: {{size}}px",
+      "opacity": "Opacity: {{percentage}}%",
       "windowPosition": "Window Position",
       "windowPositionHint": "Drag the window to set position, or enter coordinates",
       "positionX": "X",
@@ -94,8 +94,8 @@
     "notifications": {
       "desktopNotifications": "Desktop notifications",
       "soundAlerts": "Sound alerts",
-      "volume": "Volume: {percentage}%",
-      "completionThreshold": "Completion threshold: {percentage}%",
+      "volume": "Volume: {{percentage}}%",
+      "completionThreshold": "Completion threshold: {{percentage}}%",
       "doNotDisturb": "Do Not Disturb",
       "startTime": "Start Time",
       "endTime": "End Time",
