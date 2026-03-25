@@ -23,11 +23,11 @@ export function shouldDisplayTask(
   }
 
   if (showOnlyWhenRunning) {
-    // Completed tasks are visible unless the user has double-clicked on them
+    // Show running tasks, completed tasks (unless dismissed by user), and focused tasks
     if (task.status === 'completed' && clickedCompletedTasks?.has(task.id)) {
       return false;
     }
-    return task.status === 'running';
+    return task.status === 'running' || task.status === 'completed' || task.is_focused === true;
   }
 
   return true;
