@@ -21,9 +21,11 @@ export interface ProgressTask {
   name: string;
   tokens: number;
   status: 'armed' | 'running' | 'completed' | 'idle' | 'error' | 'cancelled';
+  created_at?: number;
   is_focused?: boolean;
   start_time: number;
   end_time?: number;
+  last_heartbeat?: number;
   adapter?: string;
   ide?: string;
   window_title?: string;
@@ -72,6 +74,40 @@ const defaultSettings: AppSettings = {
   windowY: null,
   showOnlyWhenRunning: true,
 };
+
+function normalizeHistoryTask(task: ProgressTask): ProgressTask {
+  const normalizedStartTime = task.start_time || task.created_at || 0;
+  const normalizedEndTime = task.end_time || (
+    task.status === 'completed' || task.status === 'cancelled' || task.status === 'error'
+      ? task.last_heartbeat
+      : undefined
+  );
+
+  return {
+    ...task,
+    start_time: normalizedStartTime,
+    end_time: normalizedEndTime,
+  };
+}
+
+function getHistorySortTime(task: ProgressTask): number {
+  return task.end_time || task.last_heartbeat || task.start_time || task.created_at || 0;
+}
+
+function normalizeHistoryTasks(tasks: ProgressTask[]): ProgressTask[] {
+  const uniqueTasks = new Map<string, ProgressTask>();
+
+  for (const task of tasks) {
+    if (!(task.status === 'completed' || task.status === 'cancelled' || task.status === 'error')) {
+      continue;
+    }
+
+    uniqueTasks.set(task.id, normalizeHistoryTask(task));
+  }
+
+  return Array.from(uniqueTasks.values())
+    .sort((left, right) => getHistorySortTime(right) - getHistorySortTime(left));
+}
 
 export const useProgressStore = defineStore('progress', () => {
   const tasks = ref<ProgressTask[]>([]);
@@ -248,15 +284,18 @@ export const useProgressStore = defineStore('progress', () => {
         if (key) {
           headers['X-API-Key'] = key;
         }
-        
-        const response = await fetch(`${url}/api/status`, { headers });
-        if (response.ok) {
+
+        for (const endpoint of ['/api/history', '/api/status']) {
+          const response = await fetch(`${url}${endpoint}`, { headers });
+          if (!response.ok) {
+            continue;
+          }
+
           const data = await response.json();
-          const completedTasks = (data.tasks || []).filter(
-            (t: ProgressTask) => t.status === 'completed' || t.status === 'cancelled'
-          );
+          const completedTasks = normalizeHistoryTasks(data.tasks || []);
+
           history.value = completedTasks;
-          debug('Fetched history from backend', { count: completedTasks.length });
+          debug('Fetched history from backend', { count: completedTasks.length, endpoint });
           return;
         }
       }
@@ -264,7 +303,7 @@ export const useProgressStore = defineStore('progress', () => {
       // Fallback to local tasks
       const taskList = await safeInvoke<ProgressTask[]>('get_tasks');
       if (taskList) {
-        const completedTasks = taskList.filter(t => t.status === 'completed' || t.status === 'cancelled');
+        const completedTasks = normalizeHistoryTasks(taskList);
         history.value = completedTasks;
         debug('Fetched history from local', { count: completedTasks.length });
       }
@@ -470,7 +509,7 @@ export const useProgressStore = defineStore('progress', () => {
   }
 
   function addToHistory(task: ProgressTask) {
-    history.value = [task, ...history.value].slice(0, 50);
+    history.value = normalizeHistoryTasks([task, ...history.value]).slice(0, 50);
   }
 
   function clearHistory() {

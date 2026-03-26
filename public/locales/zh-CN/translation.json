@@ -105,12 +105,14 @@
       "history": "任务历史",
       "historyCount": "{count} 个任务",
       "filteredFrom": "筛选自 {total} 个任务",
+      "sortedByRecent": "按最近完成时间排序",
       "searchPlaceholder": "搜索任务、IDE、文件或路径",
       "refresh": "刷新",
       "loading": "加载中...",
       "empty": "无匹配任务",
       "loadError": "加载历史失败：{message}",
       "notAvailable": "暂无",
+      "detailsTitle": "任务详情",
       "filters": {
         "allStatuses": "全部状态"
       },
@@ -125,13 +127,18 @@
       "fields": {
         "ide": "IDE",
         "tokens": "Token数",
+        "executionTime": "完成时间",
         "startedAt": "开始时间",
-        "duration": "持续时间"
+        "duration": "持续时间",
+        "project": "项目路径",
+        "file": "文件"
       },
       "stages": {
         "title": "任务阶段",
         "empty": "暂无阶段记录",
-        "loadError": "加载阶段记录失败：{message}"
+        "loadError": "加载阶段记录失败：{message}",
+        "momentLabel": "时间",
+        "rangeLabel": "区间"
       },
       "backToTasks": "返回任务",
       "clearHistory": "清除历史",

@@ -105,12 +105,14 @@
       "history": "Task History",
       "historyCount": "{count} tasks",
       "filteredFrom": "Filtered from {total}",
+      "sortedByRecent": "Newest finished first",
       "searchPlaceholder": "Search by task, IDE, file, or path",
       "refresh": "Refresh",
       "loading": "Loading...",
       "empty": "No matching tasks",
       "loadError": "Failed to load history: {message}",
       "notAvailable": "N/A",
+      "detailsTitle": "Task Details",
       "filters": {
         "allStatuses": "All statuses"
       },
@@ -125,13 +127,18 @@
       "fields": {
         "ide": "IDE",
         "tokens": "Tokens",
+        "executionTime": "Finished",
         "startedAt": "Started",
-        "duration": "Duration"
+        "duration": "Duration",
+        "project": "Project",
+        "file": "File"
       },
       "stages": {
         "title": "Task Stages",
         "empty": "No stage records",
-        "loadError": "Failed to load stages: {message}"
+        "loadError": "Failed to load stages: {message}",
+        "momentLabel": "Time",
+        "rangeLabel": "Range"
       },
       "backToTasks": "Back to Tasks",
       "clearHistory": "Clear History",

@@ -85,7 +85,7 @@ function getTaskMeta(task: ProgressTask) {
   return getHistoryMeta(task);
 }
 
-function formatDate(value?: number) {
+function formatDateTime(value?: number) {
   if (!value) {
     return t('settings.tasks.notAvailable');
   }
@@ -99,22 +99,98 @@ function formatDate(value?: number) {
   }).format(new Date(value));
 }
 
-function formatDuration(task: ProgressTask) {
-  if (!task.start_time) {
+function formatDateLabel(value?: number) {
+  if (!value) {
     return t('settings.tasks.notAvailable');
   }
 
-  const end = task.end_time || Date.now();
-  const durationMs = Math.max(0, end - task.start_time);
+  return new Intl.DateTimeFormat(undefined, {
+    month: 'short',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(new Date(value));
+}
+
+function formatDurationMs(durationMs?: number) {
+  if (durationMs === undefined) {
+    return t('settings.tasks.notAvailable');
+  }
+
   const totalSeconds = Math.floor(durationMs / 1000);
+  const hours = Math.floor(totalSeconds / 3600);
   const minutes = Math.floor(totalSeconds / 60);
+  const remainingMinutes = Math.floor((totalSeconds % 3600) / 60);
   const seconds = totalSeconds % 60;
+
+  if (hours > 0) {
+    return `${hours}h ${remainingMinutes}m`;
+  }
 
   if (minutes > 0) {
     return t('time.minutesSeconds', { minutes, seconds });
   }
 
   return t('time.seconds', { seconds });
+}
+
+function getTaskDurationMs(task: ProgressTask) {
+  if (!task.start_time) {
+    return undefined;
+  }
+
+  return Math.max(0, (task.end_time || Date.now()) - task.start_time);
+}
+
+function formatDuration(task: ProgressTask) {
+  return formatDurationMs(getTaskDurationMs(task));
+}
+
+function getCompletedAt(task: ProgressTask) {
+  return task.end_time || task.last_heartbeat || task.start_time || task.created_at;
+}
+
+function formatTokenCount(value?: number) {
+  return new Intl.NumberFormat().format(value || 0);
+}
+
+function getTaskBadges(task: ProgressTask) {
+  return [task.ide, task.adapter].filter(Boolean) as string[];
+}
+
+function getTaskDetailRows(task: ProgressTask) {
+  return [
+    {
+      key: 'execution',
+      label: t('settings.tasks.fields.executionTime'),
+      value: getCompletedAt(task) ? formatDateTime(getCompletedAt(task)) : t('settings.tasks.notAvailable'),
+    },
+    {
+      key: 'started',
+      label: t('settings.tasks.fields.startedAt'),
+      value: formatDateTime(task.start_time),
+    },
+    {
+      key: 'duration',
+      label: t('settings.tasks.fields.duration'),
+      value: formatDuration(task),
+    },
+    {
+      key: 'tokens',
+      label: t('settings.tasks.fields.tokens'),
+      value: formatTokenCount(task.tokens),
+    },
+    {
+      key: 'project',
+      label: t('settings.tasks.fields.project'),
+      value: task.project_path || t('settings.tasks.notAvailable'),
+    },
+    {
+      key: 'file',
+      label: t('settings.tasks.fields.file'),
+      value: task.active_file || t('settings.tasks.notAvailable'),
+    },
+  ];
 }
 
 function getHistoryApiBaseUrl() {
@@ -194,39 +270,35 @@ async function fetchTaskStages(taskId: string) {
 
 function formatStageDuration(duration?: number, startedAt?: number, endedAt?: number) {
   const durationMs = duration ?? (startedAt && endedAt ? Math.max(0, endedAt - startedAt) : undefined);
-  if (durationMs === undefined) {
-    return t('settings.tasks.notAvailable');
-  }
-
-  const totalSeconds = Math.floor(durationMs / 1000);
-  const minutes = Math.floor(totalSeconds / 60);
-  const seconds = totalSeconds % 60;
-
-  if (minutes > 0) {
-    return t('time.minutesSeconds', { minutes, seconds });
-  }
-
-  return t('time.seconds', { seconds });
+  return formatDurationMs(durationMs);
 }
 
 function getTimeline(task: ProgressTask): HistoryTimelineEvent[] {
   return normalizeTaskHistory(task, stageRecords.value[task.id] || []);
 }
 
-function formatEventTitle(task: ProgressTask, event: HistoryTimelineEvent) {
-  return event.kind === 'stage' ? event.title : getStatusLabel(task.status);
+function formatEventTitle(event: HistoryTimelineEvent) {
+  return event.kind === 'stage' ? event.title : getStatusLabel(event.kind);
 }
 
 function formatEventSubtitle(event: HistoryTimelineEvent) {
-  return event.subtitle || t('settings.tasks.notAvailable');
+  return event.subtitle;
 }
 
 function formatEventTime(event: HistoryTimelineEvent) {
   if (event.startedAt && event.endedAt && event.startedAt !== event.endedAt) {
-    return `${formatDate(event.startedAt)} - ${formatDate(event.endedAt)}`;
+    return `${formatDateLabel(event.startedAt)} - ${formatDateLabel(event.endedAt)}`;
   }
 
-  return formatDate(event.startedAt || event.endedAt);
+  return formatDateLabel(event.startedAt || event.endedAt);
+}
+
+function getEventMomentLabel(event: HistoryTimelineEvent) {
+  if (event.kind === 'stage' && event.startedAt && event.endedAt && event.startedAt !== event.endedAt) {
+    return t('settings.tasks.stages.rangeLabel');
+  }
+
+  return t('settings.tasks.stages.momentLabel');
 }
 
 async function refreshHistory() {
@@ -281,6 +353,7 @@ onMounted(async () => {
           <span v-if="store.history.length !== filteredHistory.length">
             {{ t('settings.tasks.filteredFrom', { total: store.history.length }) }}
           </span>
+          <span v-else>{{ t('settings.tasks.sortedByRecent') }}</span>
         </div>
 
         <div v-if="loadError" class="history-state history-error">
@@ -299,70 +372,95 @@ onMounted(async () => {
             :key="task.id"
             :class="['history-card', { 'history-card-expanded': isExpanded(task.id) }]"
           >
-            <button class="history-card-toggle" type="button" @click="toggleExpanded(task.id)">
+            <button
+              class="history-card-toggle"
+              type="button"
+              :aria-expanded="isExpanded(task.id)"
+              @click="toggleExpanded(task.id)"
+            >
               <div class="history-card-header">
                 <div class="history-card-main">
+                  <div class="history-card-topline">
+                    <span :class="['history-status-pill', `status-${task.status}`]">
+                      {{ getStatusLabel(task.status) }}
+                    </span>
+                    <span class="history-run-at">
+                      {{ formatDateLabel(getCompletedAt(task)) }}
+                    </span>
+                  </div>
                   <div class="history-task-title" :title="getTaskTitle(task)">{{ getTaskTitle(task) }}</div>
                   <div class="history-task-meta" :title="getTaskMeta(task)">{{ getTaskMeta(task) }}</div>
+                  <div v-if="getTaskBadges(task).length" class="history-card-badges">
+                    <span v-for="badge in getTaskBadges(task)" :key="badge" class="history-badge">{{ badge }}</span>
+                  </div>
                 </div>
                 <div class="history-card-side">
-                  <span :class="['history-status-pill', `status-${task.status}`]">
-                    {{ getStatusLabel(task.status) }}
-                  </span>
                   <span class="history-expand-indicator">{{ isExpanded(task.id) ? '−' : '+' }}</span>
+                </div>
+              </div>
+              <div class="history-metrics">
+                <div class="history-metric-card">
+                  <span class="history-grid-label">{{ t('settings.tasks.fields.executionTime') }}</span>
+                  <span class="history-metric-value">{{ formatDateTime(getCompletedAt(task)) }}</span>
+                </div>
+                <div class="history-metric-card">
+                  <span class="history-grid-label">{{ t('settings.tasks.fields.duration') }}</span>
+                  <span class="history-metric-value">{{ formatDuration(task) }}</span>
+                </div>
+                <div class="history-metric-card">
+                  <span class="history-grid-label">{{ t('settings.tasks.fields.tokens') }}</span>
+                  <span class="history-metric-value">{{ formatTokenCount(task.tokens) }}</span>
                 </div>
               </div>
             </button>
 
-            <div class="history-grid">
-              <div class="history-grid-item">
-                <span class="history-grid-label">{{ t('settings.tasks.fields.ide') }}</span>
-                <span>{{ task.ide || t('settings.tasks.notAvailable') }}</span>
-              </div>
-              <div class="history-grid-item">
-                <span class="history-grid-label">{{ t('settings.tasks.fields.tokens') }}</span>
-                <span>{{ task.tokens }}</span>
-              </div>
-              <div class="history-grid-item">
-                <span class="history-grid-label">{{ t('settings.tasks.fields.startedAt') }}</span>
-                <span>{{ formatDate(task.start_time) }}</span>
-              </div>
-              <div class="history-grid-item">
-                <span class="history-grid-label">{{ t('settings.tasks.fields.duration') }}</span>
-                <span>{{ formatDuration(task) }}</span>
-              </div>
-            </div>
-
             <div v-if="isExpanded(task.id)" class="history-stages">
-              <div class="history-stages-title">{{ t('settings.tasks.stages.title') }}</div>
-              <div v-if="stageLoading[task.id]" class="history-state">
-                {{ t('settings.tasks.loading') }}
-              </div>
-              <div v-else-if="stageErrors[task.id]" class="history-state history-error">
-                {{ t('settings.tasks.stages.loadError', { message: stageErrors[task.id] }) }}
-              </div>
-              <div v-else-if="!(getTimeline(task).length)" class="history-state">
-                {{ t('settings.tasks.stages.empty') }}
-              </div>
-              <div v-else class="history-stage-list history-timeline">
-                <div
-                  v-for="event in getTimeline(task)"
-                  :key="event.key"
-                  :class="['history-stage-card', 'history-timeline-item', `kind-${event.kind}`]"
-                >
-                  <div class="history-stage-header">
-                    <div class="history-timeline-copy">
-                      <span class="history-stage-name">{{ formatEventTitle(task, event) }}</span>
-                      <span class="history-stage-description">{{ formatEventSubtitle(event) }}</span>
+              <div class="history-expanded-grid">
+                <section class="history-details">
+                  <div class="history-stages-title">{{ t('settings.tasks.detailsTitle') }}</div>
+                  <div class="history-grid history-details-grid">
+                    <div v-for="detail in getTaskDetailRows(task)" :key="detail.key" class="history-grid-item">
+                      <span class="history-grid-label">{{ detail.label }}</span>
+                      <span :title="detail.value">{{ detail.value }}</span>
                     </div>
-                    <span class="history-stage-duration">
-                      {{ formatStageDuration(event.duration, event.startedAt, event.endedAt) }}
-                    </span>
                   </div>
-                  <div class="history-timeline-time">
-                    {{ formatEventTime(event) }}
+                </section>
+
+                <section class="history-timeline-panel">
+                  <div class="history-stages-title">{{ t('settings.tasks.stages.title') }}</div>
+                  <div v-if="stageLoading[task.id]" class="history-state">
+                    {{ t('settings.tasks.loading') }}
                   </div>
-                </div>
+                  <div v-else-if="stageErrors[task.id]" class="history-state history-error">
+                    {{ t('settings.tasks.stages.loadError', { message: stageErrors[task.id] }) }}
+                  </div>
+                  <div v-else-if="!(getTimeline(task).length)" class="history-state">
+                    {{ t('settings.tasks.stages.empty') }}
+                  </div>
+                  <div v-else class="history-stage-list history-timeline">
+                    <div
+                      v-for="event in getTimeline(task)"
+                      :key="event.key"
+                      :class="['history-stage-card', 'history-timeline-item', `kind-${event.kind}`]"
+                    >
+                      <div class="history-stage-header">
+                        <div class="history-timeline-copy">
+                          <span class="history-stage-name">{{ formatEventTitle(event) }}</span>
+                          <span v-if="formatEventSubtitle(event)" class="history-stage-description">
+                            {{ formatEventSubtitle(event) }}
+                          </span>
+                        </div>
+                        <span class="history-stage-duration">
+                          {{ formatStageDuration(event.duration, event.startedAt, event.endedAt) }}
+                        </span>
+                      </div>
+                      <div class="history-timeline-time">
+                        <span class="history-timeline-label">{{ getEventMomentLabel(event) }}</span>
+                        <span>{{ formatEventTime(event) }}</span>
+                      </div>
+                    </div>
+                  </div>
+                </section>
               </div>
             </div>
           </article>

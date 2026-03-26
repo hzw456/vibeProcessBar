@@ -264,10 +264,13 @@
 }
 
 .history-card {
-  padding: 12px;
+  padding: 14px;
   border-radius: 10px;
   border: 1px solid var(--border-color);
-  background: rgba(255, 255, 255, 0.04);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.03)),
+    rgba(255, 255, 255, 0.03);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.12);
 }
 
 .history-card-expanded {
@@ -288,16 +291,19 @@
 .history-card-side {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   flex-shrink: 0;
 }
 
 .history-expand-indicator {
-  width: 20px;
+  width: 24px;
+  height: 24px;
   text-align: center;
-  font-size: 16px;
-  line-height: 1;
+  font-size: 18px;
+  line-height: 24px;
   color: var(--text-secondary);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
 }
 
 .history-card-header {
@@ -313,6 +319,19 @@
   flex: 1;
 }
 
+.history-card-topline {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+}
+
+.history-run-at {
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
 .history-task-title,
 .history-task-meta {
   overflow: hidden;
@@ -321,8 +340,8 @@
 }
 
 .history-task-title {
-  font-size: 13px;
-  font-weight: 600;
+  font-size: 15px;
+  font-weight: 700;
   color: var(--text-color);
 }
 
@@ -338,8 +357,6 @@
   border-radius: 999px;
   font-size: 11px;
   font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
   background: rgba(148, 163, 184, 0.16);
   color: var(--text-secondary);
 }
@@ -364,6 +381,51 @@
 .history-status-pill.status-idle {
   color: #facc15;
   background: rgba(250, 204, 21, 0.12);
+}
+
+.history-card-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.history-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 0 8px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text-secondary);
+  font-size: 11px;
+}
+
+.history-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.history-metric-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.history-metric-value {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-color);
 }
 
 .history-grid {
@@ -398,6 +460,24 @@
   border-top: 1px solid var(--border-color);
 }
 
+.history-expanded-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.15fr);
+  gap: 16px;
+}
+
+.history-details,
+.history-timeline-panel {
+  min-width: 0;
+}
+
+.history-details-grid {
+  padding: 12px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
 .history-stages-title {
   margin-bottom: 10px;
   font-size: 12px;
@@ -417,15 +497,15 @@
 }
 
 .history-stage-card {
-  padding: 10px;
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  padding: 12px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.07);
 }
 
 .history-timeline-item {
   position: relative;
-  padding-left: 16px;
+  padding-left: 18px;
 }
 
 .history-timeline-item::before {
@@ -481,15 +561,21 @@
 }
 
 .history-stage-name {
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 600;
   color: var(--text-color);
 }
 
 .history-stage-duration {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 0 8px;
+  border-radius: 999px;
   font-size: 11px;
   color: var(--text-secondary);
   white-space: nowrap;
+  background: rgba(255, 255, 255, 0.06);
 }
 
 .history-stage-description {
@@ -500,9 +586,17 @@
 }
 
 .history-timeline-time {
-  margin-top: 8px;
+  margin-top: 10px;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
   font-size: 11px;
   color: var(--text-secondary);
+}
+
+.history-timeline-label {
+  color: var(--text-color);
+  opacity: 0.72;
 }
 
 .history-state {
@@ -553,12 +647,25 @@
     grid-template-columns: 1fr;
   }
 
+  .history-metrics,
+  .history-expanded-grid,
   .history-grid {
     grid-template-columns: 1fr;
   }
 
   .history-summary {
     flex-direction: column;
+  }
+
+  .history-card-header,
+  .history-stage-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .history-card-side {
+    width: 100%;
+    justify-content: flex-end;
   }
 }
 

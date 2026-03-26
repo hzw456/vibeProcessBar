@@ -110,8 +110,8 @@ function mergeStageRecords(left: TaskStageRecord, right: TaskStageRecord): TaskS
 }
 
 function toStageEvent(record: TaskStageRecord, index: number): HistoryTimelineEvent {
-  const title = record.description || record.stage;
-  const subtitle = record.description && record.description !== record.stage ? record.stage : undefined;
+  const title = record.stage;
+  const subtitle = record.description && record.description !== record.stage ? record.description : undefined;
 
   return {
     key: `stage-${index}-${record.stage}-${record.started_at ?? record.ended_at ?? 'na'}`,
@@ -184,13 +184,11 @@ export function normalizeTaskHistory(task: ProgressTask, stages: TaskStageRecord
 
 export function getHistoryTitle(task: ProgressTask): string {
   const currentStage = normalizeText(task.current_stage);
-  if (currentStage && !TERMINAL_STAGE_NAMES.has(currentStage.toLowerCase())) {
-    return currentStage;
-  }
 
   return normalizeText(task.name)
     || normalizeText(task.window_title)
     || normalizeText(task.active_file)
+    || (currentStage && !TERMINAL_STAGE_NAMES.has(currentStage.toLowerCase()) ? currentStage : undefined)
     || task.id;
 }
 
