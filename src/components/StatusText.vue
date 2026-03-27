@@ -74,7 +74,7 @@ function getTranslatedIdeName(ideName: string): string {
     @click="handleClick"
   >
     <span v-if="showIcon" :class="['status-icon', `status-${status}`]">{{ statusIcon }}</span>
-    <span :class="['status-text', `status-${status}`]">{{ statusText }}</span>
+    <span :class="['status-text', `status-${status}`]" :title="name">{{ statusText }}</span>
     <span v-if="tokens > 0" class="token-count">{{ formatTokens(tokens) }}</span>
     <span v-if="ide" class="ide-badge" :title="`Click to activate ${ide}`">
       {{ getTranslatedIdeName(ide) }}
