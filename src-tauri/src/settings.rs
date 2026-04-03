@@ -25,7 +25,6 @@ pub struct AppSettings {
     pub api_key: String,
     pub window_visible: bool,
     pub language: String,
-    pub block_plugin_status: bool,
     #[serde(default)]
     pub window_x: Option<f64>,
     #[serde(default)]
@@ -69,7 +68,6 @@ impl Default for AppSettings {
             api_key: String::new(),
             window_visible: true,
             language: "zh-CN".to_string(),
-            block_plugin_status: false,
             window_x: None,
             window_y: None,
             show_only_when_running: false,

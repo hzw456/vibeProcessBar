@@ -216,22 +216,14 @@ struct TaskStagesResponse {
 
 pub struct SharedState {
     pub tasks: Mutex<Vec<Task>>,
-    pub block_plugin_status: Mutex<bool>,
 }
 
 impl SharedState {
     pub fn new() -> Self {
         SharedState {
             tasks: Mutex::new(Vec::new()),
-            block_plugin_status: Mutex::new(false),
         }
     }
-}
-
-pub fn set_block_plugin_status(block: bool) {
-    let state = SHARED_STATE.clone();
-    *state.block_plugin_status.lock().unwrap() = block;
-    info!("Block plugin status set to: {}", block);
 }
 
 pub fn set_backend_email(email: String) {
@@ -247,11 +239,6 @@ pub fn set_backend_server_url(url: String) {
 
 pub fn set_backend_api_key(api_key: String) {
     *BACKEND_API_KEY.lock().unwrap() = api_key;
-}
-
-#[allow(dead_code)]
-pub fn get_block_plugin_status() -> bool {
-    *SHARED_STATE.block_plugin_status.lock().unwrap()
 }
 
 // ============================================================================
@@ -953,14 +940,6 @@ async fn update_state(
         );
     }
 
-    if request_source == "plugin" && *state.block_plugin_status.lock().unwrap() {
-        debug!(task_id = %req.task_id, "Ignoring plugin status update - blocked");
-        return (
-            StatusCode::OK,
-            Json(ApiResponse::ignored("plugin_status_blocked")),
-        );
-    }
-
     let mut state_sync: Option<(
         String,
         String,
@@ -1031,7 +1010,12 @@ async fn update_state(
                 );
             }
 
-            apply_task_progress_update(task, req.estimated_duration, req.current_stage.as_deref());
+            // 注意：来自 VSCode 插件的更新不处理进度字段（estimated_duration, current_stage）
+            // 插件只负责上报聚焦状态和文件变化
+            let is_plugin_source = request_source == "plugin";
+            if !is_plugin_source {
+                apply_task_progress_update(task, req.estimated_duration, req.current_stage.as_deref());
+            }
 
             if should_sync_backend_state_for_update(&req)
                 && has_backend_state_changed(&backend_state_before, task)
@@ -1049,7 +1033,8 @@ async fn update_state(
                 debug!(task_id = %req.task_id, "Skipping backend state sync for no-op update");
             }
 
-            if (req.estimated_duration.is_some() || req.current_stage.is_some())
+            // 插件来源不触发进度同步
+            if !is_plugin_source && (req.estimated_duration.is_some() || req.current_stage.is_some())
                 && has_backend_progress_changed(&backend_progress_before, task)
             {
                 progress_sync = Some((
@@ -1060,7 +1045,7 @@ async fn update_state(
                     Some(task.window_title.clone()),
                     Some(task.is_focused),
                 ));
-            } else if req.estimated_duration.is_some() || req.current_stage.is_some() {
+            } else if !is_plugin_source && (req.estimated_duration.is_some() || req.current_stage.is_some()) {
                 debug!(task_id = %req.task_id, "Skipping backend progress sync for no-op update");
             }
         } else {

@@ -146,8 +146,7 @@ async fn update_app_settings<R: Runtime>(
 ) -> Result<(), String> {
     let previous_language = state.get_settings().language;
 
-    // 更新 HTTP server 的屏蔽设置
-    http_server::set_block_plugin_status(new_settings.block_plugin_status);
+    // 更新 HTTP server 的设置
     http_server::set_backend_email(new_settings.backend_email.clone());
     http_server::set_backend_server_url(new_settings.backend_server_url.clone());
     http_server::set_backend_api_key(new_settings.api_key.clone());
@@ -703,8 +702,7 @@ fn main() {
                 let _ = apply_blur(&window, Some((18, 18, 18, 200)));
             }
 
-            // 初始化 HTTP server 的屏蔽设置
-            http_server::set_block_plugin_status(current_settings.block_plugin_status);
+            // 初始化 HTTP server 的设置
             http_server::set_backend_email(current_settings.backend_email.clone());
             http_server::set_backend_server_url(current_settings.backend_server_url.clone());
             http_server::set_backend_api_key(current_settings.api_key.clone());

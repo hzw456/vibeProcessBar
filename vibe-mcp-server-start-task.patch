@@ -1,0 +1,222 @@
+diff --git a/src/services/task_service.rs b/src/services/task_service.rs
+index 0000000..0000000 100644
+--- a/src/services/task_service.rs
++++ b/src/services/task_service.rs
+@@
+-#[derive(Debug, Deserialize, Default)]
++#[derive(Debug, Deserialize, Default)]
++pub struct StartTaskRequest {
++    pub task_id: String,
++    #[serde(default)]
++    pub name: Option<String>,
++    #[serde(default)]
++    pub ide: Option<String>,
++    #[serde(default)]
++    pub window_title: Option<String>,
++    #[serde(default)]
++    pub project_path: Option<String>,
++    #[serde(default)]
++    pub active_file: Option<String>,
++    #[serde(default)]
++    pub source: Option<String>,
++    #[serde(default)]
++    pub start_time: Option<i64>,
++    #[serde(default)]
++    pub estimated_duration_ms: Option<i64>,
++    #[serde(default)]
++    pub current_stage: Option<String>,
++    #[serde(default)]
++    pub is_focused: Option<bool>,
++}
++
++#[derive(Debug, Deserialize, Default)]
+ pub struct UpdateStateRequest {
+@@
+ impl TaskService {
+@@
++    pub fn start_task(
++        &self,
++        req: &StartTaskRequest,
++        user_id: &str,
++    ) -> Result<(), TaskServiceError> {
++        let now = now_millis();
++        let mut task = if self.uses_database() {
++            Self::query_task_from_db(&self.db_url, &req.task_id, user_id).unwrap_or_else(|| {
++                Task::new(
++                    req.task_id.clone(),
++                    user_id.to_string(),
++                    req.name.clone().unwrap_or_else(|| req.task_id.clone()),
++                    req.ide.clone().unwrap_or_else(|| "IDE".to_string()),
++                    req.window_title
++                        .clone()
++                        .unwrap_or_else(|| req.name.clone().unwrap_or_else(|| req.task_id.clone())),
++                )
++            })
++        } else {
++            let mut tasks = self.tasks.lock().unwrap();
++            let task = tasks.entry(req.task_id.clone()).or_insert_with(|| {
++                Task::new(
++                    req.task_id.clone(),
++                    user_id.to_string(),
++                    req.name.clone().unwrap_or_else(|| req.task_id.clone()),
++                    req.ide.clone().unwrap_or_else(|| "IDE".to_string()),
++                    req.window_title
++                        .clone()
++                        .unwrap_or_else(|| req.name.clone().unwrap_or_else(|| req.task_id.clone())),
++                )
++            });
++
++            if task.user_id != user_id {
++                return Err(TaskServiceError::NotFound);
++            }
++
++            task.clone()
++        };
++
++        if task.user_id != user_id {
++            return Err(TaskServiceError::NotFound);
++        }
++
++        if let Some(name) = &req.name {
++            task.name = name.clone();
++        }
++        if let Some(ide) = &req.ide {
++            task.ide = ide.clone();
++        }
++        if let Some(window_title) = &req.window_title {
++            task.window_title = window_title.clone();
++        }
++        if let Some(project_path) = &req.project_path {
++            task.project_path = Some(project_path.clone());
++        }
++        if let Some(active_file) = &req.active_file {
++            task.active_file = Some(active_file.clone());
++        }
++        if let Some(source) = &req.source {
++            task.source = source.clone();
++        } else if task.source.is_empty() {
++            task.source = "mcp".to_string();
++        }
++        if let Some(estimated_duration_ms) = req.estimated_duration_ms {
++            task.estimated_duration = Some(estimated_duration_ms);
++        }
++        if let Some(current_stage) = &req.current_stage {
++            task.current_stage = Some(current_stage.clone());
++        }
++        if let Some(is_focused) = req.is_focused {
++            task.is_focused = is_focused;
++        }
++
++        task.status = TaskStatus::Armed;
++        task.start_time = req.start_time.unwrap_or(0);
++        task.end_time = None;
++        task.last_heartbeat = now;
++        if task.created_at <= 0 {
++            task.created_at = now;
++        }
++        Self::normalize_task(&mut task, now);
++
++        if self.uses_database() {
++            self.persist_task_and_stage_history_blocking(task, None, now, None);
++        } else {
++            let task_clone = task.clone();
++            self.tasks
++                .lock()
++                .unwrap()
++                .insert(task_clone.id.clone(), task_clone.clone());
++
++            let db_url = self.db_url.clone();
++            if !db_url.is_empty() {
++                tokio::spawn(async move {
++                    Self::persist_task_and_stage_history(db_url, task_clone, None, now, None).await;
++                });
++            }
++        }
++
++        Ok(())
++    }
++
+     pub fn update_task_status(
+         &self,
+         req: &UpdateStateRequest,
+         user_id: &str,
+@@
+     pub fn update_task_progress(
+         &self,
+         req: &UpdateProgressRequest,
+         user_id: &str,
+     ) -> Result<(), TaskServiceError> {
+         if self.uses_database() {
+             let mut task = Self::query_task_from_db(&self.db_url, &req.task_id, user_id)
+                 .ok_or(TaskServiceError::NotFound)?;
+@@
+ diff --git a/src/handlers/task.rs b/src/handlers/task.rs
+ index 0000000..0000000 100644
+ --- a/src/handlers/task.rs
+ +++ b/src/handlers/task.rs
+ @@
+-use crate::services::task_service::{TaskServiceError, UpdateProgressRequest, UpdateStateRequest};
++use crate::services::task_service::{
++    StartTaskRequest, TaskServiceError, UpdateProgressRequest, UpdateStateRequest,
++};
+ @@
+ pub async fn update_task_state(
+     State(state): State<Arc<AppState>>,
+     headers: HeaderMap,
+     Json(req): Json<UpdateStateRequest>,
+ ) -> Result<Json<Value>, StatusCode> {
+@@
+     Ok(Json(json!({"status": "ok"})))
+ }
+ 
++pub async fn start_task(
++    State(state): State<Arc<AppState>>,
++    headers: HeaderMap,
++    Json(req): Json<StartTaskRequest>,
++) -> Result<Json<Value>, StatusCode> {
++    let user_id = authenticate_user(&headers, &state).await?;
++    state
++        .task_service
++        .start_task(&req, &user_id)
++        .map_err(task_service_status)?;
++    Ok(Json(json!({"status": "ok"})))
++}
++
+ pub async fn update_task_progress(
+     State(state): State<Arc<AppState>>,
+     headers: HeaderMap,
+     Json(req): Json<UpdateProgressRequest>,
+ ) -> Result<Json<Value>, StatusCode> {
+     let user_id = authenticate_user(&headers, &state).await?;
+-    state
+-        .task_service
+-        .update_task_progress(&req, &user_id)
+-        .map_err(task_service_status)?;
++    match state.task_service.update_task_progress(&req, &user_id) {
++        Ok(()) => {}
++        Err(TaskServiceError::NotFound) => {
++            tracing::warn!(
++                task_id = %req.task_id,
++                user_id = %user_id,
++                "task not found, did you forget to call /api/task/start first?"
++            );
++            return Err(StatusCode::NOT_FOUND);
++        }
++        Err(error) => return Err(task_service_status(error)),
++    }
+     Ok(Json(json!({"status": "ok"})))
+ }
+ diff --git a/src/lib.rs b/src/lib.rs
+ index 0000000..0000000 100644
+ --- a/src/lib.rs
+ +++ b/src/lib.rs
+ @@
+         .route(
+             "/api/task/:task_id/stages",
+             get(handlers::get_task_stage_history),
+         )
++        .route("/api/task/start", post(handlers::start_task))
+         .route("/api/task/update_state", post(handlers::update_task_state))
+         .route(
+             "/api/task/update_progress",
+             post(handlers::update_task_progress),
